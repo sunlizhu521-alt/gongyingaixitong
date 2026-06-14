@@ -7,9 +7,9 @@ const API = import.meta.env.DEV ? 'http://localhost:4001' : '';
 
 const INSPECTION_NOTICE_FIELDS = [
   { key: 'inspectionApplicant', label: '验货填写人', readonly: true },
-  { key: 'inspectionFillTime', label: '验货填写时间' },
-  { key: 'supplierFinishTime', label: '供应商完工时间' },
-  { key: 'shipmentTime', label: '发货时间' },
+  { key: 'inspectionFillTime', label: '验货填写时间', inputType: 'date' },
+  { key: 'supplierFinishTime', label: '供应商完工时间', inputType: 'date' },
+  { key: 'shipmentTime', label: '发货时间', inputType: 'date' },
   { key: 'kingdeeOrderNo', label: '金蝶采购订单' },
   { key: 'supplierShortName', label: '供应商简称' },
   { key: 'supplierAddress', label: '供应商地址', readonly: true },
@@ -1550,6 +1550,7 @@ function App() {
                     />
                   ) : (
                     <input
+                      type={field.inputType || 'text'}
                       className="table-input inspection-notice-input"
                       value={row[field.key] || ''}
                       onChange={(event) => updateInspectionNoticeRow(row.id, field.key, event.target.value)}
