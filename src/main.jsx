@@ -197,6 +197,14 @@ function App() {
     setActiveMenuGroup((currentGroup) => currentGroup === group ? '' : group);
   }
 
+  function applyEmbeddedDashboardChrome(event) {
+    try {
+      event.currentTarget.contentDocument?.body?.classList.add('embedded-host');
+    } catch {
+      // The embedded dashboard is served from the same app; ignore if the browser blocks access.
+    }
+  }
+
   async function loadData() {
     const params = user ? `?user=${encodeURIComponent(user.name)}&role=${encodeURIComponent(user.role)}` : '';
     const [invoiceRes, draftRes, supplierRes, ownerRes, reminderRes, settingsRes, usersRes, inspectionInitialRes, inspectionNoticeRes] = await Promise.all([
@@ -1743,6 +1751,7 @@ function App() {
             <iframe
               title={salesInventoryPageMap[activeTab].label}
               src={`/kcfx/${salesInventoryPageMap[activeTab].sourceFile}`}
+              onLoad={applyEmbeddedDashboardChrome}
             />
           </section>
         )}
