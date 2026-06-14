@@ -815,7 +815,7 @@ function App() {
         name,
         password: newUserPassword || '123456',
         role: '普通用户',
-        permissions: ['supplierPayment', 'supplierPayment.ledger', 'supplierPayment.upload', 'supplierPayment.reminders']
+        permissions: []
       })
     });
     if (!res.ok) {

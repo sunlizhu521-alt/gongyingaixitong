@@ -55,7 +55,7 @@ const PERMISSION_GROUPS = [
 ];
 const PERMISSION_KEYS = PERMISSION_GROUPS.flatMap((group) => [group.value, ...group.children]);
 const OWNER_PERMISSIONS = [...PERMISSION_KEYS];
-const DEFAULT_PERMISSIONS = ['supplierPayment', 'supplierPayment.ledger', 'supplierPayment.upload', 'supplierPayment.reminders'];
+const DEFAULT_PERMISSIONS = [];
 
 function expandPermissionKey(permission) {
   if (permission === 'supplierPayment') return ['supplierPayment', 'supplierPayment.ledger', 'supplierPayment.upload', 'supplierPayment.reminders'];
@@ -806,7 +806,7 @@ app.post('/api/users', async (req, res) => {
     name,
     password: req.body.password || '123456',
     role: req.body.role || ROLE_USER,
-    permissions: req.body.permissions || DEFAULT_PERMISSIONS
+    permissions: Array.isArray(req.body.permissions) ? req.body.permissions : DEFAULT_PERMISSIONS
   });
   db.users.push(user);
   await saveDb(db);
