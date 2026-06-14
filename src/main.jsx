@@ -58,6 +58,7 @@ function App() {
       children: [
         { value: 'qualityInspection.inspectionNotice', tab: 'inspectionNotice', label: '验货通知' },
         { value: 'qualityInspection.inspectionSchedule', tab: 'inspectionSchedule', label: '验货安排' },
+        { value: 'qualityInspection.inspectionReportUpload', tab: 'inspectionReportUpload', label: '检验报告单回传' },
         { value: 'qualityInspection.inspectionFeedback', tab: 'inspectionFeedback', label: '验货反馈' },
         { value: 'qualityInspection.inspectionReportQuery', tab: 'inspectionReportQuery', label: '检验报告单查询' },
         { value: 'qualityInspection.inspectionSummary', tab: 'inspectionSummary', label: '验货信息汇总表' },
@@ -84,6 +85,7 @@ function App() {
     'supplierPayment.supplierManagement': ['supplierManagement'],
     'qualityInspection.inspectionNotice': ['qualityInspection'],
     'qualityInspection.inspectionSchedule': ['qualityInspection'],
+    'qualityInspection.inspectionReportUpload': ['qualityInspection'],
     'qualityInspection.inspectionFeedback': ['qualityInspection'],
     'qualityInspection.inspectionReportQuery': ['qualityInspection'],
     'qualityInspection.inspectionSummary': ['qualityInspection'],
@@ -115,6 +117,7 @@ function App() {
   const qualityInspectionPages = {
     inspectionNotice: '验货通知',
     inspectionSchedule: '验货安排',
+    inspectionReportUpload: '检验报告单回传',
     inspectionFeedback: '验货反馈',
     inspectionReportQuery: '检验报告单查询',
     inspectionSummary: '验货信息汇总表',
@@ -831,6 +834,9 @@ function App() {
                 )}
                 {canAccessTab('inspectionSchedule') && (
                   <button className={activeTab === 'inspectionSchedule' ? 'active' : ''} onClick={() => openMenuTab('inspectionSchedule', 'qualityInspection')}>验货安排</button>
+                )}
+                {canAccessTab('inspectionReportUpload') && (
+                  <button className={activeTab === 'inspectionReportUpload' ? 'active' : ''} onClick={() => openMenuTab('inspectionReportUpload', 'qualityInspection')}>检验报告单回传</button>
                 )}
                 {canAccessTab('inspectionFeedback') && (
                   <button className={activeTab === 'inspectionFeedback' ? 'active' : ''} onClick={() => openMenuTab('inspectionFeedback', 'qualityInspection')}>验货反馈</button>

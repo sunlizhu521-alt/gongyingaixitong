@@ -41,6 +41,7 @@ const PERMISSION_GROUPS = [
     children: [
       'qualityInspection.inspectionNotice',
       'qualityInspection.inspectionSchedule',
+      'qualityInspection.inspectionReportUpload',
       'qualityInspection.inspectionFeedback',
       'qualityInspection.inspectionReportQuery',
       'qualityInspection.inspectionSummary',
