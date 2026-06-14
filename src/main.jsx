@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import * as XLSX from 'xlsx';
 import './styles.css';
 
-const API = '';
+const API = import.meta.env.DEV ? 'http://localhost:4001' : '';
 
 function App() {
   const [activeTab, setActiveTab] = useState('ledger');
