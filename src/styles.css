@@ -830,6 +830,12 @@ th {
   margin: 0;
 }
 
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .preview-body {
   min-height: 0;
   background: #f8fafc;

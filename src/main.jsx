@@ -906,7 +906,8 @@ function App() {
     setPreviewFile({
       url: `${API}/preview/${encodeURIComponent(row.fileName)}/${displayName}`,
       title: row.invoiceNo || '发票原件',
-      isPdf
+      isPdf,
+      row
     });
   }
 
@@ -944,21 +945,13 @@ function App() {
       setMessage('这个发票没有可下载的原文件。');
       return;
     }
-    try {
-      const res = await fetch(`${API}/uploads/${encodeURIComponent(row.fileName)}`);
-      if (!res.ok) throw new Error('download failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = invoiceDownloadName(row);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      setMessage('发票下载失败，请确认原文件是否存在。');
-    }
+    const link = document.createElement('a');
+    const downloadName = invoiceDownloadName(row);
+    link.href = `${API}/download?fileName=${encodeURIComponent(row.fileName)}&downloadName=${encodeURIComponent(downloadName)}`;
+    link.download = downloadName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   }
 
   if (!user) {
@@ -1228,7 +1221,7 @@ function App() {
                 row.issueDate,
                 row.termText,
                 row.paymentDate,
-                <button className="ghost compact-button" onClick={() => downloadInvoiceFile(row)}>下载发票</button>,
+                <button className="ghost compact-button" onClick={() => openPreview(row)}>下载发票</button>,
                 <input
                   className="table-input"
                   defaultValue={row.oaProcessNo || ''}
@@ -1704,7 +1697,10 @@ function App() {
           <div className="preview-modal">
             <div className="preview-header">
               <h3>{previewFile.title}</h3>
-              <button className="ghost" onClick={() => setPreviewFile(null)}>关闭</button>
+              <div className="preview-actions">
+                <button onClick={() => downloadInvoiceFile(previewFile.row)}>下载</button>
+                <button className="ghost" onClick={() => setPreviewFile(null)}>关闭</button>
+              </div>
             </div>
             <div className="preview-body">
               {previewFile.isPdf ? (

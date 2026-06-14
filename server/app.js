@@ -137,6 +137,27 @@ async function sendUploadedFile(req, res) {
 app.get('/uploads/:fileName', sendUploadedFile);
 app.get('/preview/:fileName/:displayName', sendUploadedFile);
 
+async function downloadUploadedFileByQuery(req, res) {
+  const safeName = path.basename(String(req.query.fileName || ''));
+  const requestedName = path.basename(String(req.query.downloadName || safeName));
+  const filePath = path.join(uploadDir, safeName);
+  try {
+    const buffer = await readFile(filePath);
+    const mimeType = detectMime(buffer);
+    const asciiFallback = requestedName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_') || safeName;
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(requestedName)}`
+    );
+    res.send(buffer);
+  } catch {
+    res.status(404).json({ error: 'file not found' });
+  }
+}
+
+app.get('/download', downloadUploadedFileByQuery);
+
 function normalizeDb(db) {
   db.settings = {
     senderEmail: '',
@@ -1200,7 +1221,7 @@ app.patch('/api/settings', async (req, res) => {
 
 const distDir = path.join(rootDir, 'dist');
 app.use(express.static(distDir));
-app.get(/^\/(?!api|uploads|preview).*/, (req, res) => {
+app.get(/^\/(?!api|uploads|preview|download).*/, (req, res) => {
   res.sendFile(path.join(distDir, 'index.html'));
 });
 
