@@ -198,6 +198,44 @@ select {
   color: #64748b;
 }
 
+.user-create-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.user-create-form input {
+  max-width: 220px;
+}
+
+.permission-table table {
+  min-width: 900px;
+}
+
+.permission-checks {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.permission-checks label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.permission-checks input {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  accent-color: #2563eb;
+}
+
 .sidebar .sender-email-form button {
   text-align: center;
   background: #2563eb;

@@ -21,6 +21,49 @@ const upload = multer({ dest: uploadDir });
 app.use(cors());
 app.use(express.json());
 
+const SYSTEM_OWNER_NAME = '孙立柱';
+const ROLE_ADMIN = '管理员';
+const ROLE_FINANCE = '财务';
+const ROLE_USER = '普通用户';
+const PERMISSION_KEYS = [
+  'supplierPayment',
+  'invoiceInventory',
+  'supplierManagement',
+  'qualityInspection',
+  'permissionManagement'
+];
+const OWNER_PERMISSIONS = [...PERMISSION_KEYS];
+const DEFAULT_PERMISSIONS = ['supplierPayment'];
+
+function sanitizePermissions(permissions) {
+  if (!Array.isArray(permissions)) return [...DEFAULT_PERMISSIONS];
+  return [...new Set(permissions.filter((item) => PERMISSION_KEYS.includes(item)))];
+}
+
+function normalizeUser(user) {
+  const name = String(user.name || '').trim();
+  const isOwner = name === SYSTEM_OWNER_NAME;
+  const role = isOwner ? ROLE_ADMIN : (user.role === ROLE_FINANCE ? ROLE_FINANCE : ROLE_USER);
+  const permissions = isOwner ? [...OWNER_PERMISSIONS] : sanitizePermissions(user.permissions);
+  return {
+    ...user,
+    id: user.id || crypto.randomUUID(),
+    name,
+    password: String(user.password || '123456'),
+    role,
+    permissions
+  };
+}
+
+function publicUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    role: user.role,
+    permissions: user.permissions || []
+  };
+}
+
 function detectMime(buffer) {
   const header = buffer.subarray(0, 8).toString('latin1');
   if (header.startsWith('%PDF')) return 'application/pdf';
@@ -54,6 +97,16 @@ function normalizeDb(db) {
     smtpPassword: '',
     ...(db.settings || {})
   };
+  db.users = (db.users || []).map(normalizeUser);
+  if (!db.users.some((user) => user.name === SYSTEM_OWNER_NAME)) {
+    db.users.unshift(normalizeUser({
+      id: 'u-admin',
+      name: SYSTEM_OWNER_NAME,
+      password: '521sunlizhu',
+      role: ROLE_ADMIN,
+      permissions: OWNER_PERMISSIONS
+    }));
+  }
   db.suppliers = (db.suppliers || []).map((supplier) => ({
     ...supplier,
     shortName: supplier.shortName || supplier.name,
@@ -150,7 +203,7 @@ function resolveRequestUser(db, source = {}) {
 
 function canAccessRow(row, requestUser) {
   if (!requestUser) return false;
-  if (canSeeAll(requestUser.role)) return true;
+  if (canSeeAllRole(requestUser.role)) return true;
   return row.owner === requestUser.name || row.uploadedBy === requestUser.name;
 }
 
@@ -184,6 +237,43 @@ function requireInvoiceInventoryOwner(db, req, res) {
     return null;
   }
   return requestUser;
+}
+
+function canSeeAllRole(role) {
+  return [ROLE_ADMIN, ROLE_FINANCE].includes(role);
+}
+
+function hasUserPermission(user, permission) {
+  if (!user) return false;
+  if (user.name === SYSTEM_OWNER_NAME) return true;
+  return Array.isArray(user.permissions) && user.permissions.includes(permission);
+}
+
+function requirePermission(db, req, res, permission) {
+  const requestUser = resolveRequestUser(db, { ...req.query, ...req.body });
+  if (!hasUserPermission(requestUser, permission)) {
+    res.status(403).json({ error: 'permission denied' });
+    return null;
+  }
+  return requestUser;
+}
+
+function requireSystemOwner(db, req, res) {
+  const requestUser = resolveRequestUser(db, { ...req.query, ...req.body });
+  if (requestUser?.name !== SYSTEM_OWNER_NAME) {
+    res.status(403).json({ error: 'system owner only' });
+    return null;
+  }
+  return requestUser;
+}
+
+function publicSettingsForUser(settings, requestUser) {
+  if (requestUser?.name !== SYSTEM_OWNER_NAME) return {};
+  return {
+    ...settings,
+    smtpPassword: undefined,
+    smtpPasswordConfigured: Boolean(settings.smtpPassword || process.env.SMTP_PASS)
+  };
 }
 
 function publicSettings(settings, requestUser) {
@@ -600,7 +690,56 @@ app.post('/api/login', async (req, res) => {
   const db = await ensureDb();
   const user = db.users.find((item) => item.name === req.body.name && item.password === req.body.password);
   if (!user) return res.status(401).json({ error: 'invalid credentials' });
-  res.json({ id: user.id, name: user.name, role: user.role });
+  res.json(publicUser(user));
+});
+
+app.get('/api/users', async (req, res) => {
+  const db = await ensureDb();
+  if (!requireSystemOwner(db, req, res)) return;
+  res.json(db.users.map(publicUser));
+});
+
+app.post('/api/users', async (req, res) => {
+  const db = await ensureDb();
+  if (!requireSystemOwner(db, req, res)) return;
+  const name = String(req.body.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'missing name' });
+  if (db.users.some((item) => item.name === name)) return res.status(409).json({ error: 'user exists' });
+  const user = normalizeUser({
+    id: crypto.randomUUID(),
+    name,
+    password: req.body.password || '123456',
+    role: req.body.role || ROLE_USER,
+    permissions: req.body.permissions || DEFAULT_PERMISSIONS
+  });
+  db.users.push(user);
+  await saveDb(db);
+  res.json(publicUser(user));
+});
+
+app.patch('/api/users/:id', async (req, res) => {
+  const db = await ensureDb();
+  const requestUser = requireSystemOwner(db, req, res);
+  if (!requestUser) return;
+  const target = db.users.find((item) => item.id === req.params.id);
+  if (!target) return res.status(404).json({ error: 'not found' });
+
+  if (target.name !== SYSTEM_OWNER_NAME) {
+    if (Object.prototype.hasOwnProperty.call(req.body, 'role')) {
+      target.role = req.body.role === ROLE_FINANCE ? ROLE_FINANCE : ROLE_USER;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'permissions')) {
+      target.permissions = sanitizePermissions(req.body.permissions);
+    }
+    if (String(req.body.password || '').trim()) {
+      target.password = String(req.body.password).trim();
+    }
+  }
+
+  const normalized = normalizeUser(target);
+  Object.assign(target, normalized);
+  await saveDb(db);
+  res.json(publicUser(target));
 });
 
 app.get('/api/invoices', async (req, res) => {
@@ -639,7 +778,7 @@ app.patch('/api/invoices/:id', async (req, res) => {
 
 app.delete('/api/invoices/:id', async (req, res) => {
   const db = await ensureDb();
-  const requestUser = requireInvoiceInventoryOwner(db, req, res);
+  const requestUser = requirePermission(db, req, res, 'invoiceInventory');
   if (!requestUser) return;
   const invoice = db.invoices.find((item) => item.id === req.params.id);
   if (!invoice) return res.status(404).json({ error: 'not found' });
@@ -759,7 +898,7 @@ app.get('/api/suppliers', async (req, res) => {
 
 app.post('/api/suppliers', async (req, res) => {
   const db = await ensureDb();
-  if (!requireAdmin(db, req, res)) return;
+  if (!requirePermission(db, req, res, 'supplierManagement')) return;
   const supplier = { id: crypto.randomUUID(), name: req.body.name, termDays: Number(req.body.termDays || 30) };
   db.suppliers.unshift(supplier);
   await saveDb(db);
@@ -769,7 +908,7 @@ app.post('/api/suppliers', async (req, res) => {
 app.post('/api/suppliers/import-terms', upload.single('file'), async (req, res) => {
   const db = await ensureDb();
   if (!req.file) return res.status(400).json({ error: 'missing file' });
-  if (!requireAdmin(db, req, res)) {
+  if (!requirePermission(db, req, res, 'supplierManagement')) {
     await removeUploadedFile(req.file.filename);
     return;
   }
@@ -811,7 +950,7 @@ app.get('/api/owners', async (req, res) => {
 
 app.post('/api/owners', async (req, res) => {
   const db = await ensureDb();
-  if (!requireAdmin(db, req, res)) return;
+  if (!requirePermission(db, req, res, 'supplierManagement')) return;
   const owner = { id: crypto.randomUUID(), owner: req.body.owner, supplier: req.body.supplier };
   db.owners.unshift(owner);
   await saveDb(db);
@@ -821,7 +960,7 @@ app.post('/api/owners', async (req, res) => {
 app.post('/api/owners/import', upload.single('file'), async (req, res) => {
   const db = await ensureDb();
   if (!req.file) return res.status(400).json({ error: 'missing file' });
-  if (!requireAdmin(db, req, res)) {
+  if (!requirePermission(db, req, res, 'supplierManagement')) {
     await removeUploadedFile(req.file.filename);
     return;
   }
@@ -857,7 +996,7 @@ app.post('/api/owners/import', upload.single('file'), async (req, res) => {
 app.get('/api/reminders', async (req, res) => {
   const db = await ensureDb();
   const requestUser = resolveRequestUser(db, req.query);
-  if (canSeeAll(requestUser?.role)) return res.json(db.reminders);
+  if (canSeeAllRole(requestUser?.role)) return res.json(db.reminders);
   res.json(db.reminders.filter((item) => item.target === requestUser?.name));
 });
 
@@ -886,12 +1025,12 @@ app.get('/api/reminders/weekly-payment-preview', async (req, res) => {
 app.get('/api/settings', async (req, res) => {
   const db = await ensureDb();
   const requestUser = resolveRequestUser(db, req.query);
-  res.json(publicSettings(db.settings, requestUser));
+  res.json(publicSettingsForUser(db.settings, requestUser));
 });
 
 app.patch('/api/settings', async (req, res) => {
   const db = await ensureDb();
-  const requestUser = requireMailSettingsOwner(db, req, res);
+  const requestUser = requireSystemOwner(db, req, res);
   if (!requestUser) return;
   db.settings.senderEmail = String(req.body.senderEmail || '').trim();
   if (Object.prototype.hasOwnProperty.call(req.body, 'smtpPassword')) {
@@ -899,7 +1038,7 @@ app.patch('/api/settings', async (req, res) => {
     if (smtpPassword) db.settings.smtpPassword = smtpPassword;
   }
   await saveDb(db);
-  res.json(publicSettings(db.settings, requestUser));
+  res.json(publicSettingsForUser(db.settings, requestUser));
 });
 
 const distDir = path.join(rootDir, 'dist');

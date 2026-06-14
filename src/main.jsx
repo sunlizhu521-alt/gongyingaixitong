@@ -34,9 +34,26 @@ function App() {
   const [dimensionShortNameFilter, setDimensionShortNameFilter] = useState([]);
   const [dimensionOwnerFilter, setDimensionOwnerFilter] = useState([]);
   const [dimensionAnnualFilter, setDimensionAnnualFilter] = useState([]);
-  const isAdmin = user?.role === '管理员';
-  const canManageMailSettings = user?.name === '孙立柱';
-  const canManageInvoiceInventory = user?.name === '孙立柱';
+  const [managedUsers, setManagedUsers] = useState([]);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('123456');
+  const systemOwnerName = '孙立柱';
+  const permissionOptions = [
+    { value: 'supplierPayment', label: '供应商付款提醒' },
+    { value: 'invoiceInventory', label: '发票信息库存查看' },
+    { value: 'supplierManagement', label: '供应商管理维度表' },
+    { value: 'qualityInspection', label: '品质验货' }
+  ];
+  function hasPermission(permission) {
+    if (user?.name === systemOwnerName) return true;
+    return Array.isArray(user?.permissions) && user.permissions.includes(permission);
+  }
+  const canManageMailSettings = user?.name === systemOwnerName;
+  const canManagePermissions = user?.name === systemOwnerName;
+  const canAccessSupplierPayment = hasPermission('supplierPayment');
+  const canManageInvoiceInventory = hasPermission('invoiceInventory');
+  const canManageSuppliers = hasPermission('supplierManagement');
+  const canAccessQualityInspection = hasPermission('qualityInspection');
   const qualityInspectionPages = {
     inspectionNotice: '验货通知',
     inspectionSchedule: '验货安排',
@@ -51,13 +68,14 @@ function App() {
 
   async function loadData() {
     const params = user ? `?user=${encodeURIComponent(user.name)}&role=${encodeURIComponent(user.role)}` : '';
-    const [invoiceRes, draftRes, supplierRes, ownerRes, reminderRes, settingsRes] = await Promise.all([
+    const [invoiceRes, draftRes, supplierRes, ownerRes, reminderRes, settingsRes, usersRes] = await Promise.all([
       fetch(`${API}/api/invoices${params}`),
       fetch(`${API}/api/drafts${params}`),
       fetch(`${API}/api/suppliers`),
       fetch(`${API}/api/owners`),
       fetch(`${API}/api/reminders${params}`),
-      fetch(`${API}/api/settings${params}`)
+      fetch(`${API}/api/settings${params}`),
+      canManagePermissions ? fetch(`${API}/api/users${params}`) : Promise.resolve(null)
     ]);
     setInvoices(await invoiceRes.json());
     setDrafts(await draftRes.json());
@@ -69,6 +87,11 @@ function App() {
     setSenderEmailInput(settings.senderEmail || '');
     setSmtpPasswordConfigured(Boolean(settings.smtpPasswordConfigured));
     setSmtpPasswordInput('');
+    if (usersRes?.ok) {
+      setManagedUsers(await usersRes.json());
+    } else if (!canManagePermissions) {
+      setManagedUsers([]);
+    }
   }
 
   useEffect(() => {
@@ -76,15 +99,38 @@ function App() {
   }, [user]);
 
   useEffect(() => {
-    if (user && !isAdmin && activeTab === 'suppliers') {
-      setActiveMenuGroup('supplierPayment');
-      setActiveTab('ledger');
+    function openFirstAllowedTab() {
+      if (canAccessSupplierPayment) {
+        setActiveMenuGroup('supplierPayment');
+        setActiveTab('ledger');
+      } else if (canAccessQualityInspection) {
+        setActiveMenuGroup('qualityInspection');
+        setActiveTab('inspectionNotice');
+      } else if (canManagePermissions) {
+        setActiveMenuGroup('systemManagement');
+        setActiveTab('permissionManagement');
+      }
+    }
+    if (user && !canAccessSupplierPayment && ['ledger', 'upload', 'reminders'].includes(activeTab)) {
+      openFirstAllowedTab();
+      return;
+    }
+    if (user && !canManageSuppliers && activeTab === 'suppliers') {
+      openFirstAllowedTab();
+      return;
     }
     if (user && !canManageInvoiceInventory && activeTab === 'invoiceInventory') {
-      setActiveMenuGroup('supplierPayment');
-      setActiveTab('ledger');
+      openFirstAllowedTab();
+      return;
     }
-  }, [activeTab, canManageInvoiceInventory, isAdmin, user]);
+    if (user && !canAccessQualityInspection && qualityInspectionPages[activeTab]) {
+      openFirstAllowedTab();
+      return;
+    }
+    if (user && !canManagePermissions && activeTab === 'permissionManagement') {
+      openFirstAllowedTab();
+    }
+  }, [activeTab, canAccessQualityInspection, canAccessSupplierPayment, canManageInvoiceInventory, canManagePermissions, canManageSuppliers, user]);
 
   useEffect(() => {
     function closeFilters() {
@@ -541,6 +587,57 @@ function App() {
     setMessage('邮件配置已保存。');
   }
 
+  async function createManagedUser(event) {
+    event.preventDefault();
+    const name = newUserName.trim();
+    if (!name) {
+      setMessage('请填写注册人姓名。');
+      return;
+    }
+    const res = await fetch(`${API}/api/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user: user.name,
+        name,
+        password: newUserPassword || '123456',
+        role: '普通用户',
+        permissions: ['supplierPayment']
+      })
+    });
+    if (!res.ok) {
+      setMessage(res.status === 409 ? '这个姓名已经存在。' : '新增用户失败。');
+      return;
+    }
+    setNewUserName('');
+    setNewUserPassword('123456');
+    await loadData();
+    setMessage('用户已新增。');
+  }
+
+  async function updateManagedUser(target, patch) {
+    const res = await fetch(`${API}/api/users/${target.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: user.name, ...patch })
+    });
+    if (!res.ok) {
+      setMessage('权限保存失败。');
+      return;
+    }
+    const updated = await res.json();
+    setManagedUsers((rows) => rows.map((row) => row.id === updated.id ? updated : row));
+    setMessage('权限已保存。');
+  }
+
+  function toggleManagedPermission(target, permission) {
+    const permissions = Array.isArray(target.permissions) ? target.permissions : [];
+    const nextPermissions = permissions.includes(permission)
+      ? permissions.filter((item) => item !== permission)
+      : [...permissions, permission];
+    updateManagedUser(target, { permissions: nextPermissions });
+  }
+
   function openPreview(row) {
     if (!row.fileName) {
       setMessage('这个记录没有可预览的原文件。');
@@ -580,6 +677,7 @@ function App() {
       <aside className="sidebar">
         <h1>供应链AI系统</h1>
         <nav className="sidebar-menu" aria-label="系统菜单">
+          {canAccessSupplierPayment && (
           <div className="menu-group">
             <button
               type="button"
@@ -597,13 +695,15 @@ function App() {
                 {canManageInvoiceInventory && (
                   <button className={activeTab === 'invoiceInventory' ? 'active' : ''} onClick={() => openMenuTab('invoiceInventory', 'supplierPayment')}>发票信息库存查看</button>
                 )}
-                {isAdmin && (
+                {canManageSuppliers && (
                   <button className={activeTab === 'suppliers' ? 'active' : ''} onClick={() => openMenuTab('suppliers', 'supplierPayment')}>供应商管理维度表</button>
                 )}
                 <button className={activeTab === 'reminders' ? 'active' : ''} onClick={() => openMenuTab('reminders', 'supplierPayment')}>操作日志</button>
               </div>
             )}
           </div>
+          )}
+          {canAccessQualityInspection && (
           <div className="menu-group">
             <button
               type="button"
@@ -623,6 +723,25 @@ function App() {
               </div>
             )}
           </div>
+          )}
+          {canManagePermissions && (
+          <div className="menu-group">
+            <button
+              type="button"
+              className={`menu-group-toggle ${activeMenuGroup === 'systemManagement' ? 'active' : ''}`}
+              onClick={() => setActiveMenuGroup('systemManagement')}
+              aria-expanded={activeMenuGroup === 'systemManagement'}
+            >
+              系统管理
+              <span>{activeMenuGroup === 'systemManagement' ? '▾' : '▸'}</span>
+            </button>
+            {activeMenuGroup === 'systemManagement' && (
+              <div className="submenu-list">
+                <button className={activeTab === 'permissionManagement' ? 'active' : ''} onClick={() => openMenuTab('permissionManagement', 'systemManagement')}>权限管理</button>
+              </div>
+            )}
+          </div>
+          )}
         </nav>
         <div className="user-box">
           <strong>{user.name}</strong>
@@ -659,7 +778,7 @@ function App() {
 
       <section className="content">
         {message && <div className="toast">{message}</div>}
-        {activeTab === 'ledger' && (
+        {activeTab === 'ledger' && canAccessSupplierPayment && (
           <>
             <div className="toolbar">
               <div className="board-heading-row">
@@ -784,7 +903,7 @@ function App() {
           </>
         )}
 
-        {activeTab === 'upload' && (
+        {activeTab === 'upload' && canAccessSupplierPayment && (
           <>
             <h2>发票上传</h2>
             <label
@@ -839,7 +958,7 @@ function App() {
           </>
         )}
 
-        {activeTab === 'suppliers' && isAdmin && (
+        {activeTab === 'suppliers' && canManageSuppliers && (
           <>
             <h2>供应商管理维度表</h2>
             <div className="metric-grid">
@@ -975,7 +1094,7 @@ function App() {
           </>
         )}
 
-        {activeTab === 'reminders' && (
+        {activeTab === 'reminders' && canAccessSupplierPayment && (
           <>
             <h2>操作日志</h2>
             <DataTable
@@ -986,7 +1105,78 @@ function App() {
           </>
         )}
 
-        {qualityInspectionPages[activeTab] && (
+        {activeTab === 'permissionManagement' && canManagePermissions && (
+          <>
+            <div className="section-heading-row">
+              <h2>权限管理</h2>
+              <span className="section-count">管理员：孙立柱</span>
+            </div>
+            <form className="user-create-form" onSubmit={createManagedUser}>
+              <input
+                placeholder="注册人姓名"
+                value={newUserName}
+                onChange={(event) => setNewUserName(event.target.value)}
+              />
+              <input
+                placeholder="初始密码"
+                value={newUserPassword}
+                onChange={(event) => setNewUserPassword(event.target.value)}
+              />
+              <button type="submit">新增用户</button>
+            </form>
+            <DataTable
+              className="permission-table"
+              rows={managedUsers}
+              columns={['姓名', '角色', '权限', '密码']}
+              render={(row) => [
+                row.name,
+                row.name === systemOwnerName ? (
+                  <span>管理员</span>
+                ) : (
+                  <select
+                    className="table-select"
+                    value={row.role}
+                    onChange={(event) => updateManagedUser(row, { role: event.target.value })}
+                  >
+                    <option value="普通用户">普通用户</option>
+                    <option value="财务">财务</option>
+                  </select>
+                ),
+                <div className="permission-checks">
+                  {permissionOptions.map((option) => (
+                    <label key={option.value}>
+                      <input
+                        type="checkbox"
+                        checked={row.name === systemOwnerName || (row.permissions || []).includes(option.value)}
+                        disabled={row.name === systemOwnerName}
+                        onChange={() => toggleManagedPermission(row, option.value)}
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>,
+                row.name === systemOwnerName ? (
+                  <span>固定管理员</span>
+                ) : (
+                  <input
+                    className="table-input"
+                    type="password"
+                    placeholder="填写新密码后回车"
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        updateManagedUser(row, { password: event.currentTarget.value });
+                        event.currentTarget.value = '';
+                      }
+                    }}
+                  />
+                )
+              ]}
+            />
+          </>
+        )}
+
+        {canAccessQualityInspection && qualityInspectionPages[activeTab] && (
           <section className="placeholder-panel">
             <h2>{qualityInspectionPages[activeTab]}</h2>
             <p>当前页面已建立入口，具体业务内容待配置。</p>
