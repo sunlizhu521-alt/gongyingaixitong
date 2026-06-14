@@ -36,6 +36,12 @@ function App() {
   const isAdmin = user?.role === '管理员';
   const canManageMailSettings = user?.name === '孙立柱';
   const canManageInvoiceInventory = user?.name === '孙立柱';
+  const qualityInspectionPages = {
+    inspectionNotice: '验货通知',
+    inspectionSchedule: '验货安排',
+    inspectionFeedback: '验货反馈',
+    inspectionReportQuery: '检验报告单查询'
+  };
 
   async function loadData() {
     const params = user ? `?user=${encodeURIComponent(user.name)}&role=${encodeURIComponent(user.role)}` : '';
@@ -580,6 +586,15 @@ function App() {
               <button className={activeTab === 'reminders' ? 'active' : ''} onClick={() => setActiveTab('reminders')}>操作日志</button>
             </div>
           </div>
+          <div className="menu-group">
+            <div className="menu-group-title">品质验货</div>
+            <div className="submenu-list">
+              <button className={activeTab === 'inspectionNotice' ? 'active' : ''} onClick={() => setActiveTab('inspectionNotice')}>验货通知</button>
+              <button className={activeTab === 'inspectionSchedule' ? 'active' : ''} onClick={() => setActiveTab('inspectionSchedule')}>验货安排</button>
+              <button className={activeTab === 'inspectionFeedback' ? 'active' : ''} onClick={() => setActiveTab('inspectionFeedback')}>验货反馈</button>
+              <button className={activeTab === 'inspectionReportQuery' ? 'active' : ''} onClick={() => setActiveTab('inspectionReportQuery')}>检验报告单查询</button>
+            </div>
+          </div>
         </nav>
         <div className="user-box">
           <strong>{user.name}</strong>
@@ -941,6 +956,13 @@ function App() {
               render={(row) => [row.createdAt, row.type, row.target, row.content]}
             />
           </>
+        )}
+
+        {qualityInspectionPages[activeTab] && (
+          <section className="placeholder-panel">
+            <h2>{qualityInspectionPages[activeTab]}</h2>
+            <p>当前页面已建立入口，具体业务内容待配置。</p>
+          </section>
         )}
       </section>
 

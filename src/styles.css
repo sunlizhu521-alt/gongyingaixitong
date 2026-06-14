@@ -503,6 +503,23 @@ th {
   max-height: 520px;
 }
 
+.placeholder-panel {
+  max-width: 720px;
+  padding: 22px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: white;
+}
+
+.placeholder-panel h2 {
+  margin-bottom: 10px;
+}
+
+.placeholder-panel p {
+  margin: 0;
+  color: #64748b;
+}
+
 .actions,
 .inline-form,
 .management-grid {
