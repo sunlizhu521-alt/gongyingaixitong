@@ -910,6 +910,57 @@ function App() {
     });
   }
 
+  function sanitizeDownloadName(value, fallback = '未填写') {
+    return String(value || fallback)
+      .trim()
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .replace(/\s+/g, '');
+  }
+
+  function fileExtension(row) {
+    const originalName = String(row.originalName || '');
+    const match = originalName.match(/\.[A-Za-z0-9]+$/);
+    if (match) return match[0].toLowerCase();
+    if (row.mimeType === 'application/pdf') return '.pdf';
+    if (row.mimeType === 'image/png') return '.png';
+    if (row.mimeType === 'image/jpeg') return '.jpg';
+    if (row.mimeType === 'image/gif') return '.gif';
+    if (row.mimeType === 'image/webp') return '.webp';
+    return '';
+  }
+
+  function invoiceDownloadName(row) {
+    const amount = Number(row.amount);
+    const amountText = Number.isFinite(amount) ? String(amount) : String(row.amount || '未填金额');
+    return [
+      sanitizeDownloadName(row.supplier, '供应商'),
+      sanitizeDownloadName(row.issueDate, '开票时间'),
+      sanitizeDownloadName(amountText, '金额')
+    ].join('_') + fileExtension(row);
+  }
+
+  async function downloadInvoiceFile(row) {
+    if (!row.fileName) {
+      setMessage('这个发票没有可下载的原文件。');
+      return;
+    }
+    try {
+      const res = await fetch(`${API}/uploads/${encodeURIComponent(row.fileName)}`);
+      if (!res.ok) throw new Error('download failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = invoiceDownloadName(row);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setMessage('发票下载失败，请确认原文件是否存在。');
+    }
+  }
+
   if (!user) {
     return (
       <main className="login-shell">
@@ -1168,7 +1219,7 @@ function App() {
             <DataTable
               className="ledger-table"
               rows={filteredInvoices}
-              columns={['采购员', '供应商', '发票号', '金额', '开票日', '账期', '付款时间', 'OA流程号', '是否付款', '状态']}
+              columns={['采购员', '供应商', '发票号', '金额', '开票日', '账期', '付款时间', '下载发票', 'OA流程号', '是否付款', '状态']}
               render={(row) => [
                 row.buyer,
                 row.supplier,
@@ -1177,6 +1228,7 @@ function App() {
                 row.issueDate,
                 row.termText,
                 row.paymentDate,
+                <button className="ghost compact-button" onClick={() => downloadInvoiceFile(row)}>下载发票</button>,
                 <input
                   className="table-input"
                   defaultValue={row.oaProcessNo || ''}
