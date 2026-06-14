@@ -6,11 +6,14 @@ import './styles.css';
 const API = import.meta.env.DEV ? 'http://localhost:4001' : '';
 
 const INSPECTION_NOTICE_FIELDS = [
+  { key: 'inspectionApplicant', label: '验货填写人', readonly: true },
   { key: 'inspectionFillTime', label: '验货填写时间' },
   { key: 'supplierFinishTime', label: '供应商完工时间' },
   { key: 'shipmentTime', label: '发货时间' },
   { key: 'kingdeeOrderNo', label: '金蝶采购订单' },
   { key: 'supplierShortName', label: '供应商简称' },
+  { key: 'supplierAddress', label: '供应商地址', readonly: true },
+  { key: 'businessDepartments', label: '事业部', multiSelect: true },
   { key: 'operation', label: '运营' },
   { key: 'firstInspection', label: '是否首批验货' },
   { key: 'series', label: '系列' },
@@ -19,10 +22,16 @@ const INSPECTION_NOTICE_FIELDS = [
   { key: 'remark', label: '备注', multiline: true }
 ];
 
+const INSPECTION_DEPARTMENT_OPTIONS = ['海外事业部一部', '海外事业二部', '国内事业部', '全球招商部', '其他部门'];
+
 function createInspectionNoticeRow(values = {}) {
   return INSPECTION_NOTICE_FIELDS.reduce((row, field) => ({
     ...row,
-    [field.key]: values[field.key] || ''
+    [field.key]: field.multiSelect
+      ? (Array.isArray(values[field.key])
+          ? values[field.key]
+          : String(values[field.key] || '').split(/[、,，]/).map((item) => item.trim()).filter(Boolean))
+      : values[field.key] || ''
   }), {
     id: values.id || crypto.randomUUID()
   });
@@ -190,13 +199,17 @@ function App() {
     if (inspectionNoticeRes?.ok) {
       const noticeSubmission = await inspectionNoticeRes.json();
       const noticeRows = noticeSubmission.rows?.length
-        ? noticeSubmission.rows.map((row) => createInspectionNoticeRow(row))
-        : [createInspectionNoticeRow()];
+        ? noticeSubmission.rows.map((row) => createInspectionNoticeRow({
+            ...row,
+            inspectionApplicant: row.inspectionApplicant || user.name,
+            supplierAddress: row.supplierAddress || findSupplierAddressByShortName(row.supplierShortName)
+          }))
+        : [createInspectionNoticeRow({ inspectionApplicant: user.name })];
       setInspectionNoticeSubmission(noticeSubmission);
       setInspectionNoticeRows(noticeRows);
     } else if (!canAccessTab('inspectionNotice')) {
       setInspectionNoticeSubmission({ rows: [], submittedAt: '', submittedBy: '' });
-      setInspectionNoticeRows([createInspectionNoticeRow()]);
+      setInspectionNoticeRows([createInspectionNoticeRow({ inspectionApplicant: user.name })]);
     }
   }
 
@@ -255,6 +268,29 @@ function App() {
 
   function supplierShortName(name) {
     return findSupplierMeta(name)?.shortName || '未匹配简称';
+  }
+
+  function extractProvinceCity(value) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    const provinceMatch = text.match(/([\u4e00-\u9fa5]{2,}(?:省|自治区|市))/);
+    const cityMatch = text.match(/([\u4e00-\u9fa5]{2,}(?:市|自治州|地区|盟))/);
+    const parts = [];
+    if (provinceMatch?.[1]) parts.push(provinceMatch[1]);
+    if (cityMatch?.[1] && cityMatch[1] !== provinceMatch?.[1]) parts.push(cityMatch[1]);
+    return parts.join('') || '';
+  }
+
+  function findSupplierAddressByShortName(shortName) {
+    const normalizedShortName = normalizeSupplierName(shortName);
+    if (!normalizedShortName) return '';
+    const supplier = suppliers.find((item) =>
+      normalizeSupplierName(item.shortName) === normalizedShortName ||
+      normalizeSupplierName(item.name) === normalizedShortName ||
+      normalizeSupplierName(item.name).includes(normalizedShortName)
+    );
+    if (!supplier) return '';
+    return extractProvinceCity(supplier.address || supplier.provinceCity || supplier.city || supplier.name);
   }
 
   function calculatePaymentDate(supplierName, issueDate) {
@@ -617,25 +653,39 @@ function App() {
 
   function updateInspectionNoticeRow(id, field, value) {
     setInspectionNoticeRows((rows) => rows.map((row) => (
-      row.id === id ? { ...row, [field]: value } : row
+      row.id === id
+        ? {
+            ...row,
+            [field]: value,
+            inspectionApplicant: user.name,
+            supplierAddress: field === 'supplierShortName' ? findSupplierAddressByShortName(value) : row.supplierAddress
+          }
+        : row
     )));
   }
 
   function addInspectionNoticeRow() {
-    setInspectionNoticeRows((rows) => [...rows, createInspectionNoticeRow()]);
+    setInspectionNoticeRows((rows) => [...rows, createInspectionNoticeRow({ inspectionApplicant: user.name })]);
   }
 
   function deleteInspectionNoticeRow(id) {
     setInspectionNoticeRows((rows) => {
       const nextRows = rows.filter((row) => row.id !== id);
-      return nextRows.length ? nextRows : [createInspectionNoticeRow()];
+      return nextRows.length ? nextRows : [createInspectionNoticeRow({ inspectionApplicant: user.name })];
     });
   }
 
   async function confirmInspectionNotice() {
     const rowsToSubmit = inspectionNoticeRows
-      .map((row) => createInspectionNoticeRow(row))
-      .filter((row) => INSPECTION_NOTICE_FIELDS.some((field) => String(row[field.key] || '').trim()));
+      .map((row) => createInspectionNoticeRow({
+        ...row,
+        inspectionApplicant: user.name,
+        supplierAddress: row.supplierAddress || findSupplierAddressByShortName(row.supplierShortName)
+      }))
+      .filter((row) => INSPECTION_NOTICE_FIELDS.some((field) => {
+        const value = row[field.key];
+        return Array.isArray(value) ? value.length : String(value || '').trim();
+      }));
     if (!rowsToSubmit.length) {
       setMessage('请至少填写一条验货通知后再提交。');
       return;
@@ -651,8 +701,12 @@ function App() {
     }
     const result = await res.json();
     const savedRows = result.rows?.length
-      ? result.rows.map((row) => createInspectionNoticeRow(row))
-      : [createInspectionNoticeRow()];
+      ? result.rows.map((row) => createInspectionNoticeRow({
+          ...row,
+          inspectionApplicant: row.inspectionApplicant || user.name,
+          supplierAddress: row.supplierAddress || findSupplierAddressByShortName(row.supplierShortName)
+        }))
+      : [createInspectionNoticeRow({ inspectionApplicant: user.name })];
     setInspectionNoticeSubmission(result);
     setInspectionNoticeRows(savedRows);
     setMessage(`验货通知已确认提交：共 ${result.rows?.length || 0} 条。`);
@@ -1462,19 +1516,46 @@ function App() {
               rows={inspectionNoticeRows}
               columns={[...INSPECTION_NOTICE_FIELDS.map((field) => field.label), '操作']}
               render={(row) => [
-                ...INSPECTION_NOTICE_FIELDS.map((field) => field.multiline ? (
-                  <textarea
-                    className="table-textarea inspection-notice-input"
-                    value={row[field.key] || ''}
-                    onChange={(event) => updateInspectionNoticeRow(row.id, field.key, event.target.value)}
-                  />
-                ) : (
-                  <input
-                    className="table-input inspection-notice-input"
-                    value={row[field.key] || ''}
-                    onChange={(event) => updateInspectionNoticeRow(row.id, field.key, event.target.value)}
-                  />
-                )),
+                ...INSPECTION_NOTICE_FIELDS.map((field) => {
+                  if (field.readonly) {
+                    return <span className="readonly-cell">{field.key === 'inspectionApplicant' ? user.name : row[field.key] || ''}</span>;
+                  }
+                  if (field.multiSelect) {
+                    const selected = Array.isArray(row[field.key]) ? row[field.key] : [];
+                    return (
+                      <div className="inline-checkbox-group">
+                        {INSPECTION_DEPARTMENT_OPTIONS.map((option) => (
+                          <label key={option}>
+                            <input
+                              type="checkbox"
+                              checked={selected.includes(option)}
+                              onChange={(event) => {
+                                const nextSelected = event.target.checked
+                                  ? [...selected, option]
+                                  : selected.filter((item) => item !== option);
+                                updateInspectionNoticeRow(row.id, field.key, nextSelected);
+                              }}
+                            />
+                            {option}
+                          </label>
+                        ))}
+                      </div>
+                    );
+                  }
+                  return field.multiline ? (
+                    <textarea
+                      className="table-textarea inspection-notice-input"
+                      value={row[field.key] || ''}
+                      onChange={(event) => updateInspectionNoticeRow(row.id, field.key, event.target.value)}
+                    />
+                  ) : (
+                    <input
+                      className="table-input inspection-notice-input"
+                      value={row[field.key] || ''}
+                      onChange={(event) => updateInspectionNoticeRow(row.id, field.key, event.target.value)}
+                    />
+                  );
+                }),
                 <button type="button" className="danger-button" onClick={() => deleteInspectionNoticeRow(row.id)}>删除</button>
               ]}
             />

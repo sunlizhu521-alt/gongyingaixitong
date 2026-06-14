@@ -492,6 +492,34 @@ h3 {
   resize: vertical;
 }
 
+.readonly-cell {
+  display: inline-block;
+  min-width: 110px;
+  color: #334155;
+}
+
+.inline-checkbox-group {
+  display: grid;
+  gap: 4px;
+  min-width: 150px;
+  text-align: left;
+}
+
+.inline-checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.inline-checkbox-group input {
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  accent-color: #2563eb;
+}
+
 .single-management-panel {
   display: grid;
   gap: 14px;
