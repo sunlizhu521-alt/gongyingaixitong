@@ -96,6 +96,7 @@ function App() {
   const [statusFilter, setStatusFilter] = useState([]);
   const [paymentWeekFilter, setPaymentWeekFilter] = useState([]);
   const [paymentMonthFilter, setPaymentMonthFilter] = useState([]);
+  const [oaSubmitWeekFilter, setOaSubmitWeekFilter] = useState([]);
   const [openFilter, setOpenFilter] = useState('');
   const [activeMenuGroup, setActiveMenuGroup] = useState('supplierPayment');
   const [supplierImportResult, setSupplierImportResult] = useState(null);
@@ -397,6 +398,18 @@ function App() {
     return date.toISOString().slice(0, 10);
   }
 
+  function calculateOaSubmitDate(paymentDate, amount) {
+    const date = parseLocalDate(paymentDate);
+    if (!date) return paymentDate || '供应商维度表供应商信息不一致';
+    const amountValue = Number(amount || 0);
+    const advanceDays = amountValue > 100000 ? 14 : 7;
+    date.setDate(date.getDate() - advanceDays);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   function parseLocalDate(value) {
     const parts = String(value || '').split('-').map(Number);
     if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return null;
@@ -521,11 +534,13 @@ function App() {
     return invoices.map((invoice) => {
       const supplier = findSupplierMeta(invoice.supplier);
       const termDays = Number(supplier?.termDays);
+      const paymentDate = calculatePaymentDate(invoice.supplier, invoice.issueDate);
       return {
         ...invoice,
         buyer: findBuyerForSupplier(invoice.supplier) || '未匹配',
         termText: Number.isFinite(termDays) && termDays > 0 ? `${termDays}天` : '未匹配账期',
-        paymentDate: calculatePaymentDate(invoice.supplier, invoice.issueDate)
+        paymentDate,
+        oaSubmitDate: calculateOaSubmitDate(paymentDate, invoice.amount)
       };
     });
   }, [invoices, ownerByNormalizedSupplier, ownerBySupplier, owners, supplierMetaByName, suppliers]);
@@ -607,12 +622,13 @@ function App() {
       (statusFilter.length === 0 || statusFilter.includes(item.status)) &&
       (paymentWeekFilter.length === 0 || (paymentWeekFilter.includes('thisWeek') && isThisWeekPayment(item.paymentDate))) &&
       (paymentMonthFilter.length === 0 || (paymentMonthFilter.includes('thisMonth') && isThisMonthPayment(item.paymentDate))) &&
-      (!text || [item.invoiceNo, item.supplier, supplierShortName(item.supplier), item.buyer, item.status, item.issueDate, item.paymentDate]
+      (oaSubmitWeekFilter.length === 0 || (oaSubmitWeekFilter.includes('thisWeek') && isThisWeekPayment(item.oaSubmitDate))) &&
+      (!text || [item.invoiceNo, item.supplier, supplierShortName(item.supplier), item.buyer, item.status, item.issueDate, item.paymentDate, item.oaSubmitDate]
         .join(' ')
         .toLowerCase()
         .includes(text))
     );
-  }, [ledgerInvoices, ownerFilter, paymentMonthFilter, paymentWeekFilter, query, statusFilter, supplierFilter, supplierMetaByName]);
+  }, [ledgerInvoices, oaSubmitWeekFilter, ownerFilter, paymentMonthFilter, paymentWeekFilter, query, statusFilter, supplierFilter, supplierMetaByName]);
   const ledgerStats = useMemo(() => {
     const uniqueSupplierCount = (rows) => new Set(rows.map((row) => row.supplier).filter(Boolean)).size;
     const amountTotal = (rows) => rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
@@ -626,8 +642,8 @@ function App() {
     const submittedRows = filteredInvoices.filter((row) => String(row.oaProcessNo || '').trim());
     const awaitingFinanceRows = filteredInvoices.filter((row) => row.status === '待财务打款');
     const completedRows = filteredInvoices.filter((row) => row.status === '完成');
-    const thisWeekRows = pendingRows.filter((row) => isThisWeekPayment(row.paymentDate));
-    const thisMonthRows = pendingRows.filter((row) => isThisMonthPayment(row.paymentDate));
+    const thisWeekRows = pendingRows.filter((row) => isThisWeekPayment(row.oaSubmitDate));
+    const thisMonthRows = pendingRows.filter((row) => isThisMonthPayment(row.oaSubmitDate));
 
     return {
       uploadedSupplierCount: uniqueSupplierCount(filteredInvoices),
@@ -648,6 +664,7 @@ function App() {
     setStatusFilter([]);
     setPaymentWeekFilter([]);
     setPaymentMonthFilter([]);
+    setOaSubmitWeekFilter([]);
   }
 
   function togglePaymentPeriod(period) {
@@ -655,10 +672,19 @@ function App() {
     if (period === 'week') {
       setPaymentWeekFilter((current) => current.length ? [] : ['thisWeek']);
       setPaymentMonthFilter([]);
+      setOaSubmitWeekFilter([]);
       return;
     }
     setPaymentMonthFilter((current) => current.length ? [] : ['thisMonth']);
     setPaymentWeekFilter([]);
+    setOaSubmitWeekFilter([]);
+  }
+
+  function toggleOaSubmitWeek() {
+    setOpenFilter('');
+    setOaSubmitWeekFilter((current) => current.length ? [] : ['thisWeek']);
+    setPaymentWeekFilter([]);
+    setPaymentMonthFilter([]);
   }
 
   function resetDimensionFilters() {
@@ -1378,6 +1404,13 @@ function App() {
                   >
                     本月付款
                   </button>
+                  <button
+                    className={`quick-filter-button ${oaSubmitWeekFilter.length ? 'active' : ''}`}
+                    type="button"
+                    onClick={toggleOaSubmitWeek}
+                  >
+                    本周提交OA
+                  </button>
                   <button className="ghost compact-button" onClick={resetFilters}>清空筛选</button>
                 </div>
               </div>
@@ -1424,7 +1457,7 @@ function App() {
             <DataTable
               className="ledger-table"
               rows={filteredInvoices}
-              columns={['采购员', '供应商', '发票号', '金额', '开票日', '账期', '付款时间', '下载发票', 'OA流程号', '是否付款', '状态']}
+              columns={['采购员', '供应商', '发票号', '金额', '开票日', '账期', '付款时间', '提交OA时间', '下载发票', 'OA流程号', '是否付款', '状态']}
               render={(row) => [
                 row.buyer,
                 row.supplier,
@@ -1433,6 +1466,7 @@ function App() {
                 row.issueDate,
                 row.termText,
                 row.paymentDate,
+                row.oaSubmitDate,
                 <button className="ghost compact-button" onClick={() => openPreview(row)}>下载发票</button>,
                 <input
                   className="table-input"
