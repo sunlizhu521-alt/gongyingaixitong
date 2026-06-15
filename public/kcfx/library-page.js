@@ -106,7 +106,7 @@ function setSingleUploadProgress(status, percent, message) {
   const numericPercent = Number(percent);
   const hasPercent = Number.isFinite(numericPercent);
   const value = hasPercent ? Math.max(0, Math.min(100, numericPercent)) : 0;
-  const text = hasPercent ? `${message} ${Math.round(value)}%` : message;
+  const text = hasPercent && value >= 100 ? "上传已完成，正在等待服务器保存结果..." : hasPercent ? `${message} ${Math.round(value)}%` : message;
   if (status) status.textContent = text;
   setLibraryLoadProgress(value, text);
 }
@@ -115,7 +115,8 @@ function setBatchUploadProgress(uploaded, total, currentPercent) {
   const numericPercent = Number(currentPercent);
   const value = Number.isFinite(numericPercent) ? Math.max(0, Math.min(100, numericPercent)) : 0;
   const overall = total ? Math.round(((uploaded + value / 100) / total) * 100) : value;
-  const text = `正在上传到腾讯云服务器：${uploaded + 1}/${total}，当前文件 ${Math.round(value)}%`;
+  const currentText = value >= 100 ? "当前文件已完成，正在等待服务器保存结果..." : `当前文件 ${Math.round(value)}%`;
+  const text = `正在上传到腾讯云服务器：${uploaded + 1}/${total}，${currentText}`;
   setLibraryStatus(text);
   setLibraryLoadProgress(overall, text);
 }
@@ -304,12 +305,32 @@ function latestSavedAt(slots, records) {
   return times.length ? Math.max(...times) : null;
 }
 
+function scoreReadableFileName(name) {
+  const text = String(name || "");
+  const chinese = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+  const replacement = (text.match(/\uFFFD/g) || []).length;
+  const mojibake = (text.match(/[ÃÂÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ]/g) || []).length;
+  return chinese * 4 - replacement * 6 - mojibake;
+}
+
+function normalizeDisplayFileName(name) {
+  const originalName = String(name || "");
+  if (!originalName || typeof TextDecoder === "undefined") return originalName;
+  try {
+    const bytes = Uint8Array.from(Array.from(originalName, (char) => char.charCodeAt(0) & 0xff));
+    const decoded = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    return scoreReadableFileName(decoded) > scoreReadableFileName(originalName) ? decoded : originalName;
+  } catch {
+    return originalName;
+  }
+}
+
 function renderCard(slot, record, labels) {
   const displayRecord = getDisplayRecord(record);
   const pending = hasPendingRecord(record) || (record && !record.appliedAt);
   const stateClass = pending ? "pending" : record?.appliedAt ? "applied" : "empty";
   const stateText = pending ? "待应用" : record?.appliedAt ? "当前引用" : "空";
-  const fileName = displayRecord?.fileName || slot.expectedName;
+  const fileName = normalizeDisplayFileName(displayRecord?.fileName || slot.expectedName);
   const month = displayRecord?.savedAt ? `${new Date(displayRecord.savedAt).getFullYear()}年${new Date(displayRecord.savedAt).getMonth() + 1}月` : "";
   const updateDate = displayRecord?.savedAt ? new Date(displayRecord.savedAt).toLocaleString("zh-CN", {
     year: "numeric",

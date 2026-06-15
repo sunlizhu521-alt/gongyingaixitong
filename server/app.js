@@ -1776,14 +1776,30 @@ function parseKcfxSlotPayload(slotId, payload) {
   };
 }
 
+function scoreReadableFileName(name) {
+  const text = String(name || '');
+  const chinese = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+  const replacement = (text.match(/\uFFFD/g) || []).length;
+  const mojibake = (text.match(/[ÃÂÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ]/g) || []).length;
+  return chinese * 4 - replacement * 6 - mojibake;
+}
+
+function normalizeUploadedFileName(name) {
+  const originalName = String(name || '');
+  if (!originalName) return originalName;
+  const decoded = Buffer.from(originalName, 'latin1').toString('utf8');
+  return scoreReadableFileName(decoded) > scoreReadableFileName(originalName) ? decoded : originalName;
+}
+
 function buildKcfxFileRecord(file, storedFile, slot, parsed) {
   const completedAt = new Date().toISOString();
+  const fileName = normalizeUploadedFileName(file.originalname);
   return {
     id: slot.id,
     type: slot.type,
     title: slot.title,
     expectedName: slot.expectedName,
-    fileName: file.originalname,
+    fileName,
     size: file.size,
     lastModified: Date.now(),
     savedAt: completedAt,
@@ -1807,13 +1823,14 @@ function buildKcfxFileRecord(file, storedFile, slot, parsed) {
 function buildQueuedKcfxFileRecord(file, storedFile, slot, previousRecord, requestUserName) {
   const queuedAt = new Date().toISOString();
   const previousRows = Array.isArray(previousRecord?.rows) ? previousRecord.rows : [];
+  const fileName = normalizeUploadedFileName(file.originalname);
   return {
     ...(previousRecord || {}),
     id: slot.id,
     type: slot.type,
     title: slot.title,
     expectedName: slot.expectedName,
-    fileName: file.originalname,
+    fileName,
     size: file.size,
     lastModified: Date.now(),
     savedAt: queuedAt,
@@ -1848,12 +1865,13 @@ function parseKcfxClientRecordPayload(payload) {
 function buildKcfxClientParsedFileRecord(file, storedFile, slot, clientRecord) {
   const completedAt = new Date().toISOString();
   const diagnostics = clientRecord.parseDiagnostics || {};
+  const fileName = normalizeUploadedFileName(file.originalname);
   return {
     id: slot.id,
     type: slot.type,
     title: slot.title,
     expectedName: slot.expectedName,
-    fileName: file.originalname,
+    fileName,
     size: file.size,
     lastModified: Number(clientRecord.lastModified || Date.now()),
     savedAt: completedAt,
@@ -2006,6 +2024,7 @@ app.post('/api/kcfx-library/records/:id/upload', upload.single('file'), async (r
     return res.status(400).json({ error: 'invalid slot' });
   }
   if (!req.file) return res.status(400).json({ error: 'missing file' });
+  req.file.originalname = normalizeUploadedFileName(req.file.originalname);
   if (!/\.(xlsx|xlsm|xls|csv)$/i.test(req.file.originalname || '')) {
     await removeUploadedFile(req.file.filename);
     return res.status(400).json({ error: 'unsupported file type' });
