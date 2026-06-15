@@ -77,8 +77,12 @@ function createInspectionNoticeRow(values = {}) {
 function App() {
   const [activeTab, setActiveTab] = useState('ledger');
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('invoiceUser') || 'null'));
-  const [loginName, setLoginName] = useState('孙立柱');
-  const [password, setPassword] = useState('521sunlizhu');
+  const [authMode, setAuthMode] = useState('login');
+  const [loginName, setLoginName] = useState('');
+  const [password, setPassword] = useState('');
+  const [registerName, setRegisterName] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [registerPasswordConfirm, setRegisterPasswordConfirm] = useState('');
   const [invoices, setInvoices] = useState([]);
   const [drafts, setDrafts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -116,6 +120,7 @@ function App() {
   const [systemFilePackages, setSystemFilePackages] = useState([]);
   const [newUserName, setNewUserName] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('123456');
+  const [passwordResets, setPasswordResets] = useState({});
   const systemOwnerName = '孙立柱';
   const permissionGroups = [
     {
@@ -711,18 +716,53 @@ function App() {
 
   async function login(event) {
     event.preventDefault();
+    const name = loginName.trim();
+    if (!name || !password) {
+      setMessage('请填写姓名和密码。');
+      return;
+    }
     const res = await fetch(`${API}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: loginName, password })
+      body: JSON.stringify({ name, password })
     });
     if (!res.ok) {
-      setMessage('账号或密码不正确。');
+      setMessage(res.status === 403 ? '注册申请待孙立柱审核，审核通过后再登录。' : '账号或密码不正确。');
       return;
     }
     const nextUser = await res.json();
     localStorage.setItem('invoiceUser', JSON.stringify(nextUser));
     setUser(nextUser);
+    setPassword('');
+    setMessage('');
+  }
+
+  async function register(event) {
+    event.preventDefault();
+    const name = registerName.trim();
+    const nextPassword = registerPassword.trim();
+    if (!name || !nextPassword) {
+      setMessage('请填写注册姓名和密码。');
+      return;
+    }
+    if (nextPassword !== registerPasswordConfirm.trim()) {
+      setMessage('两次密码不一致。');
+      return;
+    }
+    const res = await fetch(`${API}/api/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, password: nextPassword })
+    });
+    if (!res.ok) {
+      setMessage(res.status === 409 ? '这个姓名已经存在，请直接登录或联系孙立柱。' : '注册申请提交失败。');
+      return;
+    }
+    setRegisterName('');
+    setRegisterPassword('');
+    setRegisterPasswordConfirm('');
+    setAuthMode('login');
+    setMessage('注册申请已提交，请等待孙立柱审核后登录。');
   }
 
   async function uploadFiles(files) {
@@ -998,7 +1038,8 @@ function App() {
         name,
         password: newUserPassword || '123456',
         role: '普通用户',
-        permissions: []
+        permissions: [],
+        status: 'approved'
       })
     });
     if (!res.ok) {
@@ -1019,11 +1060,25 @@ function App() {
     });
     if (!res.ok) {
       setMessage('权限保存失败。');
-      return;
+      return false;
     }
     const updated = await res.json();
     setManagedUsers((rows) => rows.map((row) => row.id === updated.id ? updated : row));
     setMessage('权限已保存。');
+    return true;
+  }
+
+  async function resetManagedPassword(target) {
+    const nextPassword = String(passwordResets[target.id] || '').trim();
+    if (!nextPassword) {
+      setMessage('请填写新密码。');
+      return;
+    }
+    const ok = await updateManagedUser(target, { password: nextPassword });
+    if (ok) {
+      setPasswordResets((current) => ({ ...current, [target.id]: '' }));
+      setMessage(`${target.name} 的密码已重置。`);
+    }
   }
 
   function managedPermissionSet(target) {
@@ -1146,19 +1201,87 @@ function App() {
   if (!user) {
     return (
       <main className="login-shell">
-        <form className="login-panel" onSubmit={login}>
-          <h1>供应链AI系统</h1>
-          <label>
-            账号
-            <input value={loginName} onChange={(event) => setLoginName(event.target.value)} />
-          </label>
-          <label>
-            密码
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
-          </label>
-          <button>登录</button>
-          {message && <p className="message">{message}</p>}
-        </form>
+        {authMode === 'login' ? (
+          <form className="login-panel" onSubmit={login}>
+            <h1>供应链AI系统</h1>
+            <label>
+              姓名
+              <input
+                name="username"
+                autoComplete="username"
+                value={loginName}
+                onChange={(event) => setLoginName(event.target.value)}
+              />
+            </label>
+            <label>
+              密码
+              <input
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
+            <button>登录</button>
+            <button
+              type="button"
+              className="ghost auth-switch-button"
+              onClick={() => {
+                setAuthMode('register');
+                setMessage('');
+              }}
+            >
+              注册
+            </button>
+            {message && <p className="message">{message}</p>}
+          </form>
+        ) : (
+          <form className="login-panel" onSubmit={register}>
+            <h1>申请注册</h1>
+            <label>
+              姓名
+              <input
+                name="username"
+                autoComplete="username"
+                value={registerName}
+                onChange={(event) => setRegisterName(event.target.value)}
+              />
+            </label>
+            <label>
+              密码
+              <input
+                name="new-password"
+                type="password"
+                autoComplete="new-password"
+                value={registerPassword}
+                onChange={(event) => setRegisterPassword(event.target.value)}
+              />
+            </label>
+            <label>
+              确认密码
+              <input
+                name="confirm-password"
+                type="password"
+                autoComplete="new-password"
+                value={registerPasswordConfirm}
+                onChange={(event) => setRegisterPasswordConfirm(event.target.value)}
+              />
+            </label>
+            <button>提交注册申请</button>
+            <button
+              type="button"
+              className="ghost auth-switch-button"
+              onClick={() => {
+                setAuthMode('login');
+                setMessage('');
+              }}
+            >
+              返回登录
+            </button>
+            {message && <p className="message">{message}</p>}
+          </form>
+        )}
       </main>
     );
   }
@@ -1356,7 +1479,13 @@ function App() {
               <button type="submit">保存邮件配置</button>
             </form>
           )}
-          <button onClick={() => { localStorage.removeItem('invoiceUser'); setUser(null); }}>退出</button>
+          <button onClick={() => {
+            localStorage.removeItem('invoiceUser');
+            setUser(null);
+            setLoginName('');
+            setPassword('');
+            setAuthMode('login');
+          }}>退出</button>
         </div>
       </aside>
 
@@ -1771,9 +1900,27 @@ function App() {
             <DataTable
               className="permission-table"
               rows={managedUsers}
-              columns={['姓名', '角色', '权限', '密码']}
+              columns={['姓名', '状态', '角色', '权限', '密码']}
               render={(row) => [
                 row.name,
+                row.name === systemOwnerName ? (
+                  <span className="status-badge approved">已通过</span>
+                ) : (
+                  <div className="status-actions">
+                    <span className={`status-badge ${row.status === 'pending' ? 'pending' : 'approved'}`}>
+                      {row.status === 'pending' ? '待审核' : '已通过'}
+                    </span>
+                    {row.status === 'pending' && (
+                      <button
+                        type="button"
+                        className="ghost compact-button"
+                        onClick={() => updateManagedUser(row, { status: 'approved' })}
+                      >
+                        同意注册
+                      </button>
+                    )}
+                  </div>
+                ),
                 row.name === systemOwnerName ? (
                   <span>管理员</span>
                 ) : (
@@ -1827,18 +1974,32 @@ function App() {
                 row.name === systemOwnerName ? (
                   <span>固定管理员</span>
                 ) : (
-                  <input
-                    className="table-input"
-                    type="password"
-                    placeholder="填写新密码后回车"
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        updateManagedUser(row, { password: event.currentTarget.value });
-                        event.currentTarget.value = '';
-                      }
-                    }}
-                  />
+                  <div className="password-reset-cell">
+                    <input
+                      className="table-input"
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder="填写新密码"
+                      value={passwordResets[row.id] || ''}
+                      onChange={(event) => setPasswordResets((current) => ({
+                        ...current,
+                        [row.id]: event.target.value
+                      }))}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          resetManagedPassword(row);
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="ghost compact-button"
+                      onClick={() => resetManagedPassword(row)}
+                    >
+                      重置密码
+                    </button>
+                  </div>
                 )
               ]}
             />

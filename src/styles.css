@@ -54,6 +54,11 @@ button.danger-button {
   font-size: 24px;
 }
 
+.auth-switch-button {
+  width: 100%;
+  margin-top: 10px;
+}
+
 label {
   display: grid;
   gap: 8px;
@@ -211,7 +216,41 @@ select {
 }
 
 .permission-table table {
-  min-width: 900px;
+  min-width: 1040px;
+}
+
+.status-actions,
+.password-reset-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  height: 26px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-badge.approved {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.status-badge.pending {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.password-reset-cell .table-input {
+  min-width: 160px;
 }
 
 .permission-checks {

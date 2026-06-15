@@ -27,6 +27,8 @@ const SYSTEM_OWNER_NAME = '孙立柱';
 const ROLE_ADMIN = '管理员';
 const ROLE_FINANCE = '财务';
 const ROLE_USER = '普通用户';
+const USER_STATUS_APPROVED = 'approved';
+const USER_STATUS_PENDING = 'pending';
 const SALES_INVENTORY_PERMISSIONS = [
   'salesInventory.receiptSummary',
   'salesInventory.salesAnalysis',
@@ -165,13 +167,15 @@ function normalizeUser(user) {
   const isOwner = name === SYSTEM_OWNER_NAME;
   const role = isOwner ? ROLE_ADMIN : (user.role === ROLE_FINANCE ? ROLE_FINANCE : ROLE_USER);
   const permissions = isOwner ? [...OWNER_PERMISSIONS] : sanitizeAssignablePermissions(user.permissions);
+  const status = isOwner || user.status !== USER_STATUS_PENDING ? USER_STATUS_APPROVED : USER_STATUS_PENDING;
   return {
     ...user,
     id: user.id || crypto.randomUUID(),
     name,
     password: String(user.password || '123456'),
     role,
-    permissions
+    permissions,
+    status
   };
 }
 
@@ -180,7 +184,8 @@ function publicUser(user) {
     id: user.id,
     name: user.name,
     role: user.role,
-    permissions: user.permissions || []
+    permissions: user.permissions || [],
+    status: user.status || USER_STATUS_APPROVED
   };
 }
 
@@ -546,7 +551,7 @@ async function removeUploadedFile(fileName) {
 }
 
 function canSeeAll(role) {
-  return ['管理员', '财务'].includes(role);
+  return canSeeAllRole(role);
 }
 
 function resolveRequestUser(db, source = {}) {
@@ -555,8 +560,14 @@ function resolveRequestUser(db, source = {}) {
   return db.users.find((item) => item.name === name) || null;
 }
 
+function isUserApproved(user) {
+  if (!user) return false;
+  return user.name === SYSTEM_OWNER_NAME || user.status === USER_STATUS_APPROVED;
+}
+
 function canAccessRow(row, requestUser) {
   if (!requestUser) return false;
+  if (!isUserApproved(requestUser)) return false;
   if (canSeeAllRole(requestUser.role)) return true;
   return row.owner === requestUser.name || row.uploadedBy === requestUser.name;
 }
@@ -606,6 +617,7 @@ const LEGACY_PERMISSION_ALIASES = {
 function hasUserPermission(user, permission) {
   if (!user) return false;
   if (user.name === SYSTEM_OWNER_NAME) return true;
+  if (!isUserApproved(user)) return false;
   const permissions = Array.isArray(user.permissions) ? user.permissions : [];
   return permissions.includes(permission) || (LEGACY_PERMISSION_ALIASES[permission] || []).some((item) => permissions.includes(item));
 }
@@ -1089,8 +1101,32 @@ async function reprocessDraft(draft, db) {
 
 app.post('/api/login', async (req, res) => {
   const db = await ensureDb();
-  const user = db.users.find((item) => item.name === req.body.name && item.password === req.body.password);
+  const name = String(req.body.name || '').trim();
+  const password = String(req.body.password || '');
+  const user = db.users.find((item) => item.name === name && item.password === password);
   if (!user) return res.status(401).json({ error: 'invalid credentials' });
+  if (!isUserApproved(user)) return res.status(403).json({ error: 'pending approval' });
+  res.json(publicUser(user));
+});
+
+app.post('/api/register', async (req, res) => {
+  const db = await ensureDb();
+  const name = String(req.body.name || '').trim();
+  const password = String(req.body.password || '').trim();
+  if (!name || !password) return res.status(400).json({ error: 'missing name or password' });
+  if (db.users.some((item) => item.name === name)) return res.status(409).json({ error: 'user exists' });
+
+  const user = normalizeUser({
+    id: crypto.randomUUID(),
+    name,
+    password,
+    role: ROLE_USER,
+    permissions: [],
+    status: USER_STATUS_PENDING
+  });
+  db.users.push(user);
+  pushLog(db, '注册申请', SYSTEM_OWNER_NAME, `${name} 申请注册，等待孙立柱审核。`, '系统管理', '权限管理');
+  await saveDb(db);
   res.json(publicUser(user));
 });
 
@@ -1111,7 +1147,8 @@ app.post('/api/users', async (req, res) => {
     name,
     password: req.body.password || '123456',
     role: req.body.role || ROLE_USER,
-    permissions: Array.isArray(req.body.permissions) ? req.body.permissions : DEFAULT_PERMISSIONS
+    permissions: Array.isArray(req.body.permissions) ? req.body.permissions : DEFAULT_PERMISSIONS,
+    status: USER_STATUS_APPROVED
   });
   db.users.push(user);
   await saveDb(db);
@@ -1134,6 +1171,9 @@ app.patch('/api/users/:id', async (req, res) => {
     }
     if (String(req.body.password || '').trim()) {
       target.password = String(req.body.password).trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'status')) {
+      target.status = req.body.status === USER_STATUS_PENDING ? USER_STATUS_PENDING : USER_STATUS_APPROVED;
     }
   }
 
