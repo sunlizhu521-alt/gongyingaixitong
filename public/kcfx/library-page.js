@@ -65,21 +65,50 @@ async function uploadAllToServer() {
   if (button) button.disabled = true;
   setLibraryStatus(`正在上传 ${uploadableSlots.length} 个文件到腾讯云服务器...`);
   let uploaded = 0;
+  let queued = 0;
   try {
     for (const { slot, file } of uploadableSlots) {
       const serverRecord = await uploadKcfxServerFile(slot, file);
       await saveRecord(serverRecord);
+      if (serverRecord?.parseStatus && serverRecord.parseStatus !== "ready") queued += 1;
       uploaded += 1;
       setLibraryStatus(`正在上传到腾讯云服务器：${uploaded}/${uploadableSlots.length}`);
     }
     await loadSharedLibrary({ statusEl: $("#sharedStatus"), force: true });
     await renderLibrary();
+    if (queued) {
+      scheduleServerParseRefresh();
+      setLibraryStatus(`已保存 ${uploaded} 个原始文件到腾讯云服务器，后台解析中。`);
+      return;
+    }
     setLibraryStatus(`已上传到腾讯云服务器：${uploaded} 个文件。`);
   } catch (error) {
     setLibraryStatus(`上传到腾讯云服务器失败：${error?.message || error}`);
   } finally {
     if (button) button.disabled = false;
   }
+}
+
+let serverParseRefreshTimer = null;
+let serverParseRefreshCount = 0;
+
+function shouldWaitForServerParse(records) {
+  return Object.values(records || {}).some((record) => ["queued", "parsing"].includes(record?.parseStatus));
+}
+
+function scheduleServerParseRefresh() {
+  window.clearTimeout(serverParseRefreshTimer);
+  serverParseRefreshTimer = window.setTimeout(async () => {
+    serverParseRefreshCount += 1;
+    const result = await loadSharedLibrary({ statusEl: $("#sharedStatus"), force: true }).catch(() => null);
+    await renderLibrary();
+    const records = result?.manifest?.records || {};
+    if (serverParseRefreshCount < 8 && shouldWaitForServerParse(records)) {
+      scheduleServerParseRefresh();
+    } else {
+      serverParseRefreshCount = 0;
+    }
+  }, 3000);
 }
 
 async function refreshAll() {
@@ -237,6 +266,7 @@ function renderCard(slot, record, labels) {
         <span>引用路径</span>
         <strong>${escapeHtml(recordReferencePath(record))}</strong>
       </div>
+      ${renderParseStatus(displayRecord)}
       ${renderParseDiagnostics(displayRecord)}
       <input class="slot-file-input" type="file" accept=".xlsx,.xlsm,.xls,.csv" data-file-input="${slot.id}">
       <div class="card-actions">
@@ -351,6 +381,12 @@ async function saveSlot(slotId) {
     status.textContent = "正在上传原始文件到腾讯云服务器并解析...";
     const nextRecord = await uploadKcfxServerFile(slot, file);
     await saveRecord(nextRecord);
+    if (nextRecord?.parseStatus && nextRecord.parseStatus !== "ready") {
+      status.textContent = "已保存到腾讯云服务器，后台解析中。";
+      scheduleServerParseRefresh();
+      await renderLibrary();
+      return;
+    }
     status.textContent = "已上传到腾讯云服务器并解析保存，其他人刷新后会读取这份文件。";
     await renderLibrary();
   } catch (error) {
@@ -381,6 +417,12 @@ async function saveSlotFile(slotId, file) {
     status.textContent = "正在上传原始文件到腾讯云服务器并解析...";
     const nextRecord = await uploadKcfxServerFile(slot, file);
     await saveRecord(nextRecord);
+    if (nextRecord?.parseStatus && nextRecord.parseStatus !== "ready") {
+      status.textContent = "已保存到腾讯云服务器，后台解析中。";
+      scheduleServerParseRefresh();
+      await renderLibrary();
+      return;
+    }
     status.textContent = "已上传到腾讯云服务器并解析保存，其他人刷新后会读取这份文件。";
     await renderLibrary();
   } catch (error) {
@@ -451,6 +493,23 @@ function recordReferencePath(record) {
   const source = record.libraryPath ? "库存分析看板文件库 + 浏览器本地库" : record.sharedSavedAt ? "GitHub共享包 + 浏览器本地库" : "浏览器本地库";
   const githubPath = record.libraryPath || `data/kcfx-library/${record.type === "fact" ? "fact" : "dimensions"}/${record.id}.json`;
   return `${source} / IndexedDB: ${KC_DB_NAME}/${KC_STORE}/${record.id} / GitHub: ${githubPath}`;
+}
+
+function renderParseStatus(record) {
+  const status = record?.parseStatus || (record?.rows ? "ready" : "");
+  if (!status) return "";
+  const labels = {
+    queued: "已保存，等待后台解析",
+    parsing: "后台解析中",
+    ready: "解析完成",
+    failed: `解析失败：${record?.parseError || "请重新上传"}`
+  };
+  return `
+    <div class="slot-info parse-status">
+      <span>服务器状态</span>
+      <strong>${escapeHtml(labels[status] || status)}</strong>
+    </div>
+  `;
 }
 
 function renderParseDiagnostics(record) {

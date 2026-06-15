@@ -1758,6 +1758,7 @@ function parseKcfxSlotPayload(slotId, payload) {
 }
 
 function buildKcfxFileRecord(file, storedFile, slot, parsed) {
+  const completedAt = new Date().toISOString();
   return {
     id: slot.id,
     type: slot.type,
@@ -1766,19 +1767,51 @@ function buildKcfxFileRecord(file, storedFile, slot, parsed) {
     fileName: file.originalname,
     size: file.size,
     lastModified: Date.now(),
-    savedAt: new Date().toISOString(),
-    appliedAt: new Date().toISOString(),
+    savedAt: completedAt,
+    appliedAt: completedAt,
     sheetName: parsed.sheetName,
     serverFileName: storedFile.fileName,
     serverFilePath: storedFile.relativePath,
     serverFileCategory: 'original',
     serverFileLibrary: 'maintenance-library',
+    parseStatus: 'ready',
+    parseCompletedAt: completedAt,
     parseDiagnostics: {
       ...buildKcfxParseDiagnostics(parsed),
       readMode: 'server',
       fallbackAttempts: []
     },
     rows: parsed.rows
+  };
+}
+
+function buildQueuedKcfxFileRecord(file, storedFile, slot, previousRecord, requestUserName) {
+  const queuedAt = new Date().toISOString();
+  const previousRows = Array.isArray(previousRecord?.rows) ? previousRecord.rows : [];
+  return {
+    ...(previousRecord || {}),
+    id: slot.id,
+    type: slot.type,
+    title: slot.title,
+    expectedName: slot.expectedName,
+    fileName: file.originalname,
+    size: file.size,
+    lastModified: Date.now(),
+    savedAt: queuedAt,
+    appliedAt: previousRecord?.appliedAt || queuedAt,
+    serverFileName: storedFile.fileName,
+    serverFilePath: storedFile.relativePath,
+    serverFileCategory: 'original',
+    serverFileLibrary: 'maintenance-library',
+    serverSavedAt: queuedAt,
+    serverSavedBy: requestUserName,
+    parseStatus: 'queued',
+    parseQueuedAt: queuedAt,
+    parseStartedAt: '',
+    parseCompletedAt: '',
+    parseFailedAt: '',
+    parseError: '',
+    rows: previousRows
   };
 }
 
@@ -1830,6 +1863,63 @@ function parseKcfxWorkbookFile(filePath, slot) {
   return parseKcfxWorkbookRows(workbook, slot);
 }
 
+function scheduleKcfxFileParse(job) {
+  setTimeout(() => {
+    parseKcfxStoredFile(job).catch((error) => {
+      console.error('kcfx background parse failed', error);
+    });
+  }, 0);
+}
+
+async function parseKcfxStoredFile({ id, slot, file, storedFile, previousRecord, requestUserName }) {
+  const parseStartedAt = new Date().toISOString();
+  let db = await ensureDb();
+  const currentRecord = db.kcfxLibrary.records[id];
+  if (!currentRecord || currentRecord.serverFilePath !== storedFile.relativePath) return;
+  db.kcfxLibrary.records[id] = {
+    ...currentRecord,
+    parseStatus: 'parsing',
+    parseStartedAt,
+    parseError: ''
+  };
+  db.kcfxLibrary.savedAt = parseStartedAt;
+  await saveDb(db);
+
+  try {
+    const parsed = parseKcfxWorkbookFile(storedFile.fullPath, slot);
+    if (!parsed.rows.length) throw new Error('file parsed no valid rows');
+    const record = buildKcfxFileRecord(file, storedFile, slot, parsed);
+    db = await ensureDb();
+    const latestRecord = db.kcfxLibrary.records[id];
+    if (!latestRecord || latestRecord.serverFilePath !== storedFile.relativePath) return;
+    db.kcfxLibrary.records[id] = {
+      ...record,
+      serverSavedAt: latestRecord.serverSavedAt || record.savedAt,
+      serverSavedBy: requestUserName,
+      parseQueuedAt: latestRecord.parseQueuedAt || record.savedAt,
+      parseStartedAt
+    };
+    db.kcfxLibrary.savedAt = new Date().toISOString();
+    await removeKcfxStoredFile(previousRecord);
+    pushLog(db, 'kcfx file library parsed', requestUserName, `${requestUserName} uploaded and parsed ${record.title || id}`);
+    await saveDb(db);
+  } catch (error) {
+    db = await ensureDb();
+    const latestRecord = db.kcfxLibrary.records[id];
+    if (!latestRecord || latestRecord.serverFilePath !== storedFile.relativePath) return;
+    db.kcfxLibrary.records[id] = {
+      ...latestRecord,
+      parseStatus: 'failed',
+      parseFailedAt: new Date().toISOString(),
+      parseError: error?.message || 'parse failed',
+      rows: Array.isArray(previousRecord?.rows) ? previousRecord.rows : latestRecord.rows || []
+    };
+    db.kcfxLibrary.savedAt = new Date().toISOString();
+    pushLog(db, 'kcfx file library parse failed', requestUserName, `${requestUserName} uploaded ${latestRecord.title || id}, background parse failed`);
+    await saveDb(db);
+  }
+}
+
 app.get('/api/kcfx-library', async (req, res) => {
   const db = await ensureDb();
   res.json(publicKcfxLibrary(db));
@@ -1858,19 +1948,24 @@ app.post('/api/kcfx-library/records/:id/upload', upload.single('file'), async (r
   try {
     const slot = parseKcfxSlotPayload(id, req.body.slot);
     storedFile = await saveKcfxOriginalFile(id, req.file);
-    const parsed = parseKcfxWorkbookFile(storedFile.fullPath, slot);
-    if (!parsed.rows.length) throw new Error('文件未解析到有效行');
-    const record = buildKcfxFileRecord(req.file, storedFile, slot, parsed);
-    db.kcfxLibrary.records[id] = {
-      ...record,
-      serverSavedAt: new Date().toISOString(),
-      serverSavedBy: requestUser.name
-    };
+    const queuedRecord = buildQueuedKcfxFileRecord(req.file, storedFile, slot, previousRecord, requestUser.name);
+    db.kcfxLibrary.records[id] = queuedRecord;
     db.kcfxLibrary.savedAt = new Date().toISOString();
-    await removeKcfxStoredFile(previousRecord);
-    pushLog(db, '文件库上传', requestUser.name, `${requestUser.name} 上传并解析销售及库存看板文件库：${record.title || id}`);
+    pushLog(db, 'kcfx file library uploaded', requestUser.name, `${requestUser.name} uploaded ${queuedRecord.title || id}, background parse queued`);
     await saveDb(db);
-    res.json({ ok: true, library: publicKcfxLibrary(db), record: db.kcfxLibrary.records[id] });
+    res.status(202).json({ ok: true, queued: true, library: publicKcfxLibrary(db), record: db.kcfxLibrary.records[id] });
+    scheduleKcfxFileParse({
+      id,
+      slot,
+      file: {
+        originalname: req.file.originalname,
+        size: req.file.size
+      },
+      storedFile,
+      previousRecord,
+      requestUserName: requestUser.name
+    });
+    return;
   } catch (error) {
     if (storedFile?.fullPath) {
       try {

@@ -180,7 +180,13 @@ async function uploadKcfxServerFile(slot, file) {
     throw new Error(payload.error || `HTTP ${response.status}`);
   }
   const payload = await response.json();
-  return payload.record;
+  const record = payload.record || {};
+  return {
+    ...record,
+    libraryPath: `${KC_SERVER_LIBRARY_API}/records/${encodeURIComponent(slot.id)}`,
+    libraryManifestPath: KC_SERVER_LIBRARY_API,
+    sharedSavedAt: record.serverSavedAt || record.savedAt || new Date().toISOString()
+  };
 }
 
 async function deleteKcfxServerRecord(id) {
@@ -211,6 +217,24 @@ function isLocalBrowserRecord(record) {
 
 function isSharedLibraryRecord(record) {
   return Boolean(record?.libraryPath || record?.libraryManifestPath || record?.sharedSavedAt);
+}
+
+function recordIsNewer(shared, local) {
+  const sharedTime = Math.max(
+    Date.parse(shared?.parseCompletedAt || 0) || 0,
+    Date.parse(shared?.serverSavedAt || 0) || 0,
+    Date.parse(shared?.savedAt || 0) || 0,
+    Date.parse(shared?.appliedAt || 0) || 0,
+    Date.parse(shared?.sharedSavedAt || 0) || 0
+  );
+  const localTime = Math.max(
+    Date.parse(local?.parseCompletedAt || 0) || 0,
+    Date.parse(local?.serverSavedAt || 0) || 0,
+    Date.parse(local?.savedAt || 0) || 0,
+    Date.parse(local?.appliedAt || 0) || 0,
+    Date.parse(local?.sharedSavedAt || 0) || 0
+  );
+  return sharedTime > localTime;
 }
 
 async function clearStaleSharedRecords(activeSharedIds) {
