@@ -370,6 +370,19 @@ h3 {
   display: grid;
 }
 
+.date-filter {
+  display: grid;
+  gap: 4px;
+  color: #475569;
+  font-size: 12px;
+}
+
+.date-filter input {
+  width: 148px;
+  height: 34px;
+  padding: 0 10px;
+}
+
 .multi-filter-button,
 .compact-button,
 .quick-filter-button {

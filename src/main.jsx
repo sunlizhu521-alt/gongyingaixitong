@@ -102,6 +102,10 @@ function App() {
   const [dimensionShortNameFilter, setDimensionShortNameFilter] = useState([]);
   const [dimensionOwnerFilter, setDimensionOwnerFilter] = useState([]);
   const [dimensionAnnualFilter, setDimensionAnnualFilter] = useState([]);
+  const [logSecondPageFilter, setLogSecondPageFilter] = useState([]);
+  const [logThirdPageFilter, setLogThirdPageFilter] = useState([]);
+  const [logStartDate, setLogStartDate] = useState('');
+  const [logEndDate, setLogEndDate] = useState('');
   const [managedUsers, setManagedUsers] = useState([]);
   const [systemFilePackages, setSystemFilePackages] = useState([]);
   const [newUserName, setNewUserName] = useState('');
@@ -466,6 +470,28 @@ function App() {
       .map((value) => ({ value, label: value }));
   }
 
+  function classifyLogPage(row) {
+    const type = String(row.type || '');
+    const content = String(row.content || '');
+    const text = `${type} ${content}`;
+    if (text.includes('验货通知')) {
+      return { secondPage: '品质验货', thirdPage: '验货通知' };
+    }
+    if (text.includes('发票库存删除')) {
+      return { secondPage: '系统文件库', thirdPage: '发票信息库存查看' };
+    }
+    if (text.includes('供应商') && (text.includes('维度') || text.includes('账期') || text.includes('采购'))) {
+      return { secondPage: '维护文件库', thirdPage: '供应商管理维度表' };
+    }
+    if (text.includes('OCR') || text.includes('已上传') || text.includes('上传')) {
+      return { secondPage: '供应商付款提醒', thirdPage: '发票上传' };
+    }
+    if (text.includes('付款') || text.includes('OA') || text.includes('状态更新') || text.includes('定时邮件')) {
+      return { secondPage: '供应商付款提醒', thirdPage: '供应商付款看板' };
+    }
+    return { secondPage: '未分类', thirdPage: '未分类' };
+  }
+
   const supplierOptions = useMemo(() => {
     const seen = new Set();
     return invoices
@@ -535,6 +561,32 @@ function App() {
       (dimensionAnnualFilter.length === 0 || dimensionAnnualFilter.includes(row.hasAnnualFrame))
     );
   }, [appliedDimensionRows, dimensionAnnualFilter, dimensionOwnerFilter, dimensionShortNameFilter]);
+  const logRows = useMemo(() => {
+    return reminders.map((row) => ({
+      ...row,
+      ...classifyLogPage(row)
+    }));
+  }, [reminders]);
+  const logSecondPageOptions = useMemo(() => {
+    return uniqueValueOptions(logRows.map((row) => row.secondPage));
+  }, [logRows]);
+  const logThirdPageOptions = useMemo(() => {
+    const availableRows = logSecondPageFilter.length
+      ? logRows.filter((row) => logSecondPageFilter.includes(row.secondPage))
+      : logRows;
+    return uniqueValueOptions(availableRows.map((row) => row.thirdPage));
+  }, [logRows, logSecondPageFilter]);
+  const filteredLogRows = useMemo(() => {
+    const start = logStartDate ? parseLocalDate(logStartDate) : null;
+    const end = logEndDate ? parseLocalDate(logEndDate) : null;
+    return logRows.filter((row) => {
+      const rowDate = parseLocalDate(String(row.createdAt || '').slice(0, 10));
+      return (logSecondPageFilter.length === 0 || logSecondPageFilter.includes(row.secondPage)) &&
+        (logThirdPageFilter.length === 0 || logThirdPageFilter.includes(row.thirdPage)) &&
+        (!start || (rowDate && rowDate >= start)) &&
+        (!end || (rowDate && rowDate <= end));
+    });
+  }, [logEndDate, logRows, logSecondPageFilter, logStartDate, logThirdPageFilter]);
   const supplierStats = useMemo(() => {
     const failed = supplierImportResult?.failedCount || 0;
     const success = supplierImportResult?.importedCount ?? suppliers.length;
@@ -608,6 +660,14 @@ function App() {
     setDimensionShortNameFilter([]);
     setDimensionOwnerFilter([]);
     setDimensionAnnualFilter([]);
+  }
+
+  function resetLogFilters() {
+    setLogSecondPageFilter([]);
+    setLogThirdPageFilter([]);
+    setLogStartDate('');
+    setLogEndDate('');
+    setOpenFilter('');
   }
 
   async function login(event) {
@@ -1582,11 +1642,53 @@ function App() {
 
         {activeTab === 'reminders' && canAccessTab('reminders') && (
           <>
-            <h2>操作日志</h2>
+            <div className="section-heading-row">
+              <h2>操作日志</h2>
+              <span className="section-count">筛选结果 {filteredLogRows.length} / {logRows.length}</span>
+            </div>
+            <div className="filter-row log-filter-row" onClick={(event) => event.stopPropagation()}>
+              <MultiFilter
+                id="logSecondPage"
+                label="二级页面"
+                allLabel="二级页面"
+                options={logSecondPageOptions}
+                selected={logSecondPageFilter}
+                onChange={setLogSecondPageFilter}
+                openFilter={openFilter}
+                setOpenFilter={setOpenFilter}
+              />
+              <MultiFilter
+                id="logThirdPage"
+                label="三级页面"
+                allLabel="三级页面"
+                options={logThirdPageOptions}
+                selected={logThirdPageFilter}
+                onChange={setLogThirdPageFilter}
+                openFilter={openFilter}
+                setOpenFilter={setOpenFilter}
+              />
+              <div className="date-filter">
+                <span>开始时间</span>
+                <input
+                  type="date"
+                  value={logStartDate}
+                  onChange={(event) => setLogStartDate(event.target.value)}
+                />
+              </div>
+              <div className="date-filter">
+                <span>结束时间</span>
+                <input
+                  type="date"
+                  value={logEndDate}
+                  onChange={(event) => setLogEndDate(event.target.value)}
+                />
+              </div>
+              <button className="ghost compact-button" onClick={resetLogFilters}>清空筛选</button>
+            </div>
             <DataTable
-              rows={reminders}
-              columns={['时间', '类型', '对象', '内容']}
-              render={(row) => [row.createdAt, row.type, row.target, row.content]}
+              rows={filteredLogRows}
+              columns={['时间', '二级页面', '三级页面', '类型', '对象', '内容']}
+              render={(row) => [row.createdAt, row.secondPage, row.thirdPage, row.type, row.target, row.content]}
             />
           </>
         )}
