@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function bindToolbar() {
   $("#refreshBtn").addEventListener("click", refreshAll);
+  $("#uploadAllServerBtn")?.addEventListener("click", uploadAllToServer);
   $("#applyAllBtn").addEventListener("click", refreshAll);
   $("#clearCacheBtn")?.addEventListener("click", clearAllLibraryCache);
   $("#downloadSharedBtn").addEventListener("click", downloadSharedLibrary);
@@ -26,10 +27,49 @@ function adminOnlyMessage() {
 
 function applyToolbarPermissions() {
   if (libraryCanManage()) return;
-  ["#applyAllBtn", "#clearCacheBtn", "#downloadSharedBtn", "#importSharedBtn", "#importSharedInput"].forEach((selector) => {
+  ["#uploadAllServerBtn", "#applyAllBtn", "#clearCacheBtn", "#downloadSharedBtn", "#importSharedBtn", "#importSharedInput"].forEach((selector) => {
     const el = $(selector);
     if (el) el.style.display = "none";
   });
+}
+
+async function uploadAllToServer() {
+  if (!libraryCanManage()) {
+    setLibraryStatus(adminOnlyMessage());
+    return;
+  }
+  const button = $("#uploadAllServerBtn");
+  const records = Object.fromEntries((await getAllRecords()).map((record) => [record.id, record]));
+  const uploadableRecords = pageSlots()
+    .map((slot) => getDisplayRecord(records[slot.id]))
+    .filter((record) => record && !isDeletedRecord(record) && Array.isArray(record.rows) && record.rows.length);
+
+  if (!uploadableRecords.length) {
+    setLibraryStatus("当前页面没有可上传到腾讯云服务器的文件。");
+    return;
+  }
+
+  if (button) button.disabled = true;
+  setLibraryStatus(`正在上传 ${uploadableRecords.length} 个文件到腾讯云服务器...`);
+  let uploaded = 0;
+  try {
+    for (const record of uploadableRecords) {
+      const serverRecord = await saveKcfxServerRecord({
+        ...record,
+        appliedAt: record.appliedAt || new Date().toISOString()
+      });
+      await saveRecord(serverRecord);
+      uploaded += 1;
+      setLibraryStatus(`正在上传到腾讯云服务器：${uploaded}/${uploadableRecords.length}`);
+    }
+    await loadSharedLibrary({ statusEl: $("#sharedStatus"), force: true });
+    await renderLibrary();
+    setLibraryStatus(`已上传到腾讯云服务器：${uploaded} 个文件。`);
+  } catch (error) {
+    setLibraryStatus(`上传到腾讯云服务器失败：${error?.message || error}`);
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 async function refreshAll() {
