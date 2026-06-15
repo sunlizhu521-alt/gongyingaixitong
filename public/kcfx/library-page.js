@@ -5,14 +5,8 @@ document.addEventListener("DOMContentLoaded", () => {
   applyEmbeddedHostClass();
   bindToolbar();
   applyToolbarPermissions();
-  renderLibrary().catch((error) => {
-    setLibraryStatus(`文件槽位加载失败：${error?.message || error}`);
-  });
-  loadSharedLibrary({ statusEl: $("#sharedStatus") })
-    .then(() => renderLibrary())
-    .catch((error) => {
-      setLibraryStatus(`文件库同步失败：${error?.message || error}`);
-    });
+  renderLibraryShell();
+  startInitialLibrarySync();
 });
 
 function applyEmbeddedHostClass() {
@@ -45,6 +39,55 @@ function applyToolbarPermissions() {
     const el = $(selector);
     if (el) el.style.display = "none";
   });
+}
+
+function startInitialLibrarySync() {
+  setLibraryLoadProgress(8, "正在读取服务器文件库...");
+  loadSharedLibrary({
+    statusEl: $("#sharedStatus"),
+    onProgress: ({ percent, message }) => setLibraryLoadProgress(percent, message)
+  })
+    .then(() => {
+      setLibraryLoadProgress(92, "正在刷新文件槽位...");
+      return renderLibrary();
+    })
+    .then(() => {
+      setLibraryLoadProgress(100, "文件库读取完成");
+      window.setTimeout(() => setLibraryLoadProgress(0, "", { hidden: true }), 800);
+    })
+    .catch((error) => {
+      setLibraryLoadProgress(100, `文件库同步失败：${error?.message || error}`);
+      setLibraryStatus(`文件库同步失败：${error?.message || error}`);
+    });
+}
+
+function ensureLibraryLoadProgress() {
+  let progress = $("#libraryLoadProgress");
+  if (progress) return progress;
+  const toolbar = document.querySelector(".toolbar");
+  progress = document.createElement("div");
+  progress.id = "libraryLoadProgress";
+  progress.className = "library-load-progress is-hidden";
+  progress.innerHTML = `
+    <div class="library-load-progress-head">
+      <span id="libraryLoadProgressText">正在读取文件库...</span>
+      <strong id="libraryLoadProgressValue">0%</strong>
+    </div>
+    <div class="library-load-progress-track">
+      <span id="libraryLoadProgressBar"></span>
+    </div>
+  `;
+  toolbar?.insertAdjacentElement("afterend", progress);
+  return progress;
+}
+
+function setLibraryLoadProgress(percent, message, options = {}) {
+  const progress = ensureLibraryLoadProgress();
+  const value = Math.max(0, Math.min(100, Number(percent) || 0));
+  progress.classList.toggle("is-hidden", Boolean(options.hidden));
+  $("#libraryLoadProgressText").textContent = message || "";
+  $("#libraryLoadProgressValue").textContent = options.hidden ? "" : `${Math.round(value)}%`;
+  $("#libraryLoadProgressBar").style.width = `${value}%`;
 }
 
 async function uploadAllToServer() {
@@ -115,12 +158,20 @@ function scheduleServerParseRefresh() {
 }
 
 async function refreshAll() {
-  await loadSharedLibrary({ statusEl: $("#sharedStatus"), force: true });
+  setLibraryLoadProgress(8, "正在刷新服务器文件库...");
+  await loadSharedLibrary({
+    statusEl: $("#sharedStatus"),
+    force: true,
+    onProgress: ({ percent, message }) => setLibraryLoadProgress(percent, message)
+  });
+  setLibraryLoadProgress(92, "正在应用文件槽位...");
   const records = Object.fromEntries((await getAllRecords()).map((record) => [record.id, record]));
   const applicableSlots = pageSlots().filter((slot) => getDisplayRecord(records[slot.id]));
   const count = applicableSlots.length;
   if (!count) {
     await renderLibrary();
+    setLibraryLoadProgress(100, "文件库刷新完成");
+    window.setTimeout(() => setLibraryLoadProgress(0, "", { hidden: true }), 800);
     return;
   }
   let appliedCount = 0;
@@ -132,6 +183,8 @@ async function refreshAll() {
     }
   }
   await renderLibrary();
+  setLibraryLoadProgress(100, "文件库刷新完成");
+  window.setTimeout(() => setLibraryLoadProgress(0, "", { hidden: true }), 800);
   setLibraryStatus(appliedCount ? `应用成功：已应用 ${appliedCount} 个文件。` : "当前没有需要应用的文件。");
 }
 
@@ -170,9 +223,17 @@ function pageLabels() {
   return labels[pageType()] || labels.fact;
 }
 
+function renderLibraryShell() {
+  renderLibraryFromRecords({});
+}
+
 async function renderLibrary() {
-  const slots = pageSlots();
   const records = Object.fromEntries((await getAllRecords()).map((record) => [record.id, record]));
+  renderLibraryFromRecords(records);
+}
+
+function renderLibraryFromRecords(records) {
+  const slots = pageSlots();
   const used = slots.filter((slot) => getDisplayRecord(records[slot.id])).length;
   const applied = slots.filter((slot) => records[slot.id]?.appliedAt && !isDeletedRecord(records[slot.id])).length;
   const latest = latestSavedAt(slots, records);

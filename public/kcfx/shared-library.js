@@ -33,8 +33,9 @@ async function fetchKcfxApi(url, options = {}, timeoutMs = KC_SERVER_LOAD_TIMEOU
 
 async function loadSharedLibrary(options = {}) {
   const statusEl = options.statusEl || null;
+  const onProgress = typeof options.onProgress === "function" ? options.onProgress : null;
   if (options.force) kcSharedLibraryLoadPromise = null;
-  if (!kcSharedLibraryLoadPromise) kcSharedLibraryLoadPromise = loadKcfxFileLibrary(null);
+  if (!kcSharedLibraryLoadPromise) kcSharedLibraryLoadPromise = loadKcfxFileLibrary(null, { onProgress });
   const result = await kcSharedLibraryLoadPromise;
   if (statusEl) renderSharedLibraryStatus(statusEl, result);
   return result;
@@ -49,18 +50,25 @@ function renderSharedLibraryStatus(statusEl, result) {
   statusEl.textContent = buildSharedLibraryStatus(result.imported, result.cleared, entries.length);
 }
 
-async function loadKcfxFileLibrary(statusEl) {
+async function loadKcfxFileLibrary(statusEl, options = {}) {
   const cacheKey = `v=${Date.now()}`;
-  const serverResult = await loadServerKcfxFileLibrary(statusEl);
+  const onProgress = typeof options.onProgress === "function" ? options.onProgress : null;
+  onProgress?.({ percent: 12, message: "正在连接服务器文件库..." });
+  const serverResult = await loadServerKcfxFileLibrary(statusEl, { onProgress });
   if (serverResult.ok) return serverResult;
   try {
+    onProgress?.({ percent: 18, message: "服务器文件库不可用，正在读取备用清单..." });
     const response = await fetch(`${KC_FILE_LIBRARY_MANIFEST}?${cacheKey}`, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const manifest = await response.json();
     const entries = Object.entries(manifest.records || {});
     let imported = 0;
 
-    for (const [id, entry] of entries) {
+    for (const [index, [id, entry]] of entries.entries()) {
+      onProgress?.({
+        percent: entries.length ? 20 + Math.round((index / entries.length) * 60) : 80,
+        message: `正在读取备用文件 ${index + 1}/${entries.length}`
+      });
       if (!SLOT_BY_ID[id] || !entry.path) continue;
       const recordResponse = await fetch(`${entry.path}?${cacheKey}`, { cache: "no-store" });
       if (!recordResponse.ok) throw new Error(`${entry.path} HTTP ${recordResponse.status}`);
@@ -81,6 +89,7 @@ async function loadKcfxFileLibrary(statusEl) {
       }
     }
 
+    onProgress?.({ percent: 86, message: "正在清理旧文件记录..." });
     const cleared = await clearStaleSharedRecords(new Set(entries.map(([id]) => id)));
     if (statusEl) statusEl.textContent = buildSharedLibraryStatus(imported, cleared, entries.length);
     return { ok: true, imported, cleared, manifest };
@@ -90,12 +99,15 @@ async function loadKcfxFileLibrary(statusEl) {
   }
 }
 
-async function loadServerKcfxFileLibrary(statusEl) {
+async function loadServerKcfxFileLibrary(statusEl, options = {}) {
+  const onProgress = typeof options.onProgress === "function" ? options.onProgress : null;
   try {
+    onProgress?.({ percent: 20, message: "正在下载服务器文件库..." });
     const response = await fetchKcfxApi(`${KC_SERVER_LIBRARY_API}?v=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    onProgress?.({ percent: 45, message: "正在解析服务器文件库..." });
     const manifest = await response.json();
-    const result = await importLibraryManifestRecords(manifest);
+    const result = await importLibraryManifestRecords(manifest, { onProgress });
     if (statusEl) statusEl.textContent = buildSharedLibraryStatus(result.imported, result.cleared, result.sharedCount);
     return { ok: true, ...result, manifest, source: "server" };
   } catch (error) {
@@ -103,10 +115,15 @@ async function loadServerKcfxFileLibrary(statusEl) {
   }
 }
 
-async function importLibraryManifestRecords(manifest) {
+async function importLibraryManifestRecords(manifest, options = {}) {
   const entries = Object.entries(manifest.records || {});
+  const onProgress = typeof options.onProgress === "function" ? options.onProgress : null;
   let imported = 0;
-  for (const [id, record] of entries) {
+  for (const [index, [id, record]] of entries.entries()) {
+    onProgress?.({
+      percent: entries.length ? 50 + Math.round((index / entries.length) * 35) : 85,
+      message: `正在导入文件记录 ${index + 1}/${entries.length}`
+    });
     if (!SLOT_BY_ID[id] || !Array.isArray(record.rows)) continue;
     const nextRecord = {
       ...record,
@@ -122,6 +139,7 @@ async function importLibraryManifestRecords(manifest) {
       imported += 1;
     }
   }
+  onProgress?.({ percent: 88, message: "正在清理旧文件记录..." });
   const cleared = await clearStaleSharedRecords(new Set(entries.map(([id]) => id)));
   return { imported, cleared, sharedCount: entries.length, manifest };
 }
