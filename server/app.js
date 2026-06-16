@@ -1724,15 +1724,25 @@ let kcfxPreloadCache = {
 };
 let kcfxPreloadPromise = null;
 
-async function buildPreloadedKcfxLibrary(db = null) {
+function normalizeKcfxIds(idsParam) {
+  const ids = String(idsParam || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => KC_LIBRARY_SLOT_IDS.has(id));
+  return ids.length ? new Set(ids) : null;
+}
+
+async function buildPreloadedKcfxLibrary(db = null, options = {}) {
   const database = db || await ensureDb();
   await externalizeKcfxLibraryInlineRows(database);
   const manifest = publicKcfxLibrary(database);
+  const targetIds = options.targetIds || null;
   const records = {};
   let rowCount = 0;
 
   for (const [id, record] of Object.entries(database.kcfxLibrary?.records || {})) {
     if (!KC_LIBRARY_SLOT_IDS.has(id)) continue;
+    if (targetIds && !targetIds.has(id)) continue;
     try {
       const fullRecord = await attachKcfxRecordRows(record);
       records[id] = {
@@ -1809,12 +1819,8 @@ function scheduleKcfxPreloadRefresh(db = null) {
 }
 
 function filterKcfxPreloadCacheByIds(payload, idsParam) {
-  const ids = String(idsParam || '')
-    .split(',')
-    .map((id) => id.trim())
-    .filter(Boolean);
-  if (!ids.length) return payload;
-  const idSet = new Set(ids);
+  const idSet = normalizeKcfxIds(idsParam);
+  if (!idSet) return payload;
   const records = Object.fromEntries(
     Object.entries(payload.records || {}).filter(([id]) => idSet.has(id))
   );
@@ -2261,12 +2267,15 @@ app.get('/api/kcfx-library', async (req, res) => {
 
 app.get('/api/kcfx-library/preloaded', async (req, res) => {
   try {
-    if (req.query.refresh === '1' || kcfxPreloadCache.status === 'idle' || kcfxPreloadCache.status === 'failed') {
-      await refreshKcfxPreloadCache();
-    } else if (kcfxPreloadCache.status === 'loading' && kcfxPreloadPromise) {
-      await kcfxPreloadPromise;
-    }
+    const targetIds = normalizeKcfxIds(req.query.ids);
     res.setHeader('Cache-Control', 'no-store');
+    if (targetIds) {
+      const payload = await buildPreloadedKcfxLibrary(null, { targetIds });
+      return res.json(payload);
+    }
+    if (req.query.refresh === '1' || kcfxPreloadCache.status === 'idle' || kcfxPreloadCache.status === 'failed') {
+      scheduleKcfxPreloadRefresh();
+    }
     res.json(filterKcfxPreloadCacheByIds(kcfxPreloadCache, req.query.ids));
   } catch (error) {
     res.status(500).json({

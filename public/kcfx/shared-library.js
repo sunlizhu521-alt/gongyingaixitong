@@ -3,6 +3,7 @@ const KC_SERVER_LIBRARY_API = `${resolveKcfxApiBase()}/api/kcfx-library`;
 const KC_SERVER_PRELOADED_LIBRARY_API = `${KC_SERVER_LIBRARY_API}/preloaded`;
 const KC_SYSTEM_OWNER_NAME = "孙立柱";
 const KC_SERVER_LOAD_TIMEOUT_MS = 45000;
+const KC_SERVER_PRELOAD_TIMEOUT_MS = 12000;
 const KC_SERVER_UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
 const KC_PRELOAD_STATE_KEY = "kcfx-auto-preload-state";
 const KC_PRELOAD_WAIT_MS = 12000;
@@ -308,15 +309,23 @@ async function loadServerKcfxFileLibrary(statusEl, options = {}) {
   const targetIds = options.targetIds || null;
   try {
     if (!metadataOnly) {
-      const preloadedResult = await loadPreloadedServerKcfxFileLibrary({ onProgress, targetIds });
-      if (statusEl) {
-        statusEl.textContent = buildSharedLibraryStatus(
-          preloadedResult.imported,
-          preloadedResult.cleared,
-          preloadedResult.sharedCount
-        );
+      try {
+        const preloadedResult = await loadPreloadedServerKcfxFileLibrary({ onProgress, targetIds });
+        if (statusEl) {
+          statusEl.textContent = buildSharedLibraryStatus(
+            preloadedResult.imported,
+            preloadedResult.cleared,
+            preloadedResult.sharedCount
+          );
+        }
+        return preloadedResult;
+      } catch (error) {
+        console.warn("kcfx preloaded library failed, falling back to server records", error);
+        onProgress?.({
+          percent: 28,
+          message: "\u9884\u70ed\u6570\u636e\u6682\u672a\u5c31\u7eea\uff0c\u6b63\u5728\u6539\u7528\u670d\u52a1\u5668\u6587\u4ef6\u5e93..."
+        });
       }
-      return preloadedResult;
     }
     onProgress?.({ percent: 20, message: "正在下载服务器文件库..." });
     const response = await fetchKcfxApi(`${KC_SERVER_LIBRARY_API}?v=${Date.now()}`, { cache: "no-store" });
@@ -337,7 +346,7 @@ async function loadPreloadedServerKcfxFileLibrary(options = {}) {
   onProgress?.({ percent: 22, message: "\u6b63\u5728\u8bfb\u53d6\u670d\u52a1\u5668\u5df2\u9884\u70ed\u6570\u636e..." });
   const query = new URLSearchParams({ v: String(Date.now()) });
   if (targetIds) query.set("ids", [...targetIds].join(","));
-  const response = await fetchKcfxApi(`${KC_SERVER_PRELOADED_LIBRARY_API}?${query.toString()}`, { cache: "no-store" });
+  const response = await fetchKcfxApi(`${KC_SERVER_PRELOADED_LIBRARY_API}?${query.toString()}`, { cache: "no-store" }, KC_SERVER_PRELOAD_TIMEOUT_MS);
   if (!response.ok) throw new Error(`preloaded HTTP ${response.status}`);
   const payload = await response.json();
   if (!payload?.ok || payload.status !== "ready") {

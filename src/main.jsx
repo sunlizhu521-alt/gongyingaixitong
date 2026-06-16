@@ -333,11 +333,11 @@ function App() {
   }
 
   function embeddedKcfxSrc(page) {
-    return `/kcfx/${page.sourceFile}?embed=1&v=20260616i`;
+    return `/kcfx/${page.sourceFile}?embed=1&v=20260616j`;
   }
 
   function preloadKcfxSrc() {
-    return `/kcfx/preload.html?preload=1&v=20260616o`;
+    return `/kcfx/preload.html?preload=1&v=20260616p`;
   }
 
   function assertApiResponse(label, response) {
