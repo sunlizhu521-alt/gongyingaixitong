@@ -39,12 +39,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   ["priceBasisFilter", "departmentFilter", "productLineFilter", "seriesFilter", "warehouseTypeFilter", "warehouseLocationFilter", "searchInput"].forEach((id) => {
     $(`#${id}`).addEventListener(id === "searchInput" ? "input" : "change", renderDashboard);
   });
-  await refreshDashboard();
-  loadSharedLibrary({ statusEl: $("#sharedStatus"), ids: DASHBOARD_REQUIRED_SLOTS })
-    .then(refreshDashboard)
-    .catch((error) => {
-      $("#sharedStatus").textContent = `腾讯云数据同步失败：${error?.message || error}`;
+  try {
+    await loadSharedLibrary({
+      statusEl: $("#sharedStatus"),
+      ids: DASHBOARD_REQUIRED_SLOTS,
+      force: true,
+      onProgress: ({ percent, message }) => {
+        const value = Number.isFinite(Number(percent)) ? ` ${Math.round(Number(percent))}%` : "";
+        $("#sharedStatus").textContent = `${message || "正在读取完整数据"}${value}`;
+      }
     });
+  } catch (error) {
+    $("#sharedStatus").textContent = `腾讯云数据同步失败：${error?.message || error}`;
+  }
+  await refreshDashboard();
 });
 
 async function refreshDashboard() {

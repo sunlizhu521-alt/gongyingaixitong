@@ -464,8 +464,8 @@ async function clearStaleSharedRecords(activeSharedIds, options = {}) {
 }
 
 function buildSharedLibraryStatus(imported, cleared, sharedCount) {
-  if (!sharedCount && cleared) return `文件库共享默认数据已清空，已清理 ${cleared} 个旧共享记录。`;
-  if (!sharedCount) return "文件库共享默认数据为空，请上传并应用最新文件。";
+  if (!sharedCount && cleared) return `腾讯云文件库暂无记录，已保留本地槽位，并清理 ${cleared} 个旧共享记录。`;
+  if (!sharedCount) return "腾讯云文件库暂无记录，已保留本地已有槽位。";
   if (imported && cleared) return `已同步 ${imported} 个文件库记录，并清理 ${cleared} 个旧共享记录。`;
   if (imported) return `已同步 ${imported} 个文件库记录。`;
   if (cleared) return `已清理 ${cleared} 个旧共享记录。`;

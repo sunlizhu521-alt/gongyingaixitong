@@ -12,12 +12,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll("[data-download-error]").forEach((button) => {
     button.addEventListener("click", () => downloadSingleErrorTable(button.dataset.downloadError));
   });
-  await runErrorChecks();
-  loadSharedLibrary({ statusEl: $("#checkStatus"), ids: ["fact-inventory", "fact-2", "sales-data", "dim-product", "dim-warehouse", "dim-warehouse-material", "dim-store-name", "dim-customer-material"] })
-    .then(runErrorChecks)
-    .catch((error) => {
-      $("#checkStatus").textContent = `腾讯云数据同步失败：${error?.message || error}`;
+  try {
+    await loadSharedLibrary({
+      statusEl: $("#checkStatus"),
+      ids: ["fact-inventory", "fact-2", "sales-data", "dim-product", "dim-warehouse", "dim-warehouse-material", "dim-store-name", "dim-customer-material"],
+      force: true,
+      onProgress: ({ percent, message }) => {
+        const value = Number.isFinite(Number(percent)) ? ` ${Math.round(Number(percent))}%` : "";
+        $("#checkStatus").textContent = `${message || "正在读取完整数据"}${value}`;
+      }
     });
+  } catch (error) {
+    $("#checkStatus").textContent = `腾讯云数据同步失败：${error?.message || error}`;
+  }
+  await runErrorChecks();
 });
 
 async function runErrorChecks() {

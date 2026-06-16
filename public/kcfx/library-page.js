@@ -124,7 +124,7 @@ function setSingleUploadProgress(status, percent, message) {
   const numericPercent = Number(percent);
   const hasPercent = Number.isFinite(numericPercent);
   const value = hasPercent ? Math.max(0, Math.min(100, numericPercent)) : 0;
-  const text = hasPercent && value >= 100 ? "上传已完成，正在等待服务器保存并解析..." : hasPercent ? `${message} ${Math.round(value)}%` : message;
+  const text = hasPercent && value >= 100 ? "已完成，正在等待服务器保存并解析..." : hasPercent ? `${message} ${Math.round(value)}%` : message;
   if (status) status.textContent = text;
   setLibraryLoadProgress(value, text);
 }
@@ -169,11 +169,12 @@ async function uploadAllToServer() {
         onProgress: ({ percent }) => setBatchUploadProgress(uploaded, uploadableSlots.length, percent)
       });
       await saveRecord(serverRecord);
+      setBatchUploadProgress(uploaded, uploadableSlots.length, 100);
       if (serverRecord?.parseStatus && serverRecord.parseStatus !== "ready") queued += 1;
       uploaded += 1;
-      setLibraryStatus(`正在上传到腾讯云服务器：${uploaded}/${uploadableSlots.length}`);
+      setLibraryStatus(`已完成：${uploaded}/${uploadableSlots.length} 个文件已保存到腾讯云服务器。`);
     }
-    await loadSharedLibrary({ statusEl: $("#sharedStatus"), force: true, metadataOnly: true });
+    await loadSharedLibrary({ statusEl: $("#sharedStatus"), force: true });
     await renderLibrary();
     if (queued) {
       scheduleServerParseRefresh();
@@ -527,12 +528,14 @@ async function saveSlot(slotId) {
       onProgress: ({ percent }) => setSingleUploadProgress(status, percent, "正在上传原始文件和解析结果到腾讯云服务器...")
     });
     await saveRecord(nextRecord);
+    setLibraryLoadProgress(100, "已完成：已保存到腾讯云服务器。");
     if (nextRecord?.parseStatus && nextRecord.parseStatus !== "ready") {
       status.textContent = "已保存到腾讯云服务器，后台解析中。";
       scheduleServerParseRefresh();
       await renderLibrary();
       return;
     }
+    await loadSharedLibrary({ statusEl: $("#sharedStatus"), force: true, ids: [slotId] }).catch(() => null);
     status.textContent = "已上传到腾讯云服务器并解析保存，其他人刷新后会读取这份文件。";
     await renderLibrary();
   } catch (error) {
@@ -569,12 +572,14 @@ async function saveSlotFile(slotId, file) {
       onProgress: ({ percent }) => setSingleUploadProgress(status, percent, "正在上传原始文件和解析结果到腾讯云服务器...")
     });
     await saveRecord(nextRecord);
+    setLibraryLoadProgress(100, "已完成：已保存到腾讯云服务器。");
     if (nextRecord?.parseStatus && nextRecord.parseStatus !== "ready") {
       status.textContent = "已保存到腾讯云服务器，后台解析中。";
       scheduleServerParseRefresh();
       await renderLibrary();
       return;
     }
+    await loadSharedLibrary({ statusEl: $("#sharedStatus"), force: true, ids: [slotId] }).catch(() => null);
     status.textContent = "已上传到腾讯云服务器并解析保存，其他人刷新后会读取这份文件。";
     await renderLibrary();
   } catch (error) {

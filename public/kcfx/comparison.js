@@ -44,12 +44,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   $("#seriesFilter").addEventListener("change", renderCurrentDiffTable);
   $("#downloadBtn").addEventListener("click", downloadCurrentDiffTable);
-  await runComparison();
-  loadSharedLibrary({ statusEl: $("#compareStatus"), ids: ["fact-inventory", "fact-2", "dim-product", "dim-warehouse-material"] })
-    .then(runComparison)
-    .catch((error) => {
-      $("#compareStatus").textContent = `腾讯云数据同步失败：${error?.message || error}`;
+  try {
+    await loadSharedLibrary({
+      statusEl: $("#compareStatus"),
+      ids: ["fact-inventory", "fact-2", "dim-product", "dim-warehouse-material"],
+      force: true,
+      onProgress: ({ percent, message }) => {
+        const value = Number.isFinite(Number(percent)) ? ` ${Math.round(Number(percent))}%` : "";
+        $("#compareStatus").textContent = `${message || "正在读取完整数据"}${value}`;
+      }
     });
+  } catch (error) {
+    $("#compareStatus").textContent = `腾讯云数据同步失败：${error?.message || error}`;
+  }
+  await runComparison();
 });
 
 async function runComparison() {

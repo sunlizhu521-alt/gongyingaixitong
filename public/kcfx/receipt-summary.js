@@ -75,12 +75,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderSummary();
     });
   });
-  await refreshSummary();
-  loadSharedLibrary({ statusEl: $("#summaryStatus"), ids: ["fact-inventory", "fact-2", "dim-product", "dim-warehouse", "dim-warehouse-material"] })
-    .then(refreshSummary)
-    .catch((error) => {
-      $("#summaryStatus").textContent = `腾讯云数据同步失败：${error?.message || error}`;
+  try {
+    await loadSharedLibrary({
+      statusEl: $("#summaryStatus"),
+      ids: ["fact-inventory", "fact-2", "dim-product", "dim-warehouse", "dim-warehouse-material"],
+      force: true,
+      onProgress: ({ percent, message }) => {
+        const value = Number.isFinite(Number(percent)) ? ` ${Math.round(Number(percent))}%` : "";
+        $("#summaryStatus").textContent = `${message || "正在读取完整数据"}${value}`;
+      }
     });
+  } catch (error) {
+    $("#summaryStatus").textContent = `腾讯云数据同步失败：${error?.message || error}`;
+  }
+  await refreshSummary();
 });
 
 async function refreshSummary() {

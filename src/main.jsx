@@ -44,6 +44,7 @@ const MAINTENANCE_LIBRARY_PAGES = [
 ];
 
 const EMBEDDED_KCFX_PAGES = [...SALES_INVENTORY_PAGES, ...MAINTENANCE_LIBRARY_PAGES];
+const APP_VERSION_TIME = '2026-06-16 11:01';
 
 const SYSTEM_FILE_LIBRARY_PAGES = [
   { tab: 'systemMigrationPackage', key: 'migrationPackage', label: '迁移备份包' },
@@ -1422,6 +1423,7 @@ function App() {
     <main className="app-shell">
       <aside className="sidebar">
         <h1>供应链AI系统</h1>
+        <div className="app-version-time">版本时间：{APP_VERSION_TIME}</div>
         <nav className="sidebar-menu" aria-label="系统菜单">
           {canAccessSupplierPayment && (
           <div className="menu-group">
