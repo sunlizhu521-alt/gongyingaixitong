@@ -847,26 +847,27 @@ th {
 }
 
 .embedded-dashboard-frame-stack {
+  position: relative;
   height: 100%;
   min-height: 0;
 }
 
 .embedded-dashboard-panel iframe {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   border: 1px solid #d7dee8;
   border-radius: 8px;
   background: #f8fafc;
-  display: none;
-  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .embedded-dashboard-panel iframe.is-active {
-  display: block;
-}
-
-.embedded-dashboard-panel iframe.is-ready {
-  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 1;
 }
 
 .system-file-panel {
