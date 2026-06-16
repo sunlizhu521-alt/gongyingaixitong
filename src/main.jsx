@@ -55,6 +55,7 @@ const MAINTENANCE_LIBRARY_MENU_PAGES = [
   ...MAINTENANCE_LIBRARY_PAGES,
   { tab: 'suppliers', key: 'supplierManagement', label: '供应商管理维度表' }
 ];
+const MAINTENANCE_LIBRARY_TABS = new Set(MAINTENANCE_LIBRARY_MENU_PAGES.map((page) => page.tab));
 
 const SYSTEM_FILE_LIBRARY_MENU_PAGES = [
   { tab: 'invoiceInventory', key: 'invoiceInventory', label: '发票信息库存查看' },
@@ -102,7 +103,7 @@ function App() {
   const [paymentMonthFilter, setPaymentMonthFilter] = useState([]);
   const [oaSubmitWeekFilter, setOaSubmitWeekFilter] = useState([]);
   const [openFilter, setOpenFilter] = useState('');
-  const [activeMenuGroup, setActiveMenuGroup] = useState('supplierPayment');
+  const [expandedMenuGroups, setExpandedMenuGroups] = useState(() => new Set(['supplierPayment']));
   const [supplierImportResult, setSupplierImportResult] = useState(null);
   const [ownerImportResult, setOwnerImportResult] = useState(null);
   const [inspectionInitialData, setInspectionInitialData] = useState({ sheetName: '', columns: [], rows: [], updatedAt: '' });
@@ -156,6 +157,7 @@ function App() {
     {
       value: 'maintenanceLibrary',
       label: '维护文件库',
+      fixedOwnerOnly: true,
       children: MAINTENANCE_LIBRARY_MENU_PAGES.map((page) => ({
         value: `maintenanceLibrary.${page.key}`,
         tab: page.tab,
@@ -213,6 +215,7 @@ function App() {
   }
   function canAccessTab(tab) {
     if (tab === 'permissionManagement') return canManagePermissions;
+    if (MAINTENANCE_LIBRARY_TABS.has(tab)) return user?.name === systemOwnerName;
     const permission = tabPermissionMap[tab];
     return permission ? hasPermission(permission) : false;
   }
@@ -224,10 +227,11 @@ function App() {
   const canManageMailSettings = user?.name === systemOwnerName;
   const canManagePermissions = user?.name === systemOwnerName;
   const canManageSystemFiles = user?.name === systemOwnerName;
+  const canManageMaintenanceLibrary = user?.name === systemOwnerName;
   const canAccessSupplierPayment = canAccessGroup('supplierPayment');
   const canAccessQualityInspection = canAccessGroup('qualityInspection');
   const canAccessSalesInventory = canAccessGroup('salesInventory');
-  const canAccessMaintenanceLibrary = canAccessGroup('maintenanceLibrary');
+  const canAccessMaintenanceLibrary = canManageMaintenanceLibrary;
   const canAccessSystemFileLibrary = canAccessGroup('systemFileLibrary');
   const qualityInspectionPages = {
     inspectionNotice: '验货通知',
@@ -239,14 +243,33 @@ function App() {
     inspectionInitialData: '验货信息初始数据'
   };
   const embeddedKcfxPageMap = Object.fromEntries(EMBEDDED_KCFX_PAGES.map((page) => [page.tab, page]));
+  const activeEmbeddedKcfxPage = embeddedKcfxPageMap[activeTab] && canAccessTab(activeTab)
+    ? embeddedKcfxPageMap[activeTab]
+    : null;
+  const accessibleEmbeddedKcfxPages = EMBEDDED_KCFX_PAGES.filter((page) => canAccessTab(page.tab));
 
   function openMenuTab(tab, group) {
-    setActiveMenuGroup(group);
+    setExpandedMenuGroups((current) => {
+      if (current.has(group)) return current;
+      return new Set([...current, group]);
+    });
     setActiveTab(tab);
   }
 
   function toggleMenuGroup(group) {
-    setActiveMenuGroup((currentGroup) => currentGroup === group ? '' : group);
+    setExpandedMenuGroups((current) => {
+      const next = new Set(current);
+      if (next.has(group)) {
+        next.delete(group);
+      } else {
+        next.add(group);
+      }
+      return next;
+    });
+  }
+
+  function isMenuGroupExpanded(group) {
+    return expandedMenuGroups.has(group);
   }
 
   function applyEmbeddedDashboardChrome(event) {
@@ -262,7 +285,7 @@ function App() {
   }
 
   function embeddedKcfxSrc(page) {
-    return `/kcfx/${page.sourceFile}?embed=1&v=20260616f`;
+    return `/kcfx/${page.sourceFile}?embed=1&v=20260616g`;
   }
 
   function assertApiResponse(label, response) {
@@ -352,7 +375,10 @@ function App() {
         .flatMap((group) => group.children.map((child) => ({ ...child, group: group.value })))
         .find((item) => canAccessTab(item.tab));
       if (firstAllowed) {
-        setActiveMenuGroup(firstAllowed.group);
+        setExpandedMenuGroups((current) => {
+          if (current.has(firstAllowed.group)) return current;
+          return new Set([...current, firstAllowed.group]);
+        });
         setActiveTab(firstAllowed.tab);
       }
     }
@@ -1322,16 +1348,16 @@ function App() {
         <nav className="sidebar-menu" aria-label="系统菜单">
           {canAccessSupplierPayment && (
           <div className="menu-group">
-            <button
-              type="button"
-              className={`menu-group-toggle ${activeMenuGroup === 'supplierPayment' ? 'active' : ''}`}
-              onClick={() => toggleMenuGroup('supplierPayment')}
-              aria-expanded={activeMenuGroup === 'supplierPayment'}
-            >
-              供应商付款提醒
-              <span>{activeMenuGroup === 'supplierPayment' ? '▾' : '▸'}</span>
-            </button>
-            {activeMenuGroup === 'supplierPayment' && (
+              <button
+                type="button"
+                className={`menu-group-toggle ${isMenuGroupExpanded('supplierPayment') ? 'active' : ''}`}
+                onClick={() => toggleMenuGroup('supplierPayment')}
+                aria-expanded={isMenuGroupExpanded('supplierPayment')}
+              >
+                供应商付款提醒
+                <span>{isMenuGroupExpanded('supplierPayment') ? '▾' : '▸'}</span>
+              </button>
+              {isMenuGroupExpanded('supplierPayment') && (
               <div className="submenu-list">
                 {canAccessTab('ledger') && (
                   <button className={activeTab === 'ledger' ? 'active' : ''} onClick={() => openMenuTab('ledger', 'supplierPayment')}>供应商付款看板</button>
@@ -1345,16 +1371,16 @@ function App() {
           )}
           {canAccessQualityInspection && (
           <div className="menu-group">
-            <button
-              type="button"
-              className={`menu-group-toggle ${activeMenuGroup === 'qualityInspection' ? 'active' : ''}`}
-              onClick={() => toggleMenuGroup('qualityInspection')}
-              aria-expanded={activeMenuGroup === 'qualityInspection'}
-            >
-              品质验货
-              <span>{activeMenuGroup === 'qualityInspection' ? '▾' : '▸'}</span>
-            </button>
-            {activeMenuGroup === 'qualityInspection' && (
+              <button
+                type="button"
+                className={`menu-group-toggle ${isMenuGroupExpanded('qualityInspection') ? 'active' : ''}`}
+                onClick={() => toggleMenuGroup('qualityInspection')}
+                aria-expanded={isMenuGroupExpanded('qualityInspection')}
+              >
+                品质验货
+                <span>{isMenuGroupExpanded('qualityInspection') ? '▾' : '▸'}</span>
+              </button>
+              {isMenuGroupExpanded('qualityInspection') && (
               <div className="submenu-list">
                 {canAccessTab('inspectionNotice') && (
                   <button className={activeTab === 'inspectionNotice' ? 'active' : ''} onClick={() => openMenuTab('inspectionNotice', 'qualityInspection')}>验货通知</button>
@@ -1383,16 +1409,16 @@ function App() {
           )}
           {canAccessSalesInventory && (
           <div className="menu-group">
-            <button
-              type="button"
-              className={`menu-group-toggle ${activeMenuGroup === 'salesInventory' ? 'active' : ''}`}
-              onClick={() => toggleMenuGroup('salesInventory')}
-              aria-expanded={activeMenuGroup === 'salesInventory'}
-            >
-              销售及库存看板
-              <span>{activeMenuGroup === 'salesInventory' ? '▾' : '▸'}</span>
-            </button>
-            {activeMenuGroup === 'salesInventory' && (
+              <button
+                type="button"
+                className={`menu-group-toggle ${isMenuGroupExpanded('salesInventory') ? 'active' : ''}`}
+                onClick={() => toggleMenuGroup('salesInventory')}
+                aria-expanded={isMenuGroupExpanded('salesInventory')}
+              >
+                销售及库存看板
+                <span>{isMenuGroupExpanded('salesInventory') ? '▾' : '▸'}</span>
+              </button>
+              {isMenuGroupExpanded('salesInventory') && (
               <div className="submenu-list">
                 {SALES_INVENTORY_PAGES.filter((page) => canAccessTab(page.tab)).map((page) => (
                   <button
@@ -1409,16 +1435,16 @@ function App() {
           )}
           {canAccessMaintenanceLibrary && (
           <div className="menu-group">
-            <button
-              type="button"
-              className={`menu-group-toggle ${activeMenuGroup === 'maintenanceLibrary' ? 'active' : ''}`}
-              onClick={() => toggleMenuGroup('maintenanceLibrary')}
-              aria-expanded={activeMenuGroup === 'maintenanceLibrary'}
-            >
-              维护文件库
-              <span>{activeMenuGroup === 'maintenanceLibrary' ? '▾' : '▸'}</span>
-            </button>
-            {activeMenuGroup === 'maintenanceLibrary' && (
+              <button
+                type="button"
+                className={`menu-group-toggle ${isMenuGroupExpanded('maintenanceLibrary') ? 'active' : ''}`}
+                onClick={() => toggleMenuGroup('maintenanceLibrary')}
+                aria-expanded={isMenuGroupExpanded('maintenanceLibrary')}
+              >
+                维护文件库
+                <span>{isMenuGroupExpanded('maintenanceLibrary') ? '▾' : '▸'}</span>
+              </button>
+              {isMenuGroupExpanded('maintenanceLibrary') && (
               <div className="submenu-list">
                 {MAINTENANCE_LIBRARY_MENU_PAGES.filter((page) => canAccessTab(page.tab)).map((page) => (
                   <button
@@ -1435,16 +1461,16 @@ function App() {
           )}
           {canAccessSystemFileLibrary && (
           <div className="menu-group">
-            <button
-              type="button"
-              className={`menu-group-toggle ${activeMenuGroup === 'systemFileLibrary' ? 'active' : ''}`}
-              onClick={() => toggleMenuGroup('systemFileLibrary')}
-              aria-expanded={activeMenuGroup === 'systemFileLibrary'}
-            >
-              系统文件库
-              <span>{activeMenuGroup === 'systemFileLibrary' ? '▾' : '▸'}</span>
-            </button>
-            {activeMenuGroup === 'systemFileLibrary' && (
+              <button
+                type="button"
+                className={`menu-group-toggle ${isMenuGroupExpanded('systemFileLibrary') ? 'active' : ''}`}
+                onClick={() => toggleMenuGroup('systemFileLibrary')}
+                aria-expanded={isMenuGroupExpanded('systemFileLibrary')}
+              >
+                系统文件库
+                <span>{isMenuGroupExpanded('systemFileLibrary') ? '▾' : '▸'}</span>
+              </button>
+              {isMenuGroupExpanded('systemFileLibrary') && (
               <div className="submenu-list">
                 {SYSTEM_FILE_LIBRARY_MENU_PAGES.filter((page) => canAccessTab(page.tab)).map((page) => (
                   <button
@@ -1461,16 +1487,16 @@ function App() {
           )}
           {canManagePermissions && (
           <div className="menu-group">
-            <button
-              type="button"
-              className={`menu-group-toggle ${activeMenuGroup === 'systemManagement' ? 'active' : ''}`}
-              onClick={() => toggleMenuGroup('systemManagement')}
-              aria-expanded={activeMenuGroup === 'systemManagement'}
-            >
-              系统管理
-              <span>{activeMenuGroup === 'systemManagement' ? '▾' : '▸'}</span>
-            </button>
-            {activeMenuGroup === 'systemManagement' && (
+              <button
+                type="button"
+                className={`menu-group-toggle ${isMenuGroupExpanded('systemManagement') ? 'active' : ''}`}
+                onClick={() => toggleMenuGroup('systemManagement')}
+                aria-expanded={isMenuGroupExpanded('systemManagement')}
+              >
+                系统管理
+                <span>{isMenuGroupExpanded('systemManagement') ? '▾' : '▸'}</span>
+              </button>
+              {isMenuGroupExpanded('systemManagement') && (
               <div className="submenu-list">
                 <button className={activeTab === 'permissionManagement' ? 'active' : ''} onClick={() => openMenuTab('permissionManagement', 'systemManagement')}>权限管理</button>
                 <button className={activeTab === 'reminders' ? 'active' : ''} onClick={() => openMenuTab('reminders', 'systemManagement')}>操作日志</button>
@@ -2219,17 +2245,27 @@ function App() {
           </section>
         )}
 
-        {embeddedKcfxPageMap[activeTab] && canAccessTab(activeTab) && (
-          <section className="embedded-dashboard-panel">
-            <div className="embedded-dashboard-header">
-              <h2>{embeddedKcfxPageMap[activeTab].label}</h2>
+        {accessibleEmbeddedKcfxPages.length > 0 && (
+          <section
+            className={`embedded-dashboard-panel ${activeEmbeddedKcfxPage ? '' : 'is-background'}`}
+            aria-hidden={!activeEmbeddedKcfxPage}
+          >
+            {activeEmbeddedKcfxPage && (
+              <div className="embedded-dashboard-header">
+                <h2>{activeEmbeddedKcfxPage.label}</h2>
+              </div>
+            )}
+            <div className="embedded-dashboard-frame-stack">
+              {accessibleEmbeddedKcfxPages.map((page) => (
+                <iframe
+                  key={page.tab}
+                  className={`embedded-dashboard-frame ${activeTab === page.tab ? 'is-active' : ''}`}
+                  title={page.label}
+                  src={embeddedKcfxSrc(page)}
+                  onLoad={applyEmbeddedDashboardChrome}
+                />
+              ))}
             </div>
-            <iframe
-              key={activeTab}
-              title={embeddedKcfxPageMap[activeTab].label}
-              src={embeddedKcfxSrc(embeddedKcfxPageMap[activeTab])}
-              onLoad={applyEmbeddedDashboardChrome}
-            />
           </section>
         )}
       </section>

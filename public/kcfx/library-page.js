@@ -3,6 +3,10 @@ const selectedServerFiles = new Map();
 
 document.addEventListener("DOMContentLoaded", () => {
   applyEmbeddedHostClass();
+  if (!libraryCanManage()) {
+    renderOwnerOnlyLibraryNotice();
+    return;
+  }
   bindToolbar();
   applyToolbarPermissions();
   renderLibraryShell();
@@ -30,7 +34,21 @@ function libraryCanManage() {
 }
 
 function adminOnlyMessage() {
-  return "只有孙立柱可以维护文件库，其他账号只读取服务器最新文件。";
+  return "只有孙立柱可以查看和维护文件库，其他账号不可见。";
+}
+
+function renderOwnerOnlyLibraryNotice() {
+  const content = document.querySelector(".content");
+  if (!content) return;
+  content.innerHTML = `
+    <section class="library-summary">
+      <div>
+        <span class="summary-eyebrow">OWNER ONLY</span>
+        <h1>维护文件库</h1>
+        <p>${escapeHtml(adminOnlyMessage())}</p>
+      </div>
+    </section>
+  `;
 }
 
 function applyToolbarPermissions() {
@@ -142,10 +160,12 @@ async function uploadAllToServer() {
   let queued = 0;
   try {
     for (const { slot, file } of uploadableSlots) {
-      setLibraryStatus(`正在上传原始文件到腾讯云服务器：${uploaded + 1}/${uploadableSlots.length}`);
-      setLibraryStatus(`正在上传到腾讯云服务器：${uploaded + 1}/${uploadableSlots.length}`);
-      setBatchUploadProgress(uploaded, uploadableSlots.length, 0);
-      const serverRecord = await uploadKcfxServerFile(slot, file, null, {
+      setLibraryStatus(`正在本地浏览器解析文件：${uploaded + 1}/${uploadableSlots.length}`);
+      setBatchUploadProgress(uploaded, uploadableSlots.length, 5);
+      const parsedRecord = await readExcelFile(file, slot);
+      setLibraryStatus(`本地解析完成，正在上传到腾讯云服务器：${uploaded + 1}/${uploadableSlots.length}`);
+      setBatchUploadProgress(uploaded, uploadableSlots.length, 15);
+      const serverRecord = await uploadKcfxServerFile(slot, file, parsedRecord, {
         onProgress: ({ percent }) => setBatchUploadProgress(uploaded, uploadableSlots.length, percent)
       });
       await saveRecord(serverRecord);
@@ -498,10 +518,13 @@ async function saveSlot(slotId) {
 
   try {
     selectedServerFiles.set(slotId, file);
-    status.textContent = "正在上传原始文件到腾讯云服务器...";
-    setSingleUploadProgress(status, 0, "正在上传原始文件到腾讯云服务器...");
-    const nextRecord = await uploadKcfxServerFile(slot, file, null, {
-      onProgress: ({ percent }) => setSingleUploadProgress(status, percent, "正在上传原始文件到腾讯云服务器...")
+    status.textContent = "正在本地浏览器解析文件...";
+    setSingleUploadProgress(status, 5, "正在本地浏览器解析文件...");
+    const parsedRecord = await readExcelFile(file, slot);
+    status.textContent = "本地解析完成，正在上传原始文件和解析结果到腾讯云服务器...";
+    setSingleUploadProgress(status, 15, "本地解析完成，正在上传原始文件和解析结果到腾讯云服务器...");
+    const nextRecord = await uploadKcfxServerFile(slot, file, parsedRecord, {
+      onProgress: ({ percent }) => setSingleUploadProgress(status, percent, "正在上传原始文件和解析结果到腾讯云服务器...")
     });
     await saveRecord(nextRecord);
     if (nextRecord?.parseStatus && nextRecord.parseStatus !== "ready") {
@@ -537,10 +560,13 @@ async function saveSlotFile(slotId, file) {
 
   try {
     selectedServerFiles.set(slotId, file);
-    status.textContent = "正在上传原始文件到腾讯云服务器...";
-    setSingleUploadProgress(status, 0, "正在上传原始文件到腾讯云服务器...");
-    const nextRecord = await uploadKcfxServerFile(slot, file, null, {
-      onProgress: ({ percent }) => setSingleUploadProgress(status, percent, "正在上传原始文件到腾讯云服务器...")
+    status.textContent = "正在本地浏览器解析文件...";
+    setSingleUploadProgress(status, 5, "正在本地浏览器解析文件...");
+    const parsedRecord = await readExcelFile(file, slot);
+    status.textContent = "本地解析完成，正在上传原始文件和解析结果到腾讯云服务器...";
+    setSingleUploadProgress(status, 15, "本地解析完成，正在上传原始文件和解析结果到腾讯云服务器...");
+    const nextRecord = await uploadKcfxServerFile(slot, file, parsedRecord, {
+      onProgress: ({ percent }) => setSingleUploadProgress(status, percent, "正在上传原始文件和解析结果到腾讯云服务器...")
     });
     await saveRecord(nextRecord);
     if (nextRecord?.parseStatus && nextRecord.parseStatus !== "ready") {
