@@ -914,6 +914,24 @@ th {
   color: #475569;
 }
 
+.embedded-dashboard-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.embedded-dashboard-progress-row span {
+  color: #475569;
+}
+
+.embedded-dashboard-progress-row strong {
+  min-width: 54px;
+  text-align: right;
+  color: #1d4ed8;
+  font-size: 20px;
+}
+
 .embedded-dashboard-loading-bar {
   height: 8px;
   overflow: hidden;
@@ -923,21 +941,10 @@ th {
 
 .embedded-dashboard-loading-bar span {
   display: block;
-  width: 42%;
   height: 100%;
   border-radius: inherit;
   background: #2563eb;
-  animation: embeddedLoadingSweep 1.1s ease-in-out infinite;
-}
-
-@keyframes embeddedLoadingSweep {
-  0% {
-    transform: translateX(-110%);
-  }
-
-  100% {
-    transform: translateX(250%);
-  }
+  transition: width .18s ease;
 }
 
 .system-file-panel {

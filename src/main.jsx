@@ -106,6 +106,7 @@ function App() {
   const [expandedMenuGroups, setExpandedMenuGroups] = useState(() => new Set(['supplierPayment']));
   const [embeddedFrameReady, setEmbeddedFrameReady] = useState({});
   const [embeddedSwitchingTab, setEmbeddedSwitchingTab] = useState('');
+  const [embeddedLoadProgress, setEmbeddedLoadProgress] = useState({});
   const [supplierImportResult, setSupplierImportResult] = useState(null);
   const [ownerImportResult, setOwnerImportResult] = useState(null);
   const [inspectionInitialData, setInspectionInitialData] = useState({ sheetName: '', columns: [], rows: [], updatedAt: '' });
@@ -255,13 +256,21 @@ function App() {
   const activeEmbeddedKcfxLoading = Boolean(
     activeEmbeddedKcfxPage && (!activeEmbeddedKcfxFrameReady || embeddedSwitchingTab === activeTab)
   );
+  const activeEmbeddedKcfxProgress = activeEmbeddedKcfxPage
+    ? embeddedLoadProgress[activeEmbeddedKcfxPage.tab] || 0
+    : 0;
 
   function openMenuTab(tab, group) {
     setExpandedMenuGroups((current) => {
       if (current.has(group)) return current;
       return new Set([...current, group]);
     });
-    setEmbeddedSwitchingTab(embeddedKcfxPageMap[tab] ? tab : '');
+    if (embeddedKcfxPageMap[tab]) {
+      setEmbeddedSwitchingTab(tab);
+      setEmbeddedLoadProgress((current) => ({ ...current, [tab]: embeddedFrameReady[tab] ? 82 : 8 }));
+    } else {
+      setEmbeddedSwitchingTab('');
+    }
     setActiveTab(tab);
   }
 
@@ -286,6 +295,7 @@ function App() {
       if (current[tab]) return current;
       return { ...current, [tab]: true };
     });
+    setEmbeddedLoadProgress((current) => ({ ...current, [tab]: 100 }));
   }
 
   function waitForEmbeddedFramePaint(iframe, tab, attempt = 0) {
@@ -441,6 +451,22 @@ function App() {
     }, 450);
     return () => window.clearTimeout(timer);
   }, [activeTab, activeEmbeddedKcfxFrameReady, activeEmbeddedKcfxPage, embeddedSwitchingTab]);
+
+  useEffect(() => {
+    if (!activeEmbeddedKcfxPage || !activeEmbeddedKcfxLoading) {
+      return undefined;
+    }
+    const tab = activeEmbeddedKcfxPage.tab;
+    const timer = window.setInterval(() => {
+      setEmbeddedLoadProgress((current) => {
+        const currentValue = current[tab] || 8;
+        if (currentValue >= 92) return current;
+        const nextValue = Math.min(92, currentValue + (currentValue < 55 ? 11 : 5));
+        return { ...current, [tab]: nextValue };
+      });
+    }, 180);
+    return () => window.clearInterval(timer);
+  }, [activeEmbeddedKcfxLoading, activeEmbeddedKcfxPage]);
 
   useEffect(() => {
     function closeFilters() {
@@ -2326,9 +2352,19 @@ function App() {
                       <div className="embedded-dashboard-loading" role="status" aria-live="polite">
                         <div className="embedded-dashboard-loading-card">
                           <strong>{page.label}</strong>
-                          <span>正在打开页面并读取腾讯云数据</span>
-                          <div className="embedded-dashboard-loading-bar" aria-hidden="true">
-                            <span />
+                          <div className="embedded-dashboard-progress-row">
+                            <span>读取进度</span>
+                            <strong>{activeEmbeddedKcfxProgress}%</strong>
+                          </div>
+                          <div
+                            className="embedded-dashboard-loading-bar"
+                            role="progressbar"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            aria-valuenow={activeEmbeddedKcfxProgress}
+                            aria-label={`${page.label}读取进度`}
+                          >
+                            <span style={{ width: `${activeEmbeddedKcfxProgress}%` }} />
                           </div>
                         </div>
                       </div>
