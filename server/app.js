@@ -1708,6 +1708,106 @@ function publicKcfxLibrary(db, options = {}) {
   };
 }
 
+let kcfxPreloadCache = {
+  ok: false,
+  status: 'idle',
+  source: 'server-preload',
+  startedAt: '',
+  completedAt: '',
+  error: '',
+  schemaVersion: 1,
+  project: 'kcfx',
+  savedAt: '',
+  records: {},
+  recordCount: 0,
+  rowCount: 0
+};
+let kcfxPreloadPromise = null;
+
+async function buildPreloadedKcfxLibrary(db = null) {
+  const database = db || await ensureDb();
+  await externalizeKcfxLibraryInlineRows(database);
+  const manifest = publicKcfxLibrary(database);
+  const records = {};
+  let rowCount = 0;
+
+  for (const [id, record] of Object.entries(database.kcfxLibrary?.records || {})) {
+    if (!KC_LIBRARY_SLOT_IDS.has(id)) continue;
+    try {
+      const fullRecord = await attachKcfxRecordRows(record);
+      records[id] = {
+        ...fullRecord,
+        id,
+        libraryPath: `/api/kcfx-library/records/${encodeURIComponent(id)}`,
+        libraryManifestPath: '/api/kcfx-library',
+        sharedSavedAt: fullRecord.serverSavedAt || fullRecord.savedAt || manifest.savedAt || ''
+      };
+      rowCount += Array.isArray(fullRecord.rows) ? fullRecord.rows.length : Number(fullRecord.rowCount || 0);
+    } catch (error) {
+      records[id] = {
+        ...stripKcfxRecordRows(record),
+        id,
+        preloadError: error?.message || String(error)
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    status: 'ready',
+    source: 'server-preload',
+    schemaVersion: manifest.schemaVersion,
+    project: 'kcfx',
+    savedAt: manifest.savedAt || '',
+    records,
+    recordCount: Object.keys(records).length,
+    rowCount,
+    preloadedAt: new Date().toISOString()
+  };
+}
+
+async function refreshKcfxPreloadCache(db = null) {
+  if (kcfxPreloadPromise) return kcfxPreloadPromise;
+  const startedAt = new Date().toISOString();
+  kcfxPreloadCache = {
+    ...kcfxPreloadCache,
+    ok: false,
+    status: 'loading',
+    startedAt,
+    completedAt: '',
+    error: ''
+  };
+  kcfxPreloadPromise = buildPreloadedKcfxLibrary(db)
+    .then((payload) => {
+      kcfxPreloadCache = {
+        ...payload,
+        startedAt,
+        completedAt: new Date().toISOString()
+      };
+      return kcfxPreloadCache;
+    })
+    .catch((error) => {
+      kcfxPreloadCache = {
+        ...kcfxPreloadCache,
+        ok: false,
+        status: 'failed',
+        completedAt: new Date().toISOString(),
+        error: error?.message || String(error)
+      };
+      throw error;
+    })
+    .finally(() => {
+      kcfxPreloadPromise = null;
+    });
+  return kcfxPreloadPromise;
+}
+
+function scheduleKcfxPreloadRefresh(db = null) {
+  refreshKcfxPreloadCache(db).catch((error) => {
+    console.error('kcfx preload refresh failed', error);
+  });
+}
+
 function sanitizeKcfxLibraryRecord(id, record = {}) {
   const sanitized = {
     ...record,
@@ -2112,6 +2212,7 @@ async function parseKcfxStoredFile({ id, slot, file, storedFile, previousRecord,
     await removeKcfxStoredFile(previousRecord);
     pushLog(db, 'kcfx file library parsed', requestUserName, `${requestUserName} uploaded and parsed ${record.title || id}`);
     await saveDb(db);
+    scheduleKcfxPreloadRefresh(db);
   } catch (error) {
     db = await ensureDb();
     const latestRecord = db.kcfxLibrary.records[id];
@@ -2126,6 +2227,7 @@ async function parseKcfxStoredFile({ id, slot, file, storedFile, previousRecord,
     db.kcfxLibrary.savedAt = new Date().toISOString();
     pushLog(db, 'kcfx file library parse failed', requestUserName, `${requestUserName} uploaded ${latestRecord.title || id}, background parse failed`);
     await saveDb(db);
+    scheduleKcfxPreloadRefresh(db);
   }
 }
 
@@ -2133,6 +2235,25 @@ app.get('/api/kcfx-library', async (req, res) => {
   const db = await ensureDb();
   await externalizeKcfxLibraryInlineRows(db);
   res.json(publicKcfxLibrary(db, { includeRows: req.query.includeRows === '1' }));
+});
+
+app.get('/api/kcfx-library/preloaded', async (req, res) => {
+  try {
+    if (req.query.refresh === '1' || kcfxPreloadCache.status === 'idle' || kcfxPreloadCache.status === 'failed') {
+      await refreshKcfxPreloadCache();
+    } else if (kcfxPreloadCache.status === 'loading' && kcfxPreloadPromise) {
+      await kcfxPreloadPromise;
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(kcfxPreloadCache);
+  } catch (error) {
+    res.status(500).json({
+      ...kcfxPreloadCache,
+      ok: false,
+      status: 'failed',
+      error: error?.message || String(error)
+    });
+  }
 });
 
 app.get('/api/kcfx-library/records/:id', async (req, res) => {
@@ -2185,6 +2306,7 @@ app.post('/api/kcfx-library/records/:id/upload', upload.single('file'), async (r
       await removeKcfxStoredFile(previousRecord);
       pushLog(db, 'kcfx file library uploaded', requestUser.name, `${requestUser.name} uploaded browser-parsed ${record.title || id}`);
       await saveDb(db);
+      scheduleKcfxPreloadRefresh(db);
       return res.json({ ok: true, parsedOnClient: true, library: publicKcfxLibrary(db), record: db.kcfxLibrary.records[id] });
     }
     const queuedRecord = buildQueuedKcfxFileRecord(req.file, storedFile, slot, previousRecord, requestUser.name);
@@ -2232,6 +2354,7 @@ app.put('/api/kcfx-library/records/:id', async (req, res) => {
   db.kcfxLibrary.savedAt = new Date().toISOString();
   pushLog(db, '文件库更新', requestUser.name, `${requestUser.name} 更新销售及库存看板文件库：${record.title || id}`);
   await saveDb(db);
+  scheduleKcfxPreloadRefresh(db);
   res.json({ ok: true, library: publicKcfxLibrary(db), record: db.kcfxLibrary.records[id] });
 });
 
@@ -2247,6 +2370,7 @@ app.delete('/api/kcfx-library/records/:id', async (req, res) => {
   db.kcfxLibrary.savedAt = new Date().toISOString();
   pushLog(db, '文件库删除', requestUser.name, `${requestUser.name} 删除销售及库存看板文件库：${id}`);
   await saveDb(db);
+  scheduleKcfxPreloadRefresh(db);
   res.status(204).end();
 });
 
@@ -2286,7 +2410,8 @@ app.get(/^\/(?!api|uploads|preview|download).*/, (req, res) => {
 
 const port = process.env.PORT || 4001;
 app.listen(port, async () => {
-  await ensureDb();
+  const db = await ensureDb();
+  scheduleKcfxPreloadRefresh(db);
   startWeeklyPaymentEmailScheduler();
   console.log(`API running at http://localhost:${port}`);
 });

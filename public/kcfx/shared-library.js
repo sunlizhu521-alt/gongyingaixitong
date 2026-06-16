@@ -1,5 +1,6 @@
 const KC_FILE_LIBRARY_MANIFEST = "data/kcfx-library/manifest.json";
 const KC_SERVER_LIBRARY_API = `${resolveKcfxApiBase()}/api/kcfx-library`;
+const KC_SERVER_PRELOADED_LIBRARY_API = `${KC_SERVER_LIBRARY_API}/preloaded`;
 const KC_SYSTEM_OWNER_NAME = "孙立柱";
 const KC_SERVER_LOAD_TIMEOUT_MS = 45000;
 const KC_SERVER_UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
@@ -116,12 +117,6 @@ async function loadSharedLibrary(options = {}) {
     if (localReadyResult) {
       if (statusEl) renderSharedLibraryStatus(statusEl, localReadyResult);
       return localReadyResult;
-    }
-    await waitForKcfxPreload(targetIds, onProgress);
-    const postPreloadResult = await buildLocalReadyResult(targetIds);
-    if (postPreloadResult) {
-      if (statusEl) renderSharedLibraryStatus(statusEl, postPreloadResult);
-      return postPreloadResult;
     }
   }
   const targetKey = targetIds ? [...targetIds].sort().join(",") : "all";
@@ -304,6 +299,17 @@ async function loadServerKcfxFileLibrary(statusEl, options = {}) {
   const metadataOnly = Boolean(options.metadataOnly);
   const targetIds = options.targetIds || null;
   try {
+    if (!metadataOnly) {
+      const preloadedResult = await loadPreloadedServerKcfxFileLibrary({ onProgress, targetIds });
+      if (statusEl) {
+        statusEl.textContent = buildSharedLibraryStatus(
+          preloadedResult.imported,
+          preloadedResult.cleared,
+          preloadedResult.sharedCount
+        );
+      }
+      return preloadedResult;
+    }
     onProgress?.({ percent: 20, message: "正在下载服务器文件库..." });
     const response = await fetchKcfxApi(`${KC_SERVER_LIBRARY_API}?v=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -315,6 +321,35 @@ async function loadServerKcfxFileLibrary(statusEl, options = {}) {
   } catch (error) {
     return { ok: false, error, source: "server" };
   }
+}
+
+async function loadPreloadedServerKcfxFileLibrary(options = {}) {
+  const onProgress = typeof options.onProgress === "function" ? options.onProgress : null;
+  const targetIds = options.targetIds || null;
+  onProgress?.({ percent: 22, message: "\u6b63\u5728\u8bfb\u53d6\u670d\u52a1\u5668\u5df2\u9884\u70ed\u6570\u636e..." });
+  const response = await fetchKcfxApi(`${KC_SERVER_PRELOADED_LIBRARY_API}?v=${Date.now()}`, { cache: "no-store" });
+  if (!response.ok) throw new Error(`preloaded HTTP ${response.status}`);
+  const payload = await response.json();
+  if (!payload?.ok || payload.status !== "ready") {
+    throw new Error(payload?.error || `preloaded ${payload?.status || "not ready"}`);
+  }
+  onProgress?.({ percent: 48, message: "\u6b63\u5728\u540c\u6b65\u670d\u52a1\u5668\u5df2\u9884\u70ed\u6570\u636e..." });
+  const entries = filterKcfxLibraryEntries(Object.entries(payload.records || {}), targetIds);
+  const manifest = {
+    schemaVersion: payload.schemaVersion || 1,
+    project: payload.project || "kcfx",
+    savedAt: payload.savedAt || payload.completedAt || payload.preloadedAt || "",
+    records: Object.fromEntries(entries)
+  };
+  const result = await importLibraryManifestRecords(manifest, { onProgress, metadataOnly: false, targetIds });
+  onProgress?.({ percent: 92, message: "\u670d\u52a1\u5668\u9884\u70ed\u6570\u636e\u5df2\u540c\u6b65" });
+  return {
+    ok: true,
+    ...result,
+    manifest,
+    source: "server-preload",
+    preloadedAt: payload.preloadedAt || payload.completedAt || ""
+  };
 }
 
 async function importLibraryManifestRecords(manifest, options = {}) {
