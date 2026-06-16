@@ -16,7 +16,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadSharedLibrary({
       statusEl: $("#checkStatus"),
       ids: ["fact-inventory", "fact-2", "sales-data", "dim-product", "dim-warehouse", "dim-warehouse-material", "dim-store-name", "dim-customer-material"],
-      force: true,
       onProgress: ({ percent, message }) => {
         const value = Number.isFinite(Number(percent)) ? ` ${Math.round(Number(percent))}%` : "";
         $("#checkStatus").textContent = `${message || "正在读取完整数据"}${value}`;

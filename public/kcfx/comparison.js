@@ -48,7 +48,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadSharedLibrary({
       statusEl: $("#compareStatus"),
       ids: ["fact-inventory", "fact-2", "dim-product", "dim-warehouse-material"],
-      force: true,
       onProgress: ({ percent, message }) => {
         const value = Number.isFinite(Number(percent)) ? ` ${Math.round(Number(percent))}%` : "";
         $("#compareStatus").textContent = `${message || "正在读取完整数据"}${value}`;

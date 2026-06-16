@@ -43,7 +43,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadSharedLibrary({
       statusEl: $("#sharedStatus"),
       ids: DASHBOARD_REQUIRED_SLOTS,
-      force: true,
       onProgress: ({ percent, message }) => {
         const value = Number.isFinite(Number(percent)) ? ` ${Math.round(Number(percent))}%` : "";
         $("#sharedStatus").textContent = `${message || "正在读取完整数据"}${value}`;

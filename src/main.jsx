@@ -336,6 +336,10 @@ function App() {
     return `/kcfx/${page.sourceFile}?embed=1&v=20260616g`;
   }
 
+  function preloadKcfxSrc() {
+    return `/kcfx/preload.html?preload=1&v=20260616m`;
+  }
+
   function assertApiResponse(label, response) {
     if (!response) return;
     if (!response.ok) {
@@ -2340,6 +2344,16 @@ function App() {
             <h2>{qualityInspectionPages[activeTab]}</h2>
             <p>当前页面已建立入口，具体业务内容待配置。</p>
           </section>
+        )}
+
+        {accessibleEmbeddedKcfxPages.length > 0 && (
+          <iframe
+            className="kcfx-data-preload-frame"
+            title="销售及库存数据预加载"
+            src={preloadKcfxSrc()}
+            aria-hidden="true"
+            tabIndex="-1"
+          />
         )}
 
         {accessibleEmbeddedKcfxPages.length > 0 && (

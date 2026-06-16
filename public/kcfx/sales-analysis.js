@@ -43,7 +43,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadSharedLibrary({
       statusEl: $("#salesStatus"),
       ids: SALES_ANALYSIS_REQUIRED_RECORD_IDS,
-      force: true,
       onProgress: ({ percent, message }) => {
         const value = Number.isFinite(Number(percent)) ? ` ${Math.round(Number(percent))}%` : "";
         $("#salesStatus").textContent = `${message || "正在从腾讯云读取销售数据文件..."}${value}`;

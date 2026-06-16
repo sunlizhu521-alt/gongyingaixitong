@@ -1,8 +1,10 @@
 const KC_FILE_LIBRARY_MANIFEST = "data/kcfx-library/manifest.json";
 const KC_SERVER_LIBRARY_API = `${resolveKcfxApiBase()}/api/kcfx-library`;
 const KC_SYSTEM_OWNER_NAME = "孙立柱";
-const KC_SERVER_LOAD_TIMEOUT_MS = 15000;
+const KC_SERVER_LOAD_TIMEOUT_MS = 45000;
 const KC_SERVER_UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+const KC_PRELOAD_STATE_KEY = "kcfx-auto-preload-state";
+const KC_PRELOAD_WAIT_MS = 12000;
 const KC_AUTO_PRELOAD_RECORD_IDS = [
   "sales-data",
   "fact-inventory",
@@ -24,6 +26,10 @@ const KC_AUTO_PRELOAD_RECORD_IDS = [
 ];
 const kcSharedLibraryLoadPromises = new Map();
 let kcAutoPreloadStarted = false;
+
+function isKcfxPreloadFrame() {
+  return new URLSearchParams(window.location.search).get("preload") === "1";
+}
 
 function resolveKcfxApiBase() {
   const { hostname, port } = window.location;
@@ -105,6 +111,19 @@ async function loadSharedLibrary(options = {}) {
       : null;
   const metadataOnly = Boolean(options.metadataOnly);
   const targetIds = normalizeKcfxTargetIds(options.ids || options.targetIds);
+  if (!options.force && !metadataOnly && targetIds) {
+    const localReadyResult = await buildLocalReadyResult(targetIds);
+    if (localReadyResult) {
+      if (statusEl) renderSharedLibraryStatus(statusEl, localReadyResult);
+      return localReadyResult;
+    }
+    await waitForKcfxPreload(targetIds, onProgress);
+    const postPreloadResult = await buildLocalReadyResult(targetIds);
+    if (postPreloadResult) {
+      if (statusEl) renderSharedLibraryStatus(statusEl, postPreloadResult);
+      return postPreloadResult;
+    }
+  }
   const targetKey = targetIds ? [...targetIds].sort().join(",") : "all";
   const promiseKey = `${metadataOnly ? "metadata" : "full"}:${targetKey}`;
   if (options.force) kcSharedLibraryLoadPromises.delete(promiseKey);
@@ -114,6 +133,63 @@ async function loadSharedLibrary(options = {}) {
   const result = await kcSharedLibraryLoadPromises.get(promiseKey);
   if (statusEl) renderSharedLibraryStatus(statusEl, result);
   return result;
+}
+
+async function buildLocalReadyResult(targetIds) {
+  const ids = [...targetIds];
+  const records = await Promise.all(ids.map((id) => getRecord(id).catch(() => null)));
+  const ready = records.filter((record) => Array.isArray(getLatestUploadedRecord(record)?.rows));
+  if (ready.length !== ids.length) return null;
+  return {
+    ok: true,
+    imported: 0,
+    cleared: 0,
+    sharedCount: ready.length,
+    source: "indexeddb",
+    manifest: {
+      schemaVersion: 1,
+      project: "kcfx",
+      records: Object.fromEntries(ready.map((record) => {
+        const displayRecord = getLatestUploadedRecord(record);
+        return [displayRecord.id, displayRecord];
+      }))
+    }
+  };
+}
+
+function readKcfxPreloadState() {
+  try {
+    return JSON.parse(localStorage.getItem(KC_PRELOAD_STATE_KEY) || "null") || {};
+  } catch {
+    return {};
+  }
+}
+
+function writeKcfxPreloadState(state) {
+  try {
+    localStorage.setItem(KC_PRELOAD_STATE_KEY, JSON.stringify({
+      ...state,
+      updatedAt: Date.now()
+    }));
+  } catch {}
+}
+
+async function waitForKcfxPreload(targetIds, onProgress) {
+  const state = readKcfxPreloadState();
+  const isRecent = Date.now() - Number(state.updatedAt || 0) < KC_PRELOAD_WAIT_MS;
+  if (state.status !== "loading" || !isRecent) return;
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < KC_PRELOAD_WAIT_MS) {
+    onProgress?.({
+      percent: 32,
+      message: "正在等待维护文件库预加载完成"
+    });
+    const localReadyResult = await buildLocalReadyResult(targetIds);
+    if (localReadyResult) return;
+    const current = readKcfxPreloadState();
+    if (current.status !== "loading") return;
+    await new Promise((resolve) => window.setTimeout(resolve, 300));
+  }
 }
 
 function formatKcfxLoadProgress(message, percent) {
@@ -128,22 +204,27 @@ function startKcfxAutoPreload(options = {}) {
   kcAutoPreloadStarted = true;
   const delayMs = Number.isFinite(Number(options.delayMs)) ? Number(options.delayMs) : 250;
   window.setTimeout(() => {
+    writeKcfxPreloadState({ status: "loading" });
     loadSharedLibrary({
       ids: KC_AUTO_PRELOAD_RECORD_IDS,
       force: Boolean(options.force),
       onProgress: options.onProgress
+    }).then((result) => {
+      writeKcfxPreloadState({ status: result?.ok ? "ready" : "failed" });
     }).catch((error) => {
+      writeKcfxPreloadState({ status: "failed", error: error?.message || String(error) });
       console.warn("kcfx auto preload failed", error);
     });
   }, delayMs);
 }
 
 function scheduleKcfxAutoPreload() {
+  if (!isKcfxPreloadFrame()) return;
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => startKcfxAutoPreload(), { once: true });
+    document.addEventListener("DOMContentLoaded", () => startKcfxAutoPreload({ force: true }), { once: true });
     return;
   }
-  startKcfxAutoPreload();
+  startKcfxAutoPreload({ force: true });
 }
 
 function normalizeKcfxTargetIds(ids) {
@@ -258,7 +339,12 @@ async function importLibraryManifestRecords(manifest, options = {}) {
       if (canReuseLocalKcfxRows(importRecord, local)) {
         importRecord = { ...importRecord, rows: getLatestUploadedRecord(local).rows };
       } else {
-        importRecord = await loadServerKcfxFullRecord(id, index, entries.length, onProgress);
+        try {
+          importRecord = await loadServerKcfxFullRecord(id, index, entries.length, onProgress);
+        } catch (error) {
+          console.warn("kcfx full record load failed", id, error);
+          continue;
+        }
       }
     }
     if (!metadataOnly && !Array.isArray(importRecord?.rows)) continue;
