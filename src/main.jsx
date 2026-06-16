@@ -44,7 +44,6 @@ const MAINTENANCE_LIBRARY_PAGES = [
 ];
 
 const EMBEDDED_KCFX_PAGES = [...SALES_INVENTORY_PAGES, ...MAINTENANCE_LIBRARY_PAGES];
-const APP_VERSION_TIME = '2026-06-16 11:01';
 
 const SYSTEM_FILE_LIBRARY_PAGES = [
   { tab: 'systemMigrationPackage', key: 'migrationPackage', label: '迁移备份包' },
@@ -123,6 +122,7 @@ function App() {
   const [logEndDate, setLogEndDate] = useState('');
   const [managedUsers, setManagedUsers] = useState([]);
   const [systemFilePackages, setSystemFilePackages] = useState([]);
+  const [appVersionTime, setAppVersionTime] = useState('读取中...');
   const [newUserName, setNewUserName] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('123456');
   const [passwordResets, setPasswordResets] = useState({});
@@ -416,6 +416,24 @@ function App() {
       setMessage(`后端服务连接失败：${error?.message || '请确认服务已启动。'}`);
     });
   }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API}/api/app-version`, { cache: 'no-store' })
+      .then((response) => {
+        if (!response.ok) throw new Error(`app version HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((data) => {
+        if (!cancelled) setAppVersionTime(data.versionTime || '未获取');
+      })
+      .catch(() => {
+        if (!cancelled) setAppVersionTime('未获取');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     function openFirstAllowedTab() {
@@ -1423,7 +1441,7 @@ function App() {
     <main className="app-shell">
       <aside className="sidebar">
         <h1>供应链AI系统</h1>
-        <div className="app-version-time">版本时间：{APP_VERSION_TIME}</div>
+        <div className="app-version-time">版本时间：{appVersionTime}</div>
         <nav className="sidebar-menu" aria-label="系统菜单">
           {canAccessSupplierPayment && (
           <div className="menu-group">

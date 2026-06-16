@@ -20,6 +20,7 @@ const legacyKcfxFileDir = path.join(dataDir, 'kcfx-files');
 const kcfxRecordDir = path.join(dataDir, 'kcfx-records');
 const dbPath = path.join(dataDir, 'db.json');
 const kcfxDir = path.join(rootDir, 'public', 'kcfx');
+const serverStartedAt = new Date();
 
 const app = express();
 const upload = multer({
@@ -34,6 +35,36 @@ app.use(express.json({ limit: '200mb' }));
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, service: 'gongyingaixitong', time: new Date().toISOString() });
+});
+
+async function readFileMtime(filePath) {
+  try {
+    return (await stat(filePath)).mtime;
+  } catch {
+    return null;
+  }
+}
+
+async function getAppRefreshTime() {
+  const distIndexPath = path.join(rootDir, 'dist', 'index.html');
+  const mtimes = await Promise.all([
+    readFileMtime(distIndexPath),
+    readFileMtime(path.join(rootDir, 'package.json')),
+    readFileMtime(path.join(rootDir, 'server', 'app.js'))
+  ]);
+  const validTimes = mtimes.filter(Boolean).map((time) => time.getTime());
+  if (!validTimes.length) return serverStartedAt;
+  return new Date(Math.max(...validTimes));
+}
+
+app.get('/api/app-version', async (req, res) => {
+  const refreshedAt = await getAppRefreshTime();
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    service: 'gongyingaixitong',
+    versionTime: format(refreshedAt, 'yyyy-MM-dd HH:mm'),
+    refreshedAt: refreshedAt.toISOString()
+  });
 });
 
 const SYSTEM_OWNER_NAME = '孙立柱';
