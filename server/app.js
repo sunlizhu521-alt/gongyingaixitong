@@ -1657,6 +1657,107 @@ async function readKcfxRecordRows(record = {}) {
   return Array.isArray(payload?.rows) ? payload.rows : [];
 }
 
+async function readKcfxRecordRowsPayload(id) {
+  const relativePath = kcfxRecordRowsRelativePath(id);
+  const fullPath = path.join(dataDir, relativePath);
+  const payload = JSON.parse(await readFile(fullPath, 'utf8'));
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  return {
+    rows,
+    rowsPath: relativePath,
+    rowsSavedAt: payload?.savedAt || '',
+    rowCount: Number(payload?.rowCount || rows.length)
+  };
+}
+
+function defaultKcfxSlotTitle(slotId) {
+  const titles = {
+    'dim-product': '商品分类维表',
+    'dim-purchase-division': '采购分工明细'
+  };
+  return titles[slotId] || slotId;
+}
+
+async function recoverKcfxRecordFromRowsFile(id) {
+  try {
+    const payload = await readKcfxRecordRowsPayload(id);
+    if (!payload.rows.length) return null;
+    return {
+      id,
+      title: defaultKcfxSlotTitle(id),
+      sheetHint: defaultKcfxSheetHint(id),
+      sheetName: defaultKcfxSheetHint(id),
+      savedAt: payload.rowsSavedAt,
+      appliedAt: payload.rowsSavedAt,
+      parseStatus: 'ready',
+      parseSource: 'server-recovered',
+      rowsPath: payload.rowsPath,
+      rowsSavedAt: payload.rowsSavedAt,
+      rowCount: payload.rowCount
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function resolveKcfxStoredFilePath(record = {}) {
+  const candidates = [];
+  if (record.serverFilePath) {
+    candidates.push(path.join(kcfxFileDir, safeArchiveName(record.serverFilePath)));
+  }
+  if (record.serverFileName && record.id) {
+    candidates.push(path.join(legacyKcfxFileDir, path.basename(record.id), path.basename(record.serverFileName)));
+  }
+  for (const candidate of candidates) {
+    try {
+      await stat(candidate);
+      return candidate;
+    } catch {
+      // Try the next known storage location.
+    }
+  }
+  return '';
+}
+
+async function ensureKcfxRecordRows(db, id, record = {}) {
+  if (Array.isArray(record.rows) || record.rowsPath) return record;
+  const originalFilePath = await resolveKcfxStoredFilePath({ ...record, id });
+  if (!originalFilePath) return record;
+  try {
+    const slot = {
+      id,
+      type: record.type || '',
+      title: record.title || defaultKcfxSlotTitle(id),
+      expectedName: record.expectedName || '',
+      sheetHint: record.sheetHint || defaultKcfxSheetHint(id),
+      skipRows: Number.isInteger(Number(record.skipRows)) ? Number(record.skipRows) : undefined
+    };
+    const parsed = parseKcfxWorkbookFile(originalFilePath, slot);
+    if (!parsed.rows.length) return record;
+    const parsedRecord = await externalizeKcfxRecordRows({
+      ...record,
+      id,
+      title: slot.title,
+      sheetName: parsed.sheetName,
+      parseStatus: 'ready',
+      parseSource: 'server-on-demand',
+      parseCompletedAt: new Date().toISOString(),
+      parseDiagnostics: buildKcfxParseDiagnostics(parsed),
+      rows: parsed.rows
+    }, id);
+    db.kcfxLibrary.records[id] = parsedRecord;
+    db.kcfxLibrary.savedAt = new Date().toISOString();
+    await saveDb(db);
+    return parsedRecord;
+  } catch (error) {
+    return {
+      ...record,
+      parseStatus: record.parseStatus || 'failed',
+      parseError: record.parseError || error?.message || 'parse failed'
+    };
+  }
+}
+
 async function externalizeKcfxRecordRows(record = {}, id = record.id) {
   if (!Array.isArray(record.rows)) {
     return {
@@ -1748,11 +1849,21 @@ async function buildPreloadedKcfxLibrary(db = null, options = {}) {
   const targetIds = options.targetIds || null;
   const records = {};
   let rowCount = 0;
+  const entries = new Map(Object.entries(database.kcfxLibrary?.records || {}));
+  if (targetIds) {
+    for (const id of targetIds) {
+      if (!entries.has(id)) {
+        const recoveredRecord = await recoverKcfxRecordFromRowsFile(id);
+        if (recoveredRecord) entries.set(id, recoveredRecord);
+      }
+    }
+  }
 
-  for (const [id, record] of Object.entries(database.kcfxLibrary?.records || {})) {
+  for (const [id, sourceRecord] of entries.entries()) {
     if (!KC_LIBRARY_SLOT_IDS.has(id)) continue;
     if (targetIds && !targetIds.has(id)) continue;
     try {
+      const record = await ensureKcfxRecordRows(database, id, sourceRecord);
       const fullRecord = await attachKcfxRecordRows(record);
       records[id] = {
         ...fullRecord,
@@ -2305,8 +2416,9 @@ app.get('/api/kcfx-library/preloaded', async (req, res) => {
 app.get('/api/kcfx-library/records/:id', async (req, res) => {
   const db = await ensureDb();
   const id = String(req.params.id || '').trim();
-  let record = db.kcfxLibrary.records[id];
+  let record = db.kcfxLibrary.records[id] || await recoverKcfxRecordFromRowsFile(id);
   if (!record) return res.status(404).json({ error: 'record not found' });
+  record = await ensureKcfxRecordRows(db, id, record);
   if (Array.isArray(record.rows)) {
     record = await externalizeKcfxRecordRows(record, id);
     db.kcfxLibrary.records[id] = record;

@@ -387,6 +387,25 @@ function App() {
     }
   }
 
+  async function hydrateInspectionLibraryRecords(records = {}) {
+    const nextRecords = { ...records };
+    const missingIds = INSPECTION_LIBRARY_RECORD_IDS.filter((id) => {
+      const record = nextRecords[id];
+      return !Array.isArray(record?.rows) || record.rows.length === 0;
+    });
+    await Promise.all(missingIds.map(async (id) => {
+      try {
+        const response = await fetch(`${API}/api/kcfx-library/records/${encodeURIComponent(id)}`, { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (payload?.record) nextRecords[id] = payload.record;
+      } catch {
+        // Missing maintenance-library records leave the related dropdown empty until the file is uploaded.
+      }
+    }));
+    return nextRecords;
+  }
+
   async function loadData() {
     const params = user ? `?user=${encodeURIComponent(user.name)}&role=${encodeURIComponent(user.role)}` : '';
     const inspectionLibraryIds = INSPECTION_LIBRARY_RECORD_IDS.join(',');
@@ -453,7 +472,7 @@ function App() {
     }
     if (inspectionLibraryRes?.ok) {
       const inspectionLibrary = await inspectionLibraryRes.json();
-      setInspectionLibraryRecords(inspectionLibrary.records || {});
+      setInspectionLibraryRecords(await hydrateInspectionLibraryRecords(inspectionLibrary.records || {}));
     } else if (!canAccessTab('inspectionNotice')) {
       setInspectionLibraryRecords({});
     }
