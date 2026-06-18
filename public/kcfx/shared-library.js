@@ -328,9 +328,19 @@ async function loadPreloadedServerKcfxFileLibrary(options = {}) {
   onProgress?.({ percent: 22, message: "\u6b63\u5728\u8bfb\u53d6\u670d\u52a1\u5668\u5df2\u9884\u70ed\u6570\u636e..." });
   const query = new URLSearchParams({ v: String(Date.now()) });
   if (targetIds) query.set("ids", [...targetIds].join(","));
-  const response = await fetchKcfxApi(`${KC_SERVER_PRELOADED_LIBRARY_API}?${query.toString()}`, { cache: "no-store" }, KC_SERVER_PRELOAD_TIMEOUT_MS);
-  if (!response.ok) throw new Error(`preloaded HTTP ${response.status}`);
-  const payload = await response.json();
+  let payload = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const response = await fetchKcfxApi(`${KC_SERVER_PRELOADED_LIBRARY_API}?${query.toString()}`, { cache: "no-store" }, KC_SERVER_PRELOAD_TIMEOUT_MS);
+    if (!response.ok) throw new Error(`preloaded HTTP ${response.status}`);
+    payload = await response.json();
+    if (payload?.ok && payload.status === "ready") break;
+    if (payload?.status !== "loading") break;
+    onProgress?.({
+      percent: 28 + attempt * 4,
+      message: payload.message || "\u670d\u52a1\u5668\u6587\u4ef6\u5e93\u9884\u70ed\u4e2d..."
+    });
+    await new Promise((resolve) => window.setTimeout(resolve, 1200));
+  }
   if (!payload?.ok || payload.status !== "ready") {
     throw new Error(payload?.error || `preloaded ${payload?.status || "not ready"}`);
   }

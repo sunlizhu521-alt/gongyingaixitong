@@ -6,6 +6,7 @@ import { PDFParse } from 'pdf-parse';
 import xlsx from 'xlsx';
 import { addDays, format, parseISO } from 'date-fns';
 import { randomUUID } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +20,7 @@ const kcfxFileDir = originalMaintenanceLibraryDir;
 const legacyKcfxFileDir = path.join(dataDir, 'kcfx-files');
 const kcfxRecordDir = path.join(dataDir, 'kcfx-records');
 const kcfxTrendSummaryPath = path.join(dataDir, 'kcfx-trend-summary.json');
+const kcfxTrendWorkerPath = path.join(__dirname, 'kcfx-trend-summary-worker.js');
 const dbPath = path.join(dataDir, 'db.json');
 const kcfxDir = path.join(rootDir, 'public', 'kcfx');
 const serverStartedAt = new Date();
@@ -1991,13 +1993,18 @@ async function buildKcfxTrendSummary() {
 async function readKcfxTrendSummaryCache() {
   if (kcfxTrendSummaryCache?.ok) return kcfxTrendSummaryCache;
   try {
-    const payload = JSON.parse(await readFile(kcfxTrendSummaryPath, 'utf8'));
-    if (payload?.ok && Array.isArray(payload.monthSummaries)) {
-      kcfxTrendSummaryCache = payload;
-      return payload;
-    }
+    return await readKcfxTrendSummaryCacheFromDisk();
   } catch {
     // Missing cache is expected before the first background build.
+  }
+  return null;
+}
+
+async function readKcfxTrendSummaryCacheFromDisk() {
+  const payload = JSON.parse(await readFile(kcfxTrendSummaryPath, 'utf8'));
+  if (payload?.ok && Array.isArray(payload.monthSummaries)) {
+    kcfxTrendSummaryCache = payload;
+    return payload;
   }
   return null;
 }
@@ -2009,6 +2016,38 @@ async function writeKcfxTrendSummaryCache(payload) {
   return payload;
 }
 
+function runKcfxTrendSummaryWorker() {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [kcfxTrendWorkerPath, dataDir, kcfxTrendSummaryPath], {
+      cwd: rootDir,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on('error', reject);
+    child.on('close', async (code) => {
+      if (code !== 0) {
+        reject(new Error(stderr || `trend summary worker exited ${code}`));
+        return;
+      }
+      try {
+        const payload = await readKcfxTrendSummaryCacheFromDisk();
+        if (!payload?.ok) throw new Error(stdout || 'trend summary worker did not write a valid cache');
+        resolve(payload);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
+}
+
 function isKcfxTrendSummaryFresh(cache, db) {
   if (!cache?.ok) return false;
   if (!db?.kcfxLibrary?.savedAt) return true;
@@ -2017,8 +2056,7 @@ function isKcfxTrendSummaryFresh(cache, db) {
 
 async function refreshKcfxTrendSummaryCache() {
   if (kcfxTrendSummaryPromise) return kcfxTrendSummaryPromise;
-  kcfxTrendSummaryPromise = buildKcfxTrendSummary()
-    .then((payload) => writeKcfxTrendSummaryCache(payload))
+  kcfxTrendSummaryPromise = runKcfxTrendSummaryWorker()
     .finally(() => {
       kcfxTrendSummaryPromise = null;
     });
@@ -2043,6 +2081,12 @@ async function getKcfxTrendSummaryResponse() {
       status: 'ready'
     };
   }
+  return {
+    ok: false,
+    status: 'loading',
+    source: 'server-trend-summary',
+    message: '库存货值汇总正在服务器生成中，请稍后刷新'
+  };
   try {
     return await Promise.race([
       refreshKcfxTrendSummaryCache(),
@@ -2261,6 +2305,30 @@ function filterKcfxPreloadCacheByIds(payload, idsParam) {
     records,
     recordCount: Object.keys(records).length,
     rowCount
+  };
+}
+
+function kcfxPreloadCacheHasIds(payload, targetIds) {
+  if (!payload || payload.status !== 'ready') return false;
+  return [...targetIds].every((id) => Array.isArray(payload.records?.[id]?.rows));
+}
+
+function kcfxTargetIdsArePriority(targetIds) {
+  return [...targetIds].every((id) => KC_PRIORITY_PRELOAD_SLOT_IDS.has(id));
+}
+
+function kcfxPreloadLoadingResponse(targetIds) {
+  return {
+    ok: false,
+    status: 'loading',
+    source: 'server-preload',
+    schemaVersion: 1,
+    project: 'kcfx',
+    savedAt: kcfxPreloadCache.savedAt || '',
+    records: Object.fromEntries([...targetIds].map((id) => [id, kcfxPreloadCache.records?.[id] || { id }])),
+    recordCount: 0,
+    rowCount: 0,
+    message: '文件库预热数据正在服务器生成中'
   };
 }
 
@@ -2706,6 +2774,24 @@ app.get('/api/kcfx-library/preloaded', async (req, res) => {
     const targetIds = normalizeKcfxIds(req.query.ids);
     res.setHeader('Cache-Control', 'no-store');
     if (targetIds) {
+      if (kcfxPreloadCacheHasIds(kcfxPreloadCache, targetIds)) {
+        return res.json(filterKcfxPreloadCacheByIds(kcfxPreloadCache, [...targetIds].join(',')));
+      }
+      if (kcfxTargetIdsArePriority(targetIds)) {
+        if (!kcfxPreloadPromise) scheduleKcfxPreloadRefresh();
+        if (kcfxPreloadPromise) {
+          const cachedPayload = await Promise.race([
+            kcfxPreloadPromise.then(() => (
+              kcfxPreloadCacheHasIds(kcfxPreloadCache, targetIds)
+                ? filterKcfxPreloadCacheByIds(kcfxPreloadCache, [...targetIds].join(','))
+                : null
+            )),
+            new Promise((resolve) => setTimeout(() => resolve(null), 1500))
+          ]);
+          if (cachedPayload) return res.json(cachedPayload);
+        }
+        return res.json(kcfxPreloadLoadingResponse(targetIds));
+      }
       const payload = await buildPreloadedKcfxLibrary(null, { targetIds });
       return res.json(payload);
     }
