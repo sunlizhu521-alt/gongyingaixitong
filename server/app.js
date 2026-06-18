@@ -1834,6 +1834,22 @@ let kcfxPreloadCache = {
 };
 let kcfxPreloadPromise = null;
 
+const KCFX_TREND_MONTHS = [
+  { id: 'fact-3', label: '1月' },
+  { id: 'fact-4', label: '2月' },
+  { id: 'fact-5', label: '3月' },
+  { id: 'fact-6', label: '4月' },
+  { id: 'fact-7', label: '5月' }
+];
+const KCFX_TREND_RECORD_IDS = new Set([
+  ...KCFX_TREND_MONTHS.map((month) => month.id),
+  'fact-2',
+  'dim-product',
+  'dim-warehouse',
+  'dim-warehouse-material'
+]);
+const KCFX_TREND_UNCLASSIFIED_LIMIT = 1000;
+
 function normalizeKcfxIds(idsParam) {
   const ids = String(idsParam || '')
     .split(',')
@@ -1936,6 +1952,220 @@ function scheduleKcfxPreloadRefresh(db = null) {
   refreshKcfxPreloadCache(db).catch((error) => {
     console.error('kcfx preload refresh failed', error);
   });
+}
+
+async function getKcfxTrendRecord(db, id) {
+  const source = db.kcfxLibrary?.records?.[id] || await recoverKcfxRecordFromRowsFile(id);
+  if (!source) return null;
+  const record = await ensureKcfxRecordRows(db, id, source);
+  return attachKcfxRecordRows(record);
+}
+
+function stripKcfxTrendRecord(record = null) {
+  if (!record) return null;
+  return stripKcfxRecordRows(record);
+}
+
+async function buildKcfxTrendSummary() {
+  const db = await ensureDb();
+  const records = {};
+  await Promise.all([...KCFX_TREND_RECORD_IDS].map(async (id) => {
+    records[id] = await getKcfxTrendRecord(db, id);
+  }));
+  const maps = buildKcfxTrendDimensionMaps(records);
+  const monthSummaries = KCFX_TREND_MONTHS.map((month) => summarizeKcfxTrendMonth(month, records[month.id], maps));
+  return {
+    ok: true,
+    status: 'ready',
+    source: 'server-trend-summary',
+    savedAt: db.kcfxLibrary?.savedAt || '',
+    generatedAt: new Date().toISOString(),
+    monthSummaries,
+    records: Object.fromEntries(Object.entries(records).map(([id, record]) => [id, stripKcfxTrendRecord(record)]))
+  };
+}
+
+function summarizeKcfxTrendMonth(month, record, maps) {
+  const sourceRows = record?.rows || [];
+  const rows = sourceRows.length ? sourceRows.slice(0, -1) : [];
+  const qtyAccessor = makeKcfxTrendQtyAccessor(sourceRows[0]);
+  const priceAccessor = makeKcfxTrendPriceAccessor(sourceRows[0]);
+  const groupedItems = new Map();
+  const summary = {
+    ...month,
+    record: stripKcfxTrendRecord(record),
+    totalRows: sourceRows.length,
+    skippedSummaryRows: sourceRows.length ? 1 : 0,
+    usedRows: 0,
+    totalQty: 0,
+    totalValue: 0,
+    pricedRows: 0,
+    directPricedRows: 0,
+    fallbackPricedRows: 0,
+    items: [],
+    unclassifiedRows: [],
+    unclassifiedTruncated: false
+  };
+
+  for (const row of rows) {
+    const materialA = normalizeKcfxMaterialCode(kcfxNthValue(row, 1));
+    const materialB = normalizeKcfxMaterialCode(kcfxNthValue(row, 2));
+    const materialName = normalizeKcfxText(kcfxNthValue(row, 3));
+    const warehouse = normalizeKcfxText(kcfxNthValue(row, 4));
+    const qty = kcfxTrendToNumber(qtyAccessor(row));
+    if (!qty) continue;
+    const directSettlementPrice = kcfxTrendToNumber(priceAccessor(row));
+    const fallbackSettlementPrice = maps.settlementPriceByMaterial.get(materialB) || 0;
+    const settlementPrice = directSettlementPrice || fallbackSettlementPrice;
+    const value = qty * settlementPrice;
+
+    const department = maps.departmentByKey.get(makeKcfxTrendDepartmentKey(materialA, warehouse, materialB)) || '';
+    const productLine = maps.productLineByMaterial.get(materialB) || '';
+    const productSeries = maps.productSeriesByMaterial.get(materialB) || '';
+    const warehouseType = maps.warehouseTypeByName.get(normalizeKcfxText(warehouse)) || '';
+    const warehouseLocation = maps.warehouseLocationByName.get(normalizeKcfxText(warehouse)) || '';
+    const item = {
+      qty,
+      value,
+      warehouseType: warehouseType || '未分类仓库类型',
+      department: department || '未匹配事业部',
+      productLine: productLine || '未分类产品线',
+      productSeries: productSeries || '未分类销售系列',
+      warehouseLocation: warehouseLocation || '未分类仓库位置'
+    };
+    const groupKey = [
+      item.warehouseType,
+      item.department,
+      item.productLine,
+      item.productSeries,
+      item.warehouseLocation
+    ].join('\u001f');
+    const grouped = groupedItems.get(groupKey) || { ...item, qty: 0, value: 0 };
+    grouped.qty += qty;
+    grouped.value += value;
+    groupedItems.set(groupKey, grouped);
+
+    summary.usedRows += 1;
+    summary.totalQty += qty;
+    summary.totalValue += value;
+    if (settlementPrice) summary.pricedRows += 1;
+    if (directSettlementPrice) summary.directPricedRows += 1;
+    else if (fallbackSettlementPrice) summary.fallbackPricedRows += 1;
+
+    const missingReasons = [
+      department ? '' : '未区分事业部',
+      productLine ? '' : '未区分产品线',
+      warehouseLocation ? '' : '未分类仓库位置'
+    ].filter(Boolean);
+    if (missingReasons.length) {
+      if (summary.unclassifiedRows.length < KCFX_TREND_UNCLASSIFIED_LIMIT) {
+        summary.unclassifiedRows.push({
+          month: month.label,
+          reason: missingReasons.join('、'),
+          materialA,
+          materialCode: materialB,
+          materialName,
+          warehouse,
+          qty,
+          department,
+          productLine,
+          warehouseLocation
+        });
+      } else {
+        summary.unclassifiedTruncated = true;
+      }
+    }
+  }
+
+  summary.items = [...groupedItems.values()];
+  return summary;
+}
+
+function buildKcfxTrendDimensionMaps(records) {
+  const departmentByKey = new Map();
+  for (const row of records['dim-warehouse-material']?.rows || []) {
+    const key = normalizeKcfxTrendDepartmentKey(kcfxNthValue(row, 6));
+    const department = normalizeKcfxText(kcfxNthValue(row, 7));
+    if (key && department && !departmentByKey.has(key)) departmentByKey.set(key, department);
+  }
+
+  const warehouseTypeByName = new Map();
+  const warehouseLocationByName = new Map();
+  for (const row of records['dim-warehouse']?.rows || []) {
+    const warehouseName = normalizeKcfxText(kcfxNthValue(row, 2));
+    const warehouseType = normalizeKcfxText(kcfxNthValue(row, 7));
+    const warehouseLocation = normalizeKcfxText(kcfxNthValue(row, 8));
+    if (warehouseName && warehouseType && !warehouseTypeByName.has(warehouseName)) warehouseTypeByName.set(warehouseName, warehouseType);
+    if (warehouseName && warehouseLocation && !warehouseLocationByName.has(warehouseName)) warehouseLocationByName.set(warehouseName, warehouseLocation);
+  }
+
+  const productLineByMaterial = new Map();
+  const productSeriesByMaterial = new Map();
+  const settlementPriceByMaterial = new Map();
+  for (const row of records['dim-product']?.rows || []) {
+    const materialCode = normalizeKcfxMaterialCode(kcfxNthValue(row, 1));
+    const productLine = normalizeKcfxText(kcfxNthValue(row, 7));
+    const productSeries = normalizeKcfxText(kcfxNthValue(row, 8));
+    if (materialCode && productLine && !productLineByMaterial.has(materialCode)) productLineByMaterial.set(materialCode, productLine);
+    if (materialCode && productSeries && !productSeriesByMaterial.has(materialCode)) productSeriesByMaterial.set(materialCode, productSeries);
+    const price = kcfxTrendToNumber(kcfxNthValue(row, 10));
+    if (materialCode && price && !settlementPriceByMaterial.has(materialCode)) settlementPriceByMaterial.set(materialCode, price);
+  }
+
+  const inventoryMonthRows = records['fact-2']?.rows || [];
+  const monthPriceAccessor = makeKcfxTrendPriceAccessor(inventoryMonthRows[0]);
+  for (const row of inventoryMonthRows) {
+    const materialCode = normalizeKcfxMaterialCode(kcfxNthValue(row, 1));
+    const price = kcfxTrendToNumber(monthPriceAccessor(row));
+    if (materialCode && price) settlementPriceByMaterial.set(materialCode, price);
+  }
+
+  return { departmentByKey, warehouseTypeByName, warehouseLocationByName, productLineByMaterial, productSeriesByMaterial, settlementPriceByMaterial };
+}
+
+function makeKcfxTrendDepartmentKey(materialA, warehouse, materialB) {
+  return normalizeKcfxTrendDepartmentKey(`${materialA}${warehouse}${materialB}`);
+}
+
+function normalizeKcfxTrendDepartmentKey(value) {
+  return normalizeKcfxMaterialCode(value).replace(/&/g, '').toLowerCase();
+}
+
+function normalizeKcfxMaterialCode(value) {
+  return normalizeKcfxText(value).replace(/\s+/g, '');
+}
+
+function makeKcfxTrendPriceAccessor(sampleRow) {
+  const keys = Object.keys(sampleRow || {});
+  const normalized = keys.map((key) => ({ key, text: normalizeKcfxTrendHeaderText(key) }));
+  const preferred = normalized.find(({ text }) => text.includes('结算价') && text.includes('含税'))
+    || normalized.find(({ text }) => text.includes('结算价'))
+    || normalized.find(({ text }) => text.includes('含税') && text.includes('价'));
+  return preferred ? (row) => row?.[preferred.key] : (row) => kcfxNthValue(row, 16);
+}
+
+function makeKcfxTrendQtyAccessor(sampleRow) {
+  const keys = Object.keys(sampleRow || {});
+  const normalized = keys.map((key) => ({ key, text: normalizeKcfxTrendHeaderText(key) }));
+  const preferred = normalized.find(({ text }) => text.includes('结余库存数量'))
+    || normalized.find(({ text }) => text.includes('结存') && text.includes('数量'))
+    || normalized.find(({ text }) => text.includes('库存数量') && !text.includes('占比'))
+    || normalized.find(({ text }) => text === '数量');
+  return preferred ? (row) => row?.[preferred.key] : (row) => kcfxNthValue(row, 11);
+}
+
+function normalizeKcfxTrendHeaderText(value) {
+  return normalizeKcfxText(value)
+    .replace(/[()\[\]（）【】\s_：:、]/g, '')
+    .toLowerCase();
+}
+
+function kcfxTrendToNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const text = normalizeKcfxText(value);
+  if (!text || text.startsWith('#')) return 0;
+  const parsed = Number(text.replace(/[,，\s￥¥元]/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function filterKcfxPreloadCacheByIds(payload, idsParam) {
@@ -2406,6 +2636,19 @@ app.get('/api/kcfx-library/preloaded', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       ...kcfxPreloadCache,
+      ok: false,
+      status: 'failed',
+      error: error?.message || String(error)
+    });
+  }
+});
+
+app.get('/api/kcfx-library/trend-summary', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await buildKcfxTrendSummary());
+  } catch (error) {
+    res.status(500).json({
       ok: false,
       status: 'failed',
       error: error?.message || String(error)

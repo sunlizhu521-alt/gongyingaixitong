@@ -27,8 +27,15 @@ async function initTrendDashboard() {
   document.querySelector("#downloadTrendUnclassifiedBtn")?.addEventListener("click", downloadTrendUnclassifiedRows);
   document.querySelector("#clearTrendFiltersBtn")?.addEventListener("click", clearTrendFilters);
   document.addEventListener("click", closeTrendFilters);
-  await renderTrendDashboardFromCache();
-  scheduleTrendServerSync(statusEl);
+  setTrendStatus("正在读取服务器库存货值汇总...");
+  try {
+    await renderTrendDashboardFromServerSummary();
+  } catch (error) {
+    console.warn("kcfx trend summary failed, falling back to client rows", error);
+    setTrendStatus("服务器汇总暂不可用，正在读取本地文件库...");
+    await renderTrendDashboardFromCache();
+    scheduleTrendServerSync(statusEl);
+  }
 }
 
 function scheduleTrendServerSync(statusEl) {
@@ -75,6 +82,38 @@ function renderTrendDashboard(records) {
 async function renderTrendDashboardFromCache() {
   const records = Object.fromEntries((await getActiveRecords()).map((record) => [record.id, record]));
   renderTrendDashboard(records);
+}
+
+async function renderTrendDashboardFromServerSummary() {
+  const payload = await loadTrendServerSummary();
+  if (!payload?.ok || !Array.isArray(payload.monthSummaries)) {
+    throw new Error(payload?.error || "server trend summary not ready");
+  }
+  const monthSummaries = payload.monthSummaries.map((month) => ({
+    ...month,
+    items: Array.isArray(month.items) ? month.items : [],
+    unclassifiedRows: Array.isArray(month.unclassifiedRows) ? month.unclassifiedRows : []
+  }));
+  currentTrendMonthSummaries = monthSummaries;
+  trendUnclassifiedRows = monthSummaries.flatMap((item) => item.unclassifiedRows || []);
+  const loaded = monthSummaries.filter((item) => item.record).length;
+  const usedRows = monthSummaries.reduce((total, item) => total + (Number(item.usedRows) || 0), 0);
+  const totalQty = monthSummaries.reduce((total, item) => total + (Number(item.totalQty) || 0), 0);
+  const totalValue = monthSummaries.reduce((total, item) => total + (Number(item.totalValue) || 0), 0);
+  const pricedRows = monthSummaries.reduce((total, item) => total + (Number(item.pricedRows) || 0), 0);
+  const directPricedRows = monthSummaries.reduce((total, item) => total + (Number(item.directPricedRows) || 0), 0);
+  const fallbackPricedRows = monthSummaries.reduce((total, item) => total + (Number(item.fallbackPricedRows) || 0), 0);
+  setTrendStatus(`已读取服务器汇总 ${loaded}/${TREND_MONTHS.length} 个月份文件，参与趋势计算 ${formatNumber(usedRows, 0)} 行，结算价有效 ${formatNumber(pricedRows, 0)} 行（本表P列 ${formatNumber(directPricedRows, 0)} 行，补价 ${formatNumber(fallbackPricedRows, 0)} 行），K列数量合计 ${formatQuantity(totalQty)}，K×P库存货值合计 ${formatMoneyWan(totalValue)}。`);
+  populateTrendFilters(monthSummaries);
+  renderTrendCharts();
+  renderTrendSourcePanel(monthSummaries, payload.records || {});
+  renderTrendUnclassifiedRows(trendUnclassifiedRows);
+}
+
+async function loadTrendServerSummary() {
+  const response = await fetchKcfxApi(`${KC_SERVER_LIBRARY_API}/trend-summary?v=${Date.now()}`, { cache: "no-store" }, 60000);
+  if (!response.ok) throw new Error(`trend summary HTTP ${response.status}`);
+  return response.json();
 }
 
 function renderTrendCharts() {
