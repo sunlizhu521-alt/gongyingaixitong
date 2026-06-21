@@ -1,3 +1,4 @@
+(() => {
 const TREND_MONTHS = [
   { id: "fact-3", label: "1月" },
   { id: "fact-4", label: "2月" },
@@ -697,3 +698,4 @@ function escapeHtml(value) {
     "'": "&#039;"
   }[char]));
 }
+})();
