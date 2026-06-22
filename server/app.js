@@ -2311,6 +2311,8 @@ function buildKcfxReceiptSummaryRow(row, { productMap, warehouseMap, warehouseMa
     ageSettlementAmounts,
     ageQuantityTotal: sumKcfxObjectValues(ageQuantities),
     ageSettlementAmount: sumKcfxObjectValues(ageSettlementAmounts),
+    inventoryTotal: sumKcfxObjectValues(ageQuantities),
+    inventoryAmountTotal: sumKcfxObjectValues(ageSettlementAmounts),
     endingQty,
     settlementPrice,
     settlementAmount: endingQty * settlementPrice

@@ -250,6 +250,8 @@ function buildSummaryRow(row, { productMap, warehouseMap, warehouseMaterialMaps 
     ageSettlementAmounts,
     ageQuantityTotal: sumObjectValues(ageQuantities),
     ageSettlementAmount: sumObjectValues(ageSettlementAmounts),
+    inventoryTotal: sumObjectValues(ageQuantities),
+    inventoryAmountTotal: sumObjectValues(ageSettlementAmounts),
     endingQty,
     settlementPrice,
     settlementAmount: endingQty * settlementPrice
@@ -478,7 +480,7 @@ function renderSummary() {
   const shown = detailTableRows.slice(0, SUMMARY_TABLE_RENDER_LIMIT);
   const summaryBody = $("#summaryRows");
   const summaryMoreRow = detailTableRows.length > shown.length
-    ? `<tr><td colspan="7" class="empty">当前显示前 ${SUMMARY_TABLE_RENDER_LIMIT} 行，共 ${formatNumber(detailTableRows.length, 0)} 行；下载按钮会导出完整筛选结果。</td></tr>`
+    ? `<tr><td colspan="9" class="empty">当前显示前 ${SUMMARY_TABLE_RENDER_LIMIT} 行，共 ${formatNumber(detailTableRows.length, 0)} 行；下载按钮会导出完整筛选结果。</td></tr>`
     : "";
   if (summaryBody) summaryBody.innerHTML = shown.length ? `${shown.map((row) => `
     <tr>
@@ -489,8 +491,10 @@ function renderSummary() {
       <td class="num">${formatNumber(row.endingQty, 3)}</td>
       <td class="num">${formatNumber(row.settlementPrice, 6)}</td>
       <td class="num">${formatMoney(row.settlementAmount)}</td>
+      <td class="num">${formatNumber(visibleQuantity(row, selectedAgeLabels), 3)}</td>
+      <td class="num">${formatMoney(visibleAmount(row, selectedAgeLabels))}</td>
     </tr>
-  `).join("")}${summaryMoreRow}` : `<tr><td colspan="7" class="empty">暂无数据</td></tr>`;
+  `).join("")}${summaryMoreRow}` : `<tr><td colspan="9" class="empty">暂无数据</td></tr>`;
 }
 
 function updateValueGapMetric(visibleAmount = null) {
@@ -639,6 +643,7 @@ function uniqueDetailTableFilterValues(rows, key) {
 
 function detailTableFilterValue(row, key) {
   const empty = "(空白)";
+  const selectedAgeLabels = getSummaryFilterSelections().selectedAgeLabels;
   const valueMap = {
     materialCode: row.materialCode,
     sku: row.sku,
@@ -646,7 +651,9 @@ function detailTableFilterValue(row, key) {
     warehouse: row.warehouse,
     endingQty: formatNumber(row.endingQty, 3),
     settlementPrice: formatNumber(row.settlementPrice, 6),
-    settlementAmount: formatMoney(row.settlementAmount)
+    settlementAmount: formatMoney(row.settlementAmount),
+    inventoryTotal: formatNumber(visibleQuantity(row, selectedAgeLabels), 3),
+    inventoryAmountTotal: formatMoney(visibleAmount(row, selectedAgeLabels))
   };
   const label = normalizeText(valueMap[key]) || empty;
   return { value: label, label };
@@ -881,7 +888,8 @@ function updateChartTotal(id, total, formatter) {
 }
 
 function downloadCurrentRows() {
-  const headers = ["物料编码", "SKU", "物料名称", "仓库", "0430结余库存数量", "结算价(含税)", "结算价金额"];
+  const selectedAgeLabels = getSummaryFilterSelections().selectedAgeLabels;
+  const headers = ["物料编码", "SKU", "物料名称", "仓库", "关账结存库存", "结算价(含税)", "结算价金额", "库存合计", "库存金额合计"];
   const lines = [headers.join(",")];
   detailTableRows.forEach((row) => {
     lines.push([
@@ -891,7 +899,9 @@ function downloadCurrentRows() {
       row.warehouse,
       row.endingQty,
       row.settlementPrice,
-      row.settlementAmount
+      row.settlementAmount,
+      visibleQuantity(row, selectedAgeLabels),
+      visibleAmount(row, selectedAgeLabels)
     ].map(csvCell).join(","));
   });
   const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
