@@ -1515,6 +1515,28 @@ function App() {
     }
   }
 
+  async function deleteManagedUser(target) {
+    if (target.name === systemOwnerName) return;
+    const confirmed = window.confirm(`确定删除 ${target.name} 的账号吗？删除后该账号不能再登录。`);
+    if (!confirmed) return;
+    const res = await fetch(`${API}/api/users/${target.id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: user.name })
+    });
+    if (!res.ok) {
+      setMessage('账号删除失败。');
+      return;
+    }
+    setManagedUsers((rows) => rows.filter((row) => row.id !== target.id));
+    setPasswordResets((current) => {
+      const next = { ...current };
+      delete next[target.id];
+      return next;
+    });
+    setMessage(`${target.name} 的账号已删除。`);
+  }
+
   function managedPermissionSet(target) {
     return new Set(Array.isArray(target.permissions) ? target.permissions : []);
   }
@@ -2257,7 +2279,7 @@ function App() {
             <DataTable
               className="permission-table"
               rows={managedUsers}
-              columns={['姓名', '状态', '角色', '权限', '密码']}
+              columns={['姓名', '状态', '角色', '权限', '密码', '操作']}
               render={(row) => [
                 row.name,
                 row.name === systemOwnerName ? (
@@ -2357,6 +2379,17 @@ function App() {
                       重置密码
                     </button>
                   </div>
+                ),
+                row.name === systemOwnerName ? (
+                  <span>不可删除</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="ghost compact-button danger-button"
+                    onClick={() => deleteManagedUser(row)}
+                  >
+                    删除账号
+                  </button>
                 )
               ]}
             />

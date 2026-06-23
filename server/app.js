@@ -627,8 +627,7 @@ async function ensureDb() {
       },
       sessions: [],
       users: [
-        { id: 'u-admin', name: '孙立柱', password: '521sunlizhu', role: '管理员' },
-        { id: 'u-buyer', name: '采购员', password: '123456', role: '普通用户' }
+        { id: 'u-admin', name: '孙立柱', password: '521sunlizhu', role: '管理员' }
       ],
       suppliers: [
         { id: 's-1', name: '南京伴你行电子商务有限责任公司', termDays: 60 },
@@ -1337,6 +1336,20 @@ app.patch('/api/users/:id', async (req, res) => {
   Object.assign(target, normalized);
   await saveDb(db);
   res.json(publicUser(target));
+});
+
+app.delete('/api/users/:id', async (req, res) => {
+  const db = await ensureDb();
+  if (!requireSystemOwner(db, req, res)) return;
+  const target = db.users.find((item) => item.id === req.params.id);
+  if (!target) return res.status(404).json({ error: 'not found' });
+  if (target.name === SYSTEM_OWNER_NAME) return res.status(400).json({ error: 'cannot delete system owner' });
+
+  db.users = db.users.filter((item) => item.id !== target.id);
+  db.sessions = (db.sessions || []).filter((session) => session.userId !== target.id);
+  pushLog(db, '删除账号', SYSTEM_OWNER_NAME, `${target.name} 账号已删除。`, '系统管理', '权限管理');
+  await saveDb(db);
+  res.json({ ok: true, id: target.id });
 });
 
 app.get('/api/invoices', async (req, res) => {

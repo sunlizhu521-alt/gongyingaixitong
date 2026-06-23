@@ -259,6 +259,17 @@ select {
   min-width: 160px;
 }
 
+.danger-button {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.danger-button:hover {
+  border-color: #fca5a5;
+  background: #ffe4e6;
+}
+
 .permission-checks {
   display: flex;
   gap: 12px;
