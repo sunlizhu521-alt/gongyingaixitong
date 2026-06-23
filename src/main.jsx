@@ -254,7 +254,6 @@ function App() {
     {
       value: 'maintenanceLibrary',
       label: '维护文件库',
-      fixedOwnerOnly: true,
       children: MAINTENANCE_LIBRARY_MENU_PAGES.map((page) => ({
         value: `maintenanceLibrary.${page.key}`,
         tab: page.tab,
@@ -342,7 +341,6 @@ function App() {
   }
   function canAccessTab(tab) {
     if (tab === 'permissionManagement') return canManagePermissions;
-    if (MAINTENANCE_LIBRARY_TABS.has(tab)) return user?.name === systemOwnerName;
     const permission = tabPermissionMap[tab];
     return permission ? hasPermission(permission) : false;
   }
@@ -355,7 +353,7 @@ function App() {
   const canManageSystemFiles = user?.name === systemOwnerName;
   const canManageMaintenanceLibrary = user?.name === systemOwnerName;
   const canAccessSalesInventory = canAccessGroup('salesInventory');
-  const canAccessMaintenanceLibrary = canManageMaintenanceLibrary;
+  const canAccessMaintenanceLibrary = canAccessGroup('maintenanceLibrary');
   const canAccessSystemFileLibrary = canAccessGroup('systemFileLibrary');
   const embeddedKcfxPageMap = Object.fromEntries(EMBEDDED_KCFX_PAGES.map((page) => [page.tab, page]));
   const activeEmbeddedKcfxPage = embeddedKcfxPageMap[activeTab] && canAccessTab(activeTab)
@@ -1518,18 +1516,20 @@ function App() {
     return managedPermissionSet(target).has(permission);
   }
 
+  function assignablePermissionChildren(group) {
+    if (group.fixedOwnerOnly) return [];
+    return group.children.map((item) => item.value);
+  }
+
   function toggleManagedGroup(target, group) {
     if (target.name === systemOwnerName || group.fixedOwnerOnly) return;
     const permissions = managedPermissionSet(target);
-    const children = group.children.map((item) => item.value);
-    const allChecked = children.length
-      ? children.every((item) => permissions.has(item))
-      : permissions.has(group.value);
+    const children = assignablePermissionChildren(group);
+    const allChecked = children.length && children.every((item) => permissions.has(item));
+    permissions.delete(group.value);
     if (allChecked) {
-      permissions.delete(group.value);
       children.forEach((item) => permissions.delete(item));
     } else {
-      permissions.add(group.value);
       children.forEach((item) => permissions.add(item));
     }
     updateManagedUser(target, { permissions: [...permissions] });
@@ -1543,12 +1543,7 @@ function App() {
     } else {
       permissions.add(permission);
     }
-    const hasAnyChild = group.children.some((item) => permissions.has(item.value));
-    if (hasAnyChild) {
-      permissions.add(group.value);
-    } else {
-      permissions.delete(group.value);
-    }
+    permissions.delete(group.value);
     updateManagedUser(target, { permissions: [...permissions] });
   }
 

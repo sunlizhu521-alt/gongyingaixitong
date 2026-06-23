@@ -204,7 +204,9 @@ const PERMISSION_GROUPS = [
     children: ['systemManagement.permissionManagement', 'systemManagement.reminders']
   }
 ];
-const PERMISSION_KEYS = PERMISSION_GROUPS.flatMap((group) => [group.value, ...group.children]);
+const PERMISSION_PARENT_KEYS = PERMISSION_GROUPS.map((group) => group.value);
+const PERMISSION_CHILD_KEYS = PERMISSION_GROUPS.flatMap((group) => group.children);
+const PERMISSION_KEYS = [...PERMISSION_PARENT_KEYS, ...PERMISSION_CHILD_KEYS];
 const OWNER_PERMISSIONS = [...PERMISSION_KEYS];
 const DEFAULT_PERMISSIONS = [];
 
@@ -228,11 +230,11 @@ function expandPermissionKey(permission) {
 function sanitizePermissions(permissions) {
   if (!Array.isArray(permissions)) return [...DEFAULT_PERMISSIONS];
   const expanded = permissions.flatMap(expandPermissionKey);
-  return [...new Set(expanded.filter((item) => PERMISSION_KEYS.includes(item)))];
+  return [...new Set(expanded.filter((item) => PERMISSION_CHILD_KEYS.includes(item)))];
 }
 
 function sanitizeAssignablePermissions(permissions) {
-  return sanitizePermissions(permissions).filter((item) => item !== 'systemManagement' && !item.startsWith('systemManagement.'));
+  return sanitizePermissions(permissions).filter((item) => !item.startsWith('systemManagement.'));
 }
 
 function normalizeUser(user) {
