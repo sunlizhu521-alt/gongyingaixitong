@@ -120,6 +120,7 @@ const USER_STATUS_APPROVED = 'approved';
 const USER_STATUS_PENDING = 'pending';
 const SALES_INVENTORY_PERMISSIONS = [
   'salesInventory.receiptSummary',
+  'salesInventory.inventoryTrend',
   'salesInventory.salesAnalysis',
   'salesInventory.comparison',
   'salesInventory.errors'
