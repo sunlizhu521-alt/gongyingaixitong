@@ -38,6 +38,8 @@ import {
   storeAuthenticatedUser,
   uniqueOptionValues
 } from './utils.js';
+import DataTable from './components/DataTable.jsx';
+import MultiFilter from './components/MultiFilter.jsx';
 import './styles.css';
 
 function App() {
@@ -2498,69 +2500,5 @@ function App() {
   );
 }
 
-function MultiFilter({ id, label, allLabel, options, selected, onChange, openFilter, setOpenFilter }) {
-  const isOpen = openFilter === id;
-  const selectedLabels = selected
-    .map((value) => options.find((option) => option.value === value)?.label || value)
-    .filter(Boolean);
-  const buttonText = selectedLabels.length === 0
-    ? allLabel
-    : selectedLabels.length <= 2
-      ? selectedLabels.join('、')
-      : `已选${selectedLabels.length}项`;
-
-  function toggle(value) {
-    if (selected.includes(value)) {
-      onChange(selected.filter((item) => item !== value));
-    } else {
-      onChange([...selected, value]);
-    }
-  }
-
-  return (
-    <div className="multi-filter">
-      <button
-        type="button"
-        className="multi-filter-button"
-        aria-label={label}
-        onClick={() => setOpenFilter(isOpen ? '' : id)}
-      >
-        {buttonText}
-      </button>
-      {isOpen && (
-        <div className="multi-filter-menu">
-          <label>
-            <input type="checkbox" checked={selected.length === 0} onChange={() => onChange([])} />
-            全部
-          </label>
-          {options.map((option) => (
-            <label key={option.value}>
-              <input
-                type="checkbox"
-                checked={selected.includes(option.value)}
-                onChange={() => toggle(option.value)}
-              />
-              {option.label}
-            </label>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DataTable({ rows, columns, render, className = '' }) {
-  return (
-    <div className={`table-wrap ${className}`}>
-      <table>
-        <thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
-        <tbody>
-          {rows.length === 0 && <tr><td colSpan={columns.length} className="empty">暂无数据</td></tr>}
-          {rows.map((row) => <tr key={row.id || `${row.name}-${row.supplier}`}>{render(row).map((cell, index) => <td key={index}>{cell}</td>)}</tr>)}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 createRoot(document.getElementById('root')).render(<App />);
