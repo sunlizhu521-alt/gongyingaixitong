@@ -8,16 +8,22 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to Tencent Cloud
-        uses: appleboy/ssh-action@v1
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: |
+          known_hosts: unnecessary
+          if_key_exists: replace
+
+      - name: Deploy to server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+            set -e
             cd /home/ubuntu/zhuge-ai-lab/gongyingaixitong
             git fetch origin main
             git reset --hard origin/main
             npm ci
             npm run build
             pm2 restart gongyingaixitong
+            pm2 save
+          EOF
