@@ -1,17 +1,45 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { API } from '../constants.js';
 
-export async function fetchKcfxRecord(id) {
-  const response = await fetch(`${API}/api/kcfx-library/records/${encodeURIComponent(id)}`, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const payload = await response.json();
-  return payload.record || { id, rows: [] };
+const recordCache = new Map();
+const inflightRecordRequests = new Map();
+let recordCacheVersion = '';
+
+function syncRecordCacheVersion(savedAt) {
+  if (!savedAt) return;
+  if (recordCacheVersion && recordCacheVersion !== savedAt) {
+    recordCache.clear();
+    inflightRecordRequests.clear();
+  }
+  recordCacheVersion = savedAt;
 }
 
-export async function fetchKcfxRecordMap(ids) {
+export async function fetchKcfxRecord(id, { force = false } = {}) {
+  if (!force && recordCache.has(id)) return recordCache.get(id);
+  if (!force && inflightRecordRequests.has(id)) return inflightRecordRequests.get(id);
+
+  const request = fetch(`${API}/api/kcfx-library/records/${encodeURIComponent(id)}`, { cache: 'no-store' })
+    .then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    })
+    .then((payload) => {
+      const record = payload.record || { id, rows: [] };
+      recordCache.set(record.id || id, record);
+      return record;
+    })
+    .finally(() => {
+      inflightRecordRequests.delete(id);
+    });
+
+  inflightRecordRequests.set(id, request);
+  return request;
+}
+
+export async function fetchKcfxRecordMap(ids, options = {}) {
   const results = await Promise.all(ids.map(async (id) => {
     try {
-      return { id, record: await fetchKcfxRecord(id) };
+      return { id, record: await fetchKcfxRecord(id, options) };
     } catch (error) {
       return { id, error: error?.message || String(error) };
     }
@@ -37,29 +65,52 @@ export function kcfxRecordsArrayToMap(records) {
 }
 
 export function useKcfxRecordMap(kcfxData, ids) {
+  const idsKey = useMemo(() => ids.join('|'), [ids]);
   const metadataRecords = useMemo(() => kcfxRecordsArrayToMap(kcfxData?.records), [kcfxData]);
   const savedAt = kcfxData?.savedAt || '';
-  const [rowRecords, setRowRecords] = useState({});
+  const [rowRecords, setRowRecords] = useState(() => {
+    const cached = {};
+    for (const id of ids) {
+      if (recordCache.has(id)) cached[id] = recordCache.get(id);
+    }
+    return cached;
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async ({ force = false } = {}) => {
+    const currentIds = idsKey.split('|').filter(Boolean);
+    const cached = {};
+    if (!force) {
+      for (const id of currentIds) {
+        if (recordCache.has(id)) cached[id] = recordCache.get(id);
+      }
+      if (Object.keys(cached).length === currentIds.length) {
+        setRowRecords(cached);
+        setError('');
+        return cached;
+      }
+    }
+
     setLoading(true);
     setError('');
     try {
-      const result = await fetchKcfxRecordMap(ids);
+      const result = await fetchKcfxRecordMap(currentIds, { force });
       setRowRecords(result.records);
       const hasRows = Object.values(result.records).some((record) => Array.isArray(record?.rows) && record.rows.length > 0);
       setError(!hasRows && result.failedIds.length ? `记录加载失败：${result.failedIds.join('、')}` : '');
+      return result.records;
     } catch (loadError) {
       setError(loadError?.message || String(loadError));
+      return {};
     } finally {
       setLoading(false);
     }
-  }, [ids]);
+  }, [idsKey]);
 
   useEffect(() => {
-    reload();
+    syncRecordCacheVersion(savedAt);
+    reload({ force: false });
   }, [reload, savedAt]);
 
   const records = useMemo(() => ({

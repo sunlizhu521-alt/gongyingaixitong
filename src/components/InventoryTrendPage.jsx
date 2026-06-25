@@ -1,38 +1,60 @@
 import React, { useMemo } from 'react';
 import { BarPanel, KcfxPageShell, MetricCards, PanelGrid, SimpleTable, SourcePanel } from './KcfxCommon.jsx';
+import { FilterToolbar, useDashboardFilters } from './KcfxFilters.jsx';
 import { INVENTORY_TREND_MONTHS, KCFX_COLORS, buildInventoryTrendRows, formatNumber, groupSum, moneyWan, recordSourceText, sum } from './kcfxUtils.js';
 import { useKcfxRecordMap } from './kcfxRecordLoader.js';
 
 const INVENTORY_TREND_RECORD_IDS = ['fact-2', 'fact-3', 'fact-4', 'fact-5', 'fact-6', 'fact-7', 'dim-product', 'dim-warehouse', 'dim-warehouse-material'];
+const INVENTORY_TREND_FILTERS = [
+  { id: 'trendWarehouseType', field: 'warehouseType', allLabel: '全部仓库类型', sortByName: true, sortValueField: 'amount' },
+  { id: 'trendDepartment', field: 'department', allLabel: '全部事业部', sortValueField: 'amount' },
+  { id: 'trendProductLine', field: 'productLine', allLabel: '全部销售产品线', sortValueField: 'amount' },
+  { id: 'trendProductSeries', field: 'productSeries', allLabel: '全部销售系列', sortValueField: 'amount' },
+  { id: 'trendWarehouseLocation', field: 'warehouseLocation', allLabel: '全部仓库位置', sortValueField: 'amount' }
+];
 
-export default function InventoryTrendPage({ kcfxData = null, kcfxRecords = {}, loading = false, error = '', lastLoadedAt = '', onRefresh }) {
+export default function InventoryTrendPage({ kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const { records: loadedRecords, loading: recordsLoading, error: recordsError, reload } = useKcfxRecordMap(kcfxData, INVENTORY_TREND_RECORD_IDS);
   const records = useMemo(() => ({ ...kcfxRecords, ...loadedRecords }), [kcfxRecords, loadedRecords]);
-  const pageLoading = loading || recordsLoading;
   const pageError = recordsError || error;
-
   const monthRows = useMemo(() => (
     buildInventoryTrendRows(records).map((row, index) => ({ ...row, label: `${index + 1}月` }))
   ), [records]);
-  const items = useMemo(() => monthRows.flatMap((row) => row.items || []), [monthRows]);
-  const totalAmount = useMemo(() => sum(monthRows, 'amount'), [monthRows]);
-  const totalQty = useMemo(() => sum(monthRows, 'qty'), [monthRows]);
+  const items = useMemo(() => monthRows.flatMap((row) => (row.items || []).map((item) => ({ ...item, month: row.label }))), [monthRows]);
+  const filterState = useDashboardFilters(items, INVENTORY_TREND_FILTERS);
+  const filteredItems = filterState.filteredRows;
+  const filteredMonthRows = useMemo(() => (
+    monthRows.map((row) => {
+      const monthItems = filteredItems.filter((item) => item.month === row.label);
+      return {
+        ...row,
+        items: monthItems,
+        usedRows: monthItems.length,
+        qty: sum(monthItems, 'qty'),
+        amount: sum(monthItems, 'amount')
+      };
+    })
+  ), [filteredItems, monthRows]);
+  const totalAmount = useMemo(() => sum(filteredMonthRows, 'amount'), [filteredMonthRows]);
+  const totalQty = useMemo(() => sum(filteredMonthRows, 'qty'), [filteredMonthRows]);
   const loadedMonthCount = monthRows.filter((row) => row.record).length;
-  const status = pageLoading
+  const status = recordsLoading
     ? '数据加载中...'
-    : pageError || `已读取 ${loadedMonthCount}/${INVENTORY_TREND_MONTHS.length} 个月份文件，参与趋势计算 ${formatNumber(items.length)} 行，库存货值 ${moneyWan(totalAmount)}${lastLoadedAt ? `；读取时间：${lastLoadedAt}` : ''}`;
+    : pageError || `已读取 ${loadedMonthCount}/${INVENTORY_TREND_MONTHS.length} 个月份文件，筛选后 ${formatNumber(filteredItems.length)} 行，库存货值 ${moneyWan(totalAmount)}${lastLoadedAt ? `；读取时间：${lastLoadedAt}` : ''}`;
 
   const refresh = async () => {
-    await Promise.all([reload(), onRefresh?.()]);
+    await Promise.all([reload({ force: true }), onRefresh?.()]);
   };
 
   return (
-    <KcfxPageShell title="库存趋势分析" status={status} loading={pageLoading} onRefresh={refresh}>
+    <KcfxPageShell title="库存趋势分析" status={status} loading={recordsLoading} onRefresh={refresh}>
+      <FilterToolbar filters={INVENTORY_TREND_FILTERS} {...filterState} />
+
       <MetricCards metrics={[
         { label: '库存货值', value: moneyWan(totalAmount) },
         { label: '库存数量', value: formatNumber(totalQty, 2) },
         { label: '趋势月份', value: formatNumber(loadedMonthCount) },
-        { label: '最大月份金额', value: moneyWan(Math.max(...monthRows.map((row) => row.amount), 0)) }
+        { label: '最大月份金额', value: moneyWan(Math.max(...filteredMonthRows.map((row) => row.amount), 0)) }
       ]} />
 
       <section className="trend-embed-panel analysis-section-trend">
@@ -42,28 +64,28 @@ export default function InventoryTrendPage({ kcfxData = null, kcfxRecords = {}, 
               库存货值趋势
               <span className="chart-total">合计 {moneyWan(totalAmount)}</span>
             </h2>
-            <MonthTrendChart rows={monthRows.map((row) => ({ ...row, value: row.amount }))} formatter={moneyWan} />
+            <MonthTrendChart rows={filteredMonthRows.map((row) => ({ ...row, value: row.amount }))} formatter={moneyWan} />
           </section>
           <section className="panel trend-panel">
             <h2>
               库存数量趋势
               <span className="chart-total">合计 {formatNumber(totalQty, 2)}</span>
             </h2>
-            <MonthTrendChart rows={monthRows.map((row) => ({ ...row, value: row.qty }))} formatter={(value) => formatNumber(value, 2)} />
+            <MonthTrendChart rows={filteredMonthRows.map((row) => ({ ...row, value: row.qty }))} formatter={(value) => formatNumber(value, 2)} />
           </section>
         </div>
       </section>
 
       <PanelGrid>
-        <BarPanel title="事业部库存货值" rows={groupSum(items, 'department', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
-        <BarPanel title="销售产品线库存货值" rows={groupSum(items, 'productLine', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
-        <BarPanel title="仓库位置库存货值" rows={groupSum(items, 'warehouseLocation', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
+        <BarPanel title="事业部库存货值" rows={groupSum(filteredItems, 'department', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
+        <BarPanel title="销售产品线库存货值" rows={groupSum(filteredItems, 'productLine', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
+        <BarPanel title="仓库位置库存货值" rows={groupSum(filteredItems, 'warehouseLocation', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
       </PanelGrid>
 
       <section className="kcfx-panel">
         <h3>趋势明细</h3>
         <SimpleTable
-          rows={monthRows}
+          rows={filteredMonthRows}
           columns={[
             { key: 'label', label: '月份' },
             { key: 'usedRows', label: '参与行数', render: (row) => formatNumber(row.usedRows) },

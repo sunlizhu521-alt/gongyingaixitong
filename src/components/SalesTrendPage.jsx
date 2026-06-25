@@ -17,12 +17,12 @@ const TREND_FILTERS = [
 const EMPTY_SELECTIONS = Object.fromEntries(TREND_FILTERS.map((filter) => [filter.id, []]));
 const SALES_TREND_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
 
-export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, loading = false, error = '', lastLoadedAt = '', onRefresh }) {
+export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const [openFilter, setOpenFilter] = useState('');
   const [selections, setSelections] = useState(EMPTY_SELECTIONS);
   const { records: loadedRecords, loading: recordsLoading, error: recordsError, reload } = useKcfxRecordMap(kcfxData, SALES_TREND_RECORD_IDS);
   const records = useMemo(() => ({ ...kcfxRecords, ...loadedRecords }), [kcfxRecords, loadedRecords]);
-  const pageLoading = loading || recordsLoading;
+  const pageLoading = recordsLoading;
   const pageError = recordsError || error;
 
   const salesRows = useMemo(() => getSalesRows(records), [records]);
@@ -73,7 +73,7 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, load
     : pageError || `已按销售数据日期列读取 ${formatNumber(trendRows.length)} 行，年份：${TREND_YEARS.join(' / ')}，应收数量合计 ${formatQuantity(sum(trendRows, 'value'))}${lastLoadedAt ? `；读取时间：${lastLoadedAt}` : ''}`;
 
   const refresh = async () => {
-    await Promise.all([reload(), onRefresh?.()]);
+    await Promise.all([reload({ force: true }), onRefresh?.()]);
   };
 
   function setFilterValue(id, value) {

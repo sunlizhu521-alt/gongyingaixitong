@@ -1776,7 +1776,7 @@ function App() {
           <ReceiptSummaryPage
             kcfxData={kcfxData}
             kcfxRecords={kcfxCoreRecords}
-            loading={kcfxLoading}
+            loading={false}
             error={kcfxCoreMessage}
             lastLoadedAt={kcfxCoreLoadedAt}
             onRefresh={loadKcfxMetadata}
@@ -1787,7 +1787,7 @@ function App() {
           <InventoryTrendPage
             kcfxData={kcfxData}
             kcfxRecords={kcfxCoreRecords}
-            loading={kcfxLoading}
+            loading={false}
             error={kcfxCoreMessage}
             lastLoadedAt={kcfxCoreLoadedAt}
             onRefresh={loadKcfxMetadata}
@@ -1798,7 +1798,7 @@ function App() {
           <SalesAnalysisPage
             kcfxData={kcfxData}
             kcfxRecords={kcfxCoreRecords}
-            loading={kcfxLoading}
+            loading={false}
             error={kcfxCoreMessage}
             lastLoadedAt={kcfxCoreLoadedAt}
             onRefresh={loadKcfxMetadata}
@@ -1809,7 +1809,7 @@ function App() {
           <ComparisonPage
             kcfxData={kcfxData}
             kcfxRecords={kcfxCoreRecords}
-            loading={kcfxLoading}
+            loading={false}
             error={kcfxCoreMessage}
             lastLoadedAt={kcfxCoreLoadedAt}
             onRefresh={loadKcfxMetadata}
@@ -1856,7 +1856,7 @@ function App() {
           <ErrorsPage
             kcfxData={kcfxData}
             kcfxRecords={kcfxErrorRecords}
-            loading={kcfxLoading}
+            loading={false}
             error={kcfxErrorMessage}
             lastLoadedAt={kcfxErrorLoadedAt}
             onRefresh={loadKcfxMetadata}
@@ -1867,7 +1867,7 @@ function App() {
           <SalesTrendPage
             kcfxData={kcfxData}
             kcfxRecords={kcfxSalesTrendRecords}
-            loading={kcfxLoading}
+            loading={false}
             error={kcfxSalesTrendMessage}
             lastLoadedAt={kcfxSalesTrendLoadedAt}
             onRefresh={loadKcfxMetadata}

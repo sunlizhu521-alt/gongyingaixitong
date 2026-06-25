@@ -1,6 +1,6 @@
 import React from 'react';
 
-function MultiFilter({ id, label, allLabel, options, selected, onChange, openFilter, setOpenFilter }) {
+function MultiFilter({ id, label, allLabel, options, selected = [], onChange, openFilter, setOpenFilter }) {
   const isOpen = openFilter === id;
   const selectedLabels = selected
     .map((value) => options.find((option) => option.value === value)?.label || value)
@@ -24,19 +24,21 @@ function MultiFilter({ id, label, allLabel, options, selected, onChange, openFil
       <button
         type="button"
         className="multi-filter-button"
-        aria-label={label}
+        aria-label={label || allLabel}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
         onClick={() => setOpenFilter(isOpen ? '' : id)}
       >
         {buttonText}
       </button>
       {isOpen && (
-        <div className="multi-filter-menu">
+        <div className="multi-filter-menu" role="listbox">
           <label>
             <input type="checkbox" checked={selected.length === 0} onChange={() => onChange([])} />
             全部
           </label>
           {options.map((option) => (
-            <label key={option.value}>
+            <label key={option.value} title={option.label}>
               <input
                 type="checkbox"
                 checked={selected.includes(option.value)}
