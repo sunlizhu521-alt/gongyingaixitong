@@ -127,6 +127,8 @@ function App() {
   const [newUserName, setNewUserName] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('123456');
   const [passwordResets, setPasswordResets] = useState({});
+  const [kcfxData, setKcfxData] = useState(null);
+  const [kcfxLoading, setKcfxLoading] = useState(false);
   useEffect(() => {
     let cancelled = false;
     async function verifyStoredSession() {
@@ -172,6 +174,27 @@ function App() {
       setPassword('');
     }
   }, [authChecked, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    setKcfxLoading(true);
+    authFetch(`${API}/api/kcfx-library?includeRows=1`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => setKcfxData(data))
+      .catch((err) => console.error('kcfx数据加载失败', err))
+      .finally(() => setKcfxLoading(false));
+  }, [user]);
+
+  function authFetch(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (user?.id) headers.set('x-user-id', user.id);
+    if (user?.sessionToken) headers.set('x-session-token', user.sessionToken);
+    if (user?.deviceId) headers.set('x-device-id', user.deviceId);
+    return fetch(url, { ...options, headers });
+  }
 
   function hasPermission(permission) {
     if (user?.name === systemOwnerName) return true;
