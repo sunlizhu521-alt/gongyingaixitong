@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import MultiFilter from './MultiFilter.jsx';
 import { BarPanel, KcfxPageShell, PanelGrid } from './KcfxCommon.jsx';
-import { KCFX_COLORS, formatNumber, formatQuantity, getSalesRows, groupSum, percent, recordSourceText, sum } from './kcfxUtils.js';
+import { KCFX_COLORS, formatNumber, formatQuantity, getSalesRows, groupSum, recordSourceText, sum } from './kcfxUtils.js';
 import { useKcfxRecordMap } from './kcfxRecordLoader.js';
 
 const TREND_YEARS = ['2025', '2026'];
@@ -9,12 +9,13 @@ const TREND_YEAR_COLORS = { 2025: '#007aff', 2026: '#34c759' };
 const TREND_FILTERS = [
   { id: 'salesMonth', field: 'salesMonth', allLabel: '全部销售月份', matchMonthNumber: true, limit: 300 },
   { id: 'salesOrg', field: 'salesOrg', allLabel: '全部销售部门', limit: 300 },
-  { id: 'storeShortName', field: 'storeShortName', allLabel: '客户名称', limit: 300 },
+  { id: 'storeShortName', field: 'storeShortName', allLabel: '店铺简称', limit: 300 },
   { id: 'productLine', field: 'productLine', allLabel: '全部销售产品线', limit: 300 },
   { id: 'productSeries', field: 'productSeries', allLabel: '全部销售系列', limit: 300 },
   { id: 'model', field: 'model', allLabel: '型号', limit: 300 }
 ];
 const EMPTY_SELECTIONS = Object.fromEntries(TREND_FILTERS.map((filter) => [filter.id, []]));
+const SALES_TREND_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
 
 export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, loading = false, error = '', lastLoadedAt = '', onRefresh }) {
   const [openFilter, setOpenFilter] = useState('');
@@ -23,6 +24,7 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, load
   const records = useMemo(() => ({ ...kcfxRecords, ...loadedRecords }), [kcfxRecords, loadedRecords]);
   const pageLoading = loading || recordsLoading;
   const pageError = recordsError || error;
+
   const salesRows = useMemo(() => getSalesRows(records), [records]);
   const trendRows = useMemo(() => (
     salesRows
@@ -42,16 +44,20 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, load
 
   const normalizedSelections = useMemo(() => (
     Object.fromEntries(TREND_FILTERS.map((filter) => {
-      const options = new Set((linkedOptions[filter.id] || []).map((option) => option.value));
-      return [filter.id, (selections[filter.id] || []).filter((value) => options.has(value))];
+      const optionValues = new Set((linkedOptions[filter.id] || []).map((option) => option.value));
+      return [filter.id, (selections[filter.id] || []).filter((value) => optionValues.has(value))];
     }))
   ), [linkedOptions, selections]);
 
-  const filteredRows = useMemo(() => trendRows.filter((row) => rowMatchesSelections(row, normalizedSelections)), [normalizedSelections, trendRows]);
+  const filteredRows = useMemo(() => (
+    trendRows.filter((row) => rowMatchesSelections(row, normalizedSelections))
+  ), [normalizedSelections, trendRows]);
+
   const months = useMemo(() => (
     [...new Set(filteredRows.map((row) => row.salesMonthNumber).filter(Boolean))]
       .sort((a, b) => Number(a) - Number(b))
   ), [filteredRows]);
+
   const groupedTrend = useMemo(() => {
     const map = new Map();
     for (const row of filteredRows) {
@@ -60,10 +66,12 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, load
     }
     return map;
   }, [filteredRows]);
+
   const totalQty = sum(filteredRows, 'value');
   const status = pageLoading
     ? '数据加载中...'
     : pageError || `已按销售数据日期列读取 ${formatNumber(trendRows.length)} 行，年份：${TREND_YEARS.join(' / ')}，应收数量合计 ${formatQuantity(sum(trendRows, 'value'))}${lastLoadedAt ? `；读取时间：${lastLoadedAt}` : ''}`;
+
   const refresh = async () => {
     await Promise.all([reload(), onRefresh?.()]);
   };
@@ -96,12 +104,16 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, load
         <button type="button" onClick={clearFilters}>清除所有筛选</button>
       </section>
 
-      <section className="kcfx-panel">
-        <h3>
-          销售趋势
-          <span className="chart-total">合计 {formatQuantity(totalQty)}</span>
-        </h3>
-        <VerticalTrendChart months={months} grouped={groupedTrend} selections={normalizedSelections} />
+      <section className="trend-embed-panel analysis-section-trend">
+        <div className="trend-chart-grid">
+          <section className="panel trend-panel">
+            <h2>
+              销售趋势
+              <span className="chart-total">合计 {formatQuantity(totalQty)}</span>
+            </h2>
+            <VerticalTrendChart months={months} grouped={groupedTrend} />
+          </section>
+        </div>
       </section>
 
       <PanelGrid>
@@ -112,7 +124,7 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, load
         <BarPanel title="型号" rows={groupSum(filteredRows, 'model', 'value', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
       </PanelGrid>
 
-      <section className="kcfx-source-panel">
+      <section className="data-source-panel sales-trend-source-panel">
         <div><strong>销售数据文件</strong>：{recordSourceText(records['sales-data'])}</div>
         <div><strong>商品分类维表</strong>：{recordSourceText(records['dim-product'])}</div>
         <div><strong>客户与物料对照表</strong>：{recordSourceText(records['dim-store-name'])}；销售数据文件 L 列匹配维表 D 列，取维表 E 列作为销售部门</div>
@@ -122,11 +134,10 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, load
   );
 }
 
-const SALES_TREND_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
-
 function VerticalTrendChart({ months, grouped }) {
   const values = months.flatMap((month) => TREND_YEARS.map((year) => grouped.get(`${year}-${month}`) || 0));
   const max = Math.max(...values, 1);
+
   return (
     <div className="vertical-trend-chart">
       <div className="trend-legend">

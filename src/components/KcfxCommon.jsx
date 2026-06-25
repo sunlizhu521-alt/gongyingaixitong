@@ -11,7 +11,7 @@ export function KcfxPageShell({ title, status, loading, onRefresh, children }) {
         </div>
         {onRefresh && (
           <button type="button" onClick={onRefresh} disabled={loading}>
-            {loading ? '读取中' : '应用刷新'}
+            {loading ? '读取中...' : '应用刷新'}
           </button>
         )}
       </header>
@@ -35,27 +35,43 @@ export function MetricCards({ metrics }) {
 }
 
 export function BarPanel({ title, rows, total, valueFormatter = formatNumber }) {
-  const max = Math.max(...rows.map((row) => row.value), 1);
+  const panelTotal = Number.isFinite(Number(total))
+    ? Number(total)
+    : rows.reduce((amount, row) => amount + (Number(row.value) || 0), 0);
+  const max = Math.max(...rows.map((row) => Number(row.value) || 0), 1);
+
   return (
-    <section className="kcfx-panel">
-      <h3>{title}</h3>
-      <div className="kcfx-bars">
-        {rows.length ? rows.map((row, index) => (
-          <div className="kcfx-bar-row" key={`${row.name}-${index}`} title={`${row.name} ${valueFormatter(row.value)} ${percent(row.value, total)}`}>
-            <div className="kcfx-bar-label">{row.name}</div>
-            <div className="kcfx-bar-track">
-              <i style={{ width: `${Math.max(3, (row.value / max) * 100)}%`, background: KCFX_COLORS[index % KCFX_COLORS.length] }} />
+    <section className="panel">
+      <h2>
+        {title}
+        <span className="chart-total">合计 {valueFormatter(panelTotal)}</span>
+      </h2>
+      <div className="chart-bars">
+        {rows.length ? rows.map((row, index) => {
+          const value = Number(row.value) || 0;
+          return (
+            <div className="bar-row" key={`${row.name}-${index}`} title={`${row.name} ${valueFormatter(value)} ${percent(value, panelTotal)}`}>
+              <div className="bar-label">{row.name}</div>
+              <div className="bar-track">
+                <div
+                  className="bar-fill"
+                  style={{
+                    width: `${Math.max(3, (value / max) * 100)}%`,
+                    background: KCFX_COLORS[index % KCFX_COLORS.length]
+                  }}
+                />
+              </div>
+              <div className="bar-value">{valueFormatter(value)} / {percent(value, panelTotal)}</div>
             </div>
-            <div className="kcfx-bar-value">{valueFormatter(row.value)} / {percent(row.value, total)}</div>
-          </div>
-        )) : <div className="empty">暂无数据</div>}
+          );
+        }) : <div className="empty">暂无数据</div>}
       </div>
     </section>
   );
 }
 
 export function PanelGrid({ children }) {
-  return <div className="kcfx-panel-grid">{children}</div>;
+  return <div className="dashboard-grid receipt-chart-grid">{children}</div>;
 }
 
 export function SimpleTable({ columns, rows, maxRows = 100 }) {
