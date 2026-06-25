@@ -1843,8 +1843,9 @@ function App() {
 
         {activeTab === 'salesInventoryReceiptSummary' && canAccessTab('salesInventoryReceiptSummary') && (
           <ReceiptSummaryPage
+            kcfxData={kcfxData}
             kcfxRecords={kcfxCoreRecords}
-            loading={kcfxCoreLoading}
+            loading={kcfxLoading}
             error={kcfxCoreMessage}
             lastLoadedAt={kcfxCoreLoadedAt}
             onRefresh={loadKcfxCoreRecords}
@@ -1853,8 +1854,9 @@ function App() {
 
         {activeTab === 'salesInventoryInventoryTrend' && canAccessTab('salesInventoryInventoryTrend') && (
           <InventoryTrendPage
+            kcfxData={kcfxData}
             kcfxRecords={kcfxCoreRecords}
-            loading={kcfxCoreLoading}
+            loading={kcfxLoading}
             error={kcfxCoreMessage}
             lastLoadedAt={kcfxCoreLoadedAt}
             onRefresh={loadKcfxCoreRecords}
@@ -1863,8 +1865,9 @@ function App() {
 
         {activeTab === 'salesInventorySalesAnalysis' && canAccessTab('salesInventorySalesAnalysis') && (
           <SalesAnalysisPage
+            kcfxData={kcfxData}
             kcfxRecords={kcfxCoreRecords}
-            loading={kcfxCoreLoading}
+            loading={kcfxLoading}
             error={kcfxCoreMessage}
             lastLoadedAt={kcfxCoreLoadedAt}
             onRefresh={loadKcfxCoreRecords}
@@ -1873,8 +1876,9 @@ function App() {
 
         {activeTab === 'salesInventoryComparison' && canAccessTab('salesInventoryComparison') && (
           <ComparisonPage
+            kcfxData={kcfxData}
             kcfxRecords={kcfxCoreRecords}
-            loading={kcfxCoreLoading}
+            loading={kcfxLoading}
             error={kcfxCoreMessage}
             lastLoadedAt={kcfxCoreLoadedAt}
             onRefresh={loadKcfxCoreRecords}
@@ -1883,9 +1887,10 @@ function App() {
 
         {activeTab === 'maintenanceFactLibrary' && canAccessTab('maintenanceFactLibrary') && (
           <FactLibraryPage
+            kcfxData={kcfxData}
             library={kcfxLibrary}
             user={user}
-            loading={kcfxLibraryLoading}
+            loading={kcfxLoading}
             error={kcfxLibraryMessage}
             lastLoadedAt={kcfxLibraryLoadedAt}
             onRefresh={loadKcfxLibrary}
@@ -1894,9 +1899,10 @@ function App() {
 
         {activeTab === 'maintenanceSalesLibrary' && canAccessTab('maintenanceSalesLibrary') && (
           <SalesLibraryPage
+            kcfxData={kcfxData}
             library={kcfxLibrary}
             user={user}
-            loading={kcfxLibraryLoading}
+            loading={kcfxLoading}
             error={kcfxLibraryMessage}
             lastLoadedAt={kcfxLibraryLoadedAt}
             onRefresh={loadKcfxLibrary}
@@ -1905,9 +1911,10 @@ function App() {
 
         {activeTab === 'maintenanceFileLibrary' && canAccessTab('maintenanceFileLibrary') && (
           <FileLibraryPage
+            kcfxData={kcfxData}
             library={kcfxLibrary}
             user={user}
-            loading={kcfxLibraryLoading}
+            loading={kcfxLoading}
             error={kcfxLibraryMessage}
             lastLoadedAt={kcfxLibraryLoadedAt}
             onRefresh={loadKcfxLibrary}
@@ -1916,8 +1923,9 @@ function App() {
 
         {activeTab === 'salesInventoryErrors' && canAccessTab('salesInventoryErrors') && (
           <ErrorsPage
+            kcfxData={kcfxData}
             kcfxRecords={kcfxErrorRecords}
-            loading={kcfxErrorLoading}
+            loading={kcfxLoading}
             error={kcfxErrorMessage}
             lastLoadedAt={kcfxErrorLoadedAt}
             onRefresh={loadKcfxErrorRecords}
@@ -1926,8 +1934,9 @@ function App() {
 
         {activeTab === 'salesInventorySalesTrend' && canAccessTab('salesInventorySalesTrend') && (
           <SalesTrendPage
+            kcfxData={kcfxData}
             kcfxRecords={kcfxSalesTrendRecords}
-            loading={kcfxSalesTrendLoading}
+            loading={kcfxLoading}
             error={kcfxSalesTrendMessage}
             lastLoadedAt={kcfxSalesTrendLoadedAt}
             onRefresh={loadKcfxSalesTrendRecords}
