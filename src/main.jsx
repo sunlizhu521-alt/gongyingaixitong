@@ -6,7 +6,9 @@ import {
   EMBEDDED_KCFX_PAGES,
   INSPECTION_LIBRARY_RECORD_IDS,
   INSPECTION_NOTICE_FIELDS,
+  KCFX_DASHBOARD_PRELOAD_RECORD_IDS,
   KCFX_LIBRARY_TABS,
+  KCFX_PRIORITY_PRELOAD_RECORD_IDS,
   MAINTENANCE_LIBRARY_PAGES,
   MAINTENANCE_LIBRARY_TABS,
   PRIORITY_KCFX_PRELOAD_TABS,
@@ -55,6 +57,7 @@ import ComparisonPage from './components/ComparisonPage.jsx';
 import FactLibraryPage from './components/FactLibraryPage.jsx';
 import SalesLibraryPage from './components/SalesLibraryPage.jsx';
 import FileLibraryPage from './components/FileLibraryPage.jsx';
+import { prefetchKcfxRecords } from './components/kcfxRecordLoader.js';
 import './styles.css';
 
 function App() {
@@ -206,6 +209,32 @@ function App() {
   const canAccessSalesInventory = canAccessGroup('salesInventory');
   const canAccessMaintenanceLibrary = canAccessGroup('maintenanceLibrary');
   const canAccessSystemFileLibrary = canAccessGroup('systemFileLibrary');
+
+  useEffect(() => {
+    if (!authChecked || !user || !kcfxData || !canAccessSalesInventory) return undefined;
+    const controller = new AbortController();
+    const priorityIds = KCFX_PRIORITY_PRELOAD_RECORD_IDS;
+    const prioritySet = new Set(priorityIds);
+    const deferredIds = KCFX_DASHBOARD_PRELOAD_RECORD_IDS.filter((id) => !prioritySet.has(id));
+    async function preloadDashboardRecords() {
+      try {
+        await prefetchKcfxRecords(priorityIds, { batchSize: 3, delayMs: 30, signal: controller.signal });
+        if (controller.signal.aborted) return;
+        window.setTimeout(() => {
+          prefetchKcfxRecords(deferredIds, { batchSize: 2, delayMs: 80, signal: controller.signal }).catch((error) => {
+            console.warn('kcfx deferred preload failed', error);
+          });
+        }, 120);
+      } catch (error) {
+        console.warn('kcfx preload failed', error);
+      }
+    }
+    preloadDashboardRecords();
+    return () => {
+      controller.abort();
+    };
+  }, [authChecked, user, kcfxData?.savedAt, canAccessSalesInventory]);
+
   const activeEmbeddedKcfxPage = embeddedKcfxPageMap[activeTab] && canAccessTab(activeTab)
     ? embeddedKcfxPageMap[activeTab]
     : null;

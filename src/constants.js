@@ -24,6 +24,24 @@ const INSPECTION_DEPARTMENT_OPTIONS = ['海外事业部一部', '海外事业二
 const INSPECTION_LIBRARY_RECORD_IDS = ['dim-purchase-division', 'dim-product'];
 const KCFX_ERROR_RECORD_IDS = ['fact-inventory', 'fact-2', 'sales-data', 'dim-product', 'dim-warehouse', 'dim-warehouse-material', 'dim-store-name', 'dim-customer-material'];
 const KCFX_SALES_TREND_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
+const KCFX_PRIORITY_PRELOAD_RECORD_IDS = [
+  'sales-data',
+  'fact-2',
+  'dim-product',
+  'dim-warehouse',
+  'dim-warehouse-material',
+  'dim-store-name',
+  'dim-customer-material'
+];
+const KCFX_DASHBOARD_PRELOAD_RECORD_IDS = [
+  ...KCFX_PRIORITY_PRELOAD_RECORD_IDS,
+  'fact-3',
+  'fact-4',
+  'fact-5',
+  'fact-6',
+  'fact-7',
+  'fact-inventory'
+];
 const KCFX_CORE_RECORD_IDS = [
   'fact-inventory',
   'fact-2',
@@ -69,7 +87,9 @@ const KCFX_REACT_DATA_TABS = new Set([
   'salesInventoryReceiptSummary',
   'salesInventoryInventoryTrend',
   'salesInventorySalesAnalysis',
-  'salesInventoryComparison'
+  'salesInventoryComparison',
+  'salesInventoryErrors',
+  'salesInventorySalesTrend'
 ]);
 const KCFX_LIBRARY_TABS = new Set(MAINTENANCE_LIBRARY_PAGES.map((page) => page.tab));
 
@@ -158,8 +178,10 @@ export {
   INSPECTION_LIBRARY_RECORD_IDS,
   INSPECTION_NOTICE_FIELDS,
   KCFX_CORE_RECORD_IDS,
+  KCFX_DASHBOARD_PRELOAD_RECORD_IDS,
   KCFX_ERROR_RECORD_IDS,
   KCFX_LIBRARY_TABS,
+  KCFX_PRIORITY_PRELOAD_RECORD_IDS,
   KCFX_REACT_DATA_TABS,
   KCFX_SALES_TREND_RECORD_IDS,
   KCFX_INDEXED_DB_NAME,
