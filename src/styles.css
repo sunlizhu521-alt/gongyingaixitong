@@ -1221,6 +1221,25 @@ th {
   overflow: visible;
 }
 
+.trend-one-row .trend-bar-group {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(var(--trend-month-count, 5), minmax(0, 1fr));
+  white-space: nowrap;
+}
+
+.sales-yoy-trend .trend-bar-group {
+  grid-auto-flow: initial;
+  grid-template-columns: repeat(var(--trend-month-count, 1), minmax(64px, 1fr));
+  gap: clamp(10px, 1.3vw, 18px);
+}
+
+.trend-bars-vertical.single-category .trend-bar-group {
+  gap: clamp(10px, 1.4vw, 22px);
+  padding-inline: clamp(18px, 3vw, 48px);
+}
+
 .trend-yoy-month-group {
   position: relative;
   display: grid;
