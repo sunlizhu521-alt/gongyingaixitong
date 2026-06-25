@@ -12,6 +12,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzip } from 'node:zlib';
 import { initDb } from './db.js';
+import registerAuthRoutes from './routes/auth.js';
+import registerUserRoutes from './routes/users.js';
+import registerInvoiceRoutes from './routes/invoices.js';
+import registerSupplierRoutes from './routes/suppliers.js';
+import registerKcfxRoutes from './routes/kcfx.js';
+import registerQualityRoutes from './routes/quality.js';
+import registerSystemRoutes from './routes/system.js';
+import registerReminderRoutes from './routes/reminders.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -1113,490 +1121,6 @@ async function reprocessDraft(draft, db) {
   draft.recognitionSource = 'pdf-text';
   return draft;
 }
-
-app.post('/api/login', async (req, res) => {
-  const db = await initDb(dataDir);
-  const name = String(req.body.name || '').trim();
-  const password = String(req.body.password || '');
-  const deviceId = String(req.body.deviceId || '').trim();
-  if (!deviceId) return res.status(400).json({ error: 'missing device id' });
-  const user = db.users.find((item) => item.name === name && item.password === password);
-  if (!user) return res.status(401).json({ error: 'invalid credentials' });
-  if (!isUserApproved(user)) return res.status(403).json({ error: 'pending approval' });
-  const session = createUserSession(db, user, deviceId, req);
-  await db.save();
-  res.json(publicSessionUser(user, session));
-});
-
-app.post('/api/session/verify', async (req, res) => {
-  const db = await initDb(dataDir);
-  const result = findValidSession(db, req.body || {}, req);
-  if (!result) return res.status(401).json({ error: 'invalid session' });
-  result.session.lastSeenAt = new Date().toISOString();
-  await db.save();
-  res.json(publicSessionUser(result.user, result.session));
-});
-
-app.post('/api/logout', async (req, res) => {
-  const db = await initDb(dataDir);
-  const userId = String(req.body.userId || '').trim();
-  const token = String(req.body.sessionToken || req.body.token || '').trim();
-  const deviceId = String(req.body.deviceId || '').trim();
-  db.sessions.remove((session) => session.userId === userId && session.token === token && session.deviceId === deviceId);
-  await db.save();
-  res.json({ ok: true });
-});
-
-app.post('/api/register', async (req, res) => {
-  const db = await initDb(dataDir);
-  const name = String(req.body.name || '').trim();
-  const password = String(req.body.password || '').trim();
-  if (!name || !password) return res.status(400).json({ error: 'missing name or password' });
-  if (db.users.some((item) => item.name === name)) return res.status(409).json({ error: 'user exists' });
-
-  const user = normalizeUser({
-    id: crypto.randomUUID(),
-    name,
-    password,
-    role: ROLE_USER,
-    permissions: [],
-    status: USER_STATUS_PENDING
-  });
-  db.users.push(user);
-  pushLog(db, '注册申请', SYSTEM_OWNER_NAME, `${name} 申请注册，等待孙立柱审核。`, '系统管理', '权限管理');
-  await db.save();
-  res.json(publicUser(user));
-});
-
-app.get('/api/users', async (req, res) => {
-  const db = await initDb(dataDir);
-  if (!requireSystemOwner(db, req, res)) return;
-  res.json(db.users.map(publicUser));
-});
-
-app.post('/api/users', async (req, res) => {
-  const db = await initDb(dataDir);
-  if (!requireSystemOwner(db, req, res)) return;
-  const name = String(req.body.name || '').trim();
-  if (!name) return res.status(400).json({ error: 'missing name' });
-  if (db.users.some((item) => item.name === name)) return res.status(409).json({ error: 'user exists' });
-  const user = normalizeUser({
-    id: crypto.randomUUID(),
-    name,
-    password: req.body.password || '123456',
-    role: req.body.role || ROLE_USER,
-    permissions: Array.isArray(req.body.permissions) ? req.body.permissions : DEFAULT_PERMISSIONS,
-    status: USER_STATUS_APPROVED
-  });
-  db.users.push(user);
-  await db.save();
-  res.json(publicUser(user));
-});
-
-app.patch('/api/users/:id', async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = requireSystemOwner(db, req, res);
-  if (!requestUser) return;
-  const target = db.users.find((item) => item.id === req.params.id);
-  if (!target) return res.status(404).json({ error: 'not found' });
-
-  if (target.name !== SYSTEM_OWNER_NAME) {
-    if (Object.prototype.hasOwnProperty.call(req.body, 'role')) {
-      target.role = req.body.role === ROLE_FINANCE ? ROLE_FINANCE : ROLE_USER;
-    }
-    if (Object.prototype.hasOwnProperty.call(req.body, 'permissions')) {
-      target.permissions = sanitizePermissions(req.body.permissions);
-    }
-    if (String(req.body.password || '').trim()) {
-      target.password = String(req.body.password).trim();
-    }
-    if (Object.prototype.hasOwnProperty.call(req.body, 'status')) {
-      target.status = req.body.status === USER_STATUS_PENDING ? USER_STATUS_PENDING : USER_STATUS_APPROVED;
-    }
-  }
-
-  const normalized = normalizeUser(target);
-  Object.assign(target, normalized);
-  await db.save();
-  res.json(publicUser(target));
-});
-
-app.delete('/api/users/:id', async (req, res) => {
-  const db = await initDb(dataDir);
-  if (!requireSystemOwner(db, req, res)) return;
-  const target = db.users.find((item) => item.id === req.params.id);
-  if (!target) return res.status(404).json({ error: 'not found' });
-  if (target.name === SYSTEM_OWNER_NAME) return res.status(400).json({ error: 'cannot delete system owner' });
-
-  db.users.remove((item) => item.id === target.id);
-  const userSessions = db.sessions.filter((session) => session.userId === target.id);
-  for (const session of userSessions) db.sessions.remove((item) => item.id === session.id);
-  pushLog(db, '删除账号', SYSTEM_OWNER_NAME, `${target.name} 账号已删除。`, '系统管理', '权限管理');
-  await db.save();
-  res.json({ ok: true, id: target.id });
-});
-
-app.get('/api/invoices', async (req, res) => {
-  const db = await initDb(dataDir);
-  res.json(visibleRows(db.invoices, db, req.query));
-});
-
-app.patch('/api/invoices/:id', async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = resolveRequestUser(db, req.body);
-  const invoice = db.invoices.find((item) => item.id === req.params.id);
-  if (!invoice) return res.status(404).json({ error: 'not found' });
-  if (!canAccessRow(invoice, requestUser)) return res.status(403).json({ error: 'forbidden' });
-  if (Object.prototype.hasOwnProperty.call(req.body, 'oaProcessNo')) {
-    invoice.oaProcessNo = String(req.body.oaProcessNo || '').trim();
-  }
-  if (Object.prototype.hasOwnProperty.call(req.body, 'isOaPrinted')) {
-    invoice.isOaPrinted = req.body.isOaPrinted === '是' ? '是' : '否';
-  }
-  if (Object.prototype.hasOwnProperty.call(req.body, 'isPaid')) {
-    invoice.isPaid = req.body.isPaid === '是' ? '是' : '';
-  }
-  if (!Object.prototype.hasOwnProperty.call(req.body, 'oaProcessNo') &&
-      !Object.prototype.hasOwnProperty.call(req.body, 'isOaPrinted') &&
-      !Object.prototype.hasOwnProperty.call(req.body, 'isPaid')) {
-    invoice.status = req.body.status || invoice.status;
-  } else {
-    invoice.status = deriveInvoiceStatus(invoice);
-  }
-  db.reminders.unshift({
-    id: crypto.randomUUID(),
-    createdAt: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
-    type: '状态更新',
-    target: invoice.owner,
-    content: `${invoice.supplier} 发票 ${invoice.invoiceNo} 状态更新为：${invoice.status}`
-  });
-  await db.save();
-  res.json(invoice);
-});
-
-app.delete('/api/invoices/:id', async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = requirePermission(db, req, res, 'systemFileLibrary.invoiceInventory');
-  if (!requestUser) return;
-  const invoice = db.invoices.find((item) => item.id === req.params.id);
-  if (!invoice) return res.status(404).json({ error: 'not found' });
-  db.invoices.remove((item) => item.id === req.params.id);
-  await removeUploadedFile(invoice.fileName);
-  db.reminders.unshift({
-    id: crypto.randomUUID(),
-    createdAt: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
-    type: '发票库存删除',
-    target: requestUser.name,
-    content: `${requestUser.name} 删除了 ${invoice.supplier} 发票 ${invoice.invoiceNo || invoice.id}。`
-  });
-  await db.save();
-  res.status(204).end();
-});
-
-app.get('/api/drafts', async (req, res) => {
-  const db = await initDb(dataDir);
-  res.json(visibleRows(db.drafts, db, req.query));
-});
-
-app.post('/api/upload', upload.array('files'), async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = resolveRequestUser(db, req.body);
-  if (!requestUser) return res.status(401).json({ error: 'invalid user' });
-  const user = requestUser.name;
-  const recognized = await Promise.all(req.files.map((file) => recognizeInvoice(file, db, user)));
-  const existingInvoiceNos = new Set(
-    [...db.drafts, ...db.invoices]
-      .map((item) => item.invoiceNo)
-      .filter(Boolean)
-  );
-  const keptInvoiceNos = new Set();
-  const drafts = [];
-  const duplicates = [];
-
-  for (const draft of recognized) {
-    const invoiceNo = draft.invoiceNo;
-    if (invoiceNo && (existingInvoiceNos.has(invoiceNo) || keptInvoiceNos.has(invoiceNo))) {
-      duplicates.push({
-        invoiceNo,
-        supplier: draft.supplier,
-        originalName: draft.originalName
-      });
-      await removeUploadedFile(draft.fileName);
-      continue;
-    }
-    drafts.push(draft);
-    if (invoiceNo) keptInvoiceNos.add(invoiceNo);
-  }
-
-  db.drafts.unshift(...drafts);
-  drafts.forEach((draft) => db.reminders.unshift({
-    id: crypto.randomUUID(),
-    createdAt: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
-    type: 'OCR 核对提醒',
-    target: draft.owner,
-    content: `${draft.originalName} 已上传，请核对 OCR 识别结果。`
-  }));
-  await db.save();
-  res.json({ created: drafts, duplicates });
-});
-
-app.post('/api/drafts/reprocess', async (req, res) => {
-  const db = await initDb(dataDir);
-  const results = [];
-  for (const draft of db.drafts) {
-    try {
-      results.push(await reprocessDraft(draft, db));
-    } catch {
-      results.push(draft);
-    }
-  }
-  await db.save();
-  res.json(results);
-});
-
-app.post('/api/drafts/:id/confirm', async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = resolveRequestUser(db, req.body);
-  const index = db.drafts.findIndex((item) => item.id === req.params.id);
-  if (index === -1) return res.status(404).json({ error: 'not found' });
-  if (!canAccessRow(db.drafts[index], requestUser)) return res.status(403).json({ error: 'forbidden' });
-  const draft = db.drafts.splice(index, 1)[0];
-  const invoice = {
-    ...draft,
-    status: '待提交付款申请',
-    dueDate: calculateDueDate(db, draft.supplier, draft.issueDate)
-  };
-  db.invoices.unshift(invoice);
-  db.reminders.unshift({
-    id: crypto.randomUUID(),
-    createdAt: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
-    type: '付款申请提醒',
-    target: invoice.owner,
-    content: `${invoice.supplier} 发票 ${invoice.invoiceNo} 请在 ${invoice.dueDate} 前提交 OA 付款申请。`
-  });
-  await db.save();
-  res.json(invoice);
-});
-
-app.delete('/api/drafts/:id', async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = resolveRequestUser(db, req.query);
-  const draft = db.drafts.find((item) => item.id === req.params.id);
-  if (!draft) return res.status(404).json({ error: 'not found' });
-  if (!canAccessRow(draft, requestUser)) return res.status(403).json({ error: 'forbidden' });
-  db.drafts.remove((item) => item.id === req.params.id);
-  await db.save();
-  res.status(204).end();
-});
-
-app.get('/api/suppliers', async (req, res) => {
-  const db = await initDb(dataDir);
-  res.json(db.suppliers);
-});
-
-app.post('/api/suppliers', async (req, res) => {
-  const db = await initDb(dataDir);
-  if (!requirePermission(db, req, res, 'maintenanceLibrary.supplierManagement')) return;
-  const supplier = { id: crypto.randomUUID(), name: req.body.name, termDays: Number(req.body.termDays || 30) };
-  db.suppliers.unshift(supplier);
-  await db.save();
-  res.json(supplier);
-});
-
-app.post('/api/suppliers/import-terms', upload.single('file'), async (req, res) => {
-  const db = await initDb(dataDir);
-  if (!req.file) return res.status(400).json({ error: 'missing file' });
-  if (!requirePermission(db, req, res, 'maintenanceLibrary.supplierManagement')) {
-    await removeUploadedFile(req.file.filename);
-    return;
-  }
-
-  try {
-    const result = parseSupplierTermWorkbook(req.file.path);
-    const byName = new Map();
-
-    result.imported.forEach((item) => {
-      byName.set(item.supplier, {
-        id: crypto.randomUUID(),
-        name: item.supplier,
-        shortName: item.shortName,
-        termDays: item.termDays,
-        hasAnnualFrame: item.hasAnnualFrame,
-        remark: item.remark
-      });
-    });
-
-    db.suppliers.splice(0, db.suppliers.length);
-    for (const supplier of byName.values()) db.suppliers.push(supplier);
-    await db.save();
-    res.json({
-      sheetName: result.sheetName,
-      importedCount: result.imported.length,
-      failedCount: result.failed.length,
-      imported: result.imported,
-      failed: result.failed,
-      suppliers: db.suppliers
-    });
-  } finally {
-    await removeUploadedFile(req.file.filename);
-  }
-});
-
-app.get('/api/owners', async (req, res) => {
-  const db = await initDb(dataDir);
-  res.json(db.owners);
-});
-
-app.post('/api/owners', async (req, res) => {
-  const db = await initDb(dataDir);
-  if (!requirePermission(db, req, res, 'maintenanceLibrary.supplierManagement')) return;
-  const owner = { id: crypto.randomUUID(), owner: req.body.owner, supplier: req.body.supplier };
-  db.owners.unshift(owner);
-  await db.save();
-  res.json(owner);
-});
-
-app.post('/api/owners/import', upload.single('file'), async (req, res) => {
-  const db = await initDb(dataDir);
-  if (!req.file) return res.status(400).json({ error: 'missing file' });
-  if (!requirePermission(db, req, res, 'maintenanceLibrary.supplierManagement')) {
-    await removeUploadedFile(req.file.filename);
-    return;
-  }
-
-  try {
-    const result = parseOwnerWorkbook(req.file.path);
-    const bySupplier = new Map();
-
-    result.imported.forEach((item) => {
-      bySupplier.set(item.supplier, {
-        id: crypto.randomUUID(),
-        owner: item.owner,
-        supplier: item.supplier,
-        email: item.email
-      });
-    });
-
-    db.owners.splice(0, db.owners.length);
-    for (const owner of bySupplier.values()) db.owners.push(owner);
-    await db.save();
-    res.json({
-      sheetName: result.sheetName,
-      importedCount: result.imported.length,
-      failedCount: result.failed.length,
-      imported: result.imported,
-      failed: result.failed,
-      owners: db.owners
-    });
-  } finally {
-    await removeUploadedFile(req.file.filename);
-  }
-});
-
-app.get('/api/quality-inspection/initial-data', async (req, res) => {
-  const db = await initDb(dataDir);
-  if (!requirePermission(db, req, res, 'qualityInspection.inspectionInitialData')) return;
-  res.json(db.qualityInspection.initialData);
-});
-
-app.post('/api/quality-inspection/initial-data/import', upload.single('file'), async (req, res) => {
-  const db = await initDb(dataDir);
-  if (!req.file) return res.status(400).json({ error: 'missing file' });
-  if (!requirePermission(db, req, res, 'qualityInspection.inspectionInitialData')) {
-    await removeUploadedFile(req.file.filename);
-    return;
-  }
-
-  try {
-    const result = parseGenericWorkbook(req.file.path);
-    db.qualityInspection.initialData = {
-      sheetName: result.sheetName,
-      columns: result.columns,
-      rows: result.rows,
-      updatedAt: format(new Date(), 'yyyy-MM-dd HH:mm:ss')
-    };
-    await db.save();
-    res.json({
-      ...db.qualityInspection.initialData,
-      importedCount: result.importedCount
-    });
-  } finally {
-    await removeUploadedFile(req.file.filename);
-  }
-});
-
-app.get('/api/quality-inspection/notices', async (req, res) => {
-  const db = await initDb(dataDir);
-  if (!requirePermission(db, req, res, 'qualityInspection.inspectionNotice')) return;
-  res.json(db.qualityInspection.notices);
-});
-
-app.post('/api/quality-inspection/notices', async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = requirePermission(db, req, res, 'qualityInspection.inspectionNotice');
-  if (!requestUser) return;
-  const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
-  db.qualityInspection.notices = {
-    rows: rows.map((row, index) => ({
-      id: row.id || crypto.randomUUID(),
-      rowNumber: index + 1,
-      ...row
-    })),
-    submittedAt: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
-    submittedBy: requestUser.name
-  };
-  pushLog(db, '验货通知提交', requestUser.name, `${requestUser.name} 提交验货通知 ${rows.length} 条。`);
-  await db.save();
-  res.json(db.qualityInspection.notices);
-});
-
-app.get('/api/reminders', async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = resolveRequestUser(db, req.query);
-  if (canSeeAllRole(requestUser?.role)) return res.json(db.reminders);
-  res.json(db.reminders.filter((item) => item.target === requestUser?.name));
-});
-
-app.get('/api/reminders/weekly-payment-preview', async (req, res) => {
-  const db = await initDb(dataDir);
-  const { start, end, rows } = weeklyPaymentApplications(db, new Date());
-  res.json({
-    start: format(start, 'yyyy-MM-dd'),
-    end: format(end, 'yyyy-MM-dd'),
-    groups: groupInvoicesByOwner(db, rows).map((group) => ({
-      owner: group.owner,
-      email: group.email,
-      count: group.invoices.length,
-      invoices: group.invoices.map((invoice) => ({
-        invoiceNo: invoice.invoiceNo,
-        supplier: invoice.supplier,
-        amount: invoice.amount,
-        issueDate: invoice.issueDate,
-        paymentDate: invoice.paymentDate,
-        status: invoice.status
-      }))
-    }))
-  });
-});
-
-app.get('/api/settings', async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = resolveRequestUser(db, req.query);
-  res.json(publicSettingsForUser(db.settings, requestUser));
-});
-
-app.patch('/api/settings', async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = requireSystemOwner(db, req, res);
-  if (!requestUser) return;
-  db.settings.senderEmail = String(req.body.senderEmail || '').trim();
-  if (Object.prototype.hasOwnProperty.call(req.body, 'smtpPassword')) {
-    const smtpPassword = String(req.body.smtpPassword || '').trim();
-    if (smtpPassword) db.settings.smtpPassword = smtpPassword;
-  }
-  await db.save();
-  res.json(publicSettingsForUser(db.settings, requestUser));
-});
 
 function stripKcfxRecordRows(record = {}) {
   const { rows, ...metadata } = record || {};
@@ -3245,231 +2769,95 @@ async function parseKcfxStoredFile({ id, slot, file, storedFile, previousRecord,
   }
 }
 
-app.get('/api/kcfx-library', async (req, res) => {
-  const db = await initDb(dataDir);
-  await externalizeKcfxLibraryInlineRows(db);
-  res.json(publicKcfxLibrary(db, { includeRows: req.query.includeRows === '1' }));
-});
 
-app.get('/api/kcfx-library/preloaded', async (req, res) => {
-  try {
-    const targetIds = normalizeKcfxIds(req.query.ids);
-    res.setHeader('Cache-Control', 'no-store');
-    if (targetIds) {
-      if (kcfxPreloadCacheHasIds(kcfxPreloadCache, targetIds)) {
-        return res.json(filterKcfxPreloadCacheByIds(kcfxPreloadCache, [...targetIds].join(',')));
-      }
-      if (kcfxTargetIdsArePriority(targetIds)) {
-        if (!kcfxPreloadPromise) scheduleKcfxPreloadRefresh();
-        if (kcfxPreloadPromise) {
-          const cachedPayload = await Promise.race([
-            kcfxPreloadPromise.then(() => (
-              kcfxPreloadCacheHasIds(kcfxPreloadCache, targetIds)
-                ? filterKcfxPreloadCacheByIds(kcfxPreloadCache, [...targetIds].join(','))
-                : null
-            )),
-            new Promise((resolve) => setTimeout(() => resolve(null), 1500))
-          ]);
-          if (cachedPayload) return res.json(cachedPayload);
-        }
-        return res.json(kcfxPreloadLoadingResponse(targetIds));
-      }
-      const payload = await buildPreloadedKcfxLibrary(null, { targetIds });
-      return res.json(payload);
-    }
-    if (req.query.refresh === '1' || kcfxPreloadCache.status === 'idle' || kcfxPreloadCache.status === 'failed') {
-      scheduleKcfxPreloadRefresh();
-    }
-    res.json(filterKcfxPreloadCacheByIds(kcfxPreloadCache, req.query.ids));
-  } catch (error) {
-    res.status(500).json({
-      ...kcfxPreloadCache,
-      ok: false,
-      status: 'failed',
-      error: error?.message || String(error)
-    });
-  }
+const routeRegistrationDb = await initDb(dataDir);
+const gongyingContext = {
+  initDb,
+  dataDir,
+  upload,
+  format,
+  SYSTEM_OWNER_NAME,
+  ROLE_ADMIN,
+  ROLE_FINANCE,
+  ROLE_USER,
+  USER_STATUS_APPROVED,
+  USER_STATUS_PENDING,
+  DEFAULT_PERMISSIONS,
+  SYSTEM_FILE_PACKAGES,
+  KC_LIBRARY_SLOT_IDS,
+  sanitizePermissions,
+  normalizeUser,
+  publicUser,
+  publicSessionUser,
+  createUserSession,
+  findValidSession,
+  isUserApproved,
+  pushLog,
+  requireSystemOwner,
+  resolveRequestUser,
+  visibleRows,
+  canAccessRow,
+  requirePermission,
+  deriveInvoiceStatus,
+  removeUploadedFile,
+  recognizeInvoice,
+  reprocessDraft,
+  calculateDueDate,
+  parseSupplierTermWorkbook,
+  parseOwnerWorkbook,
+  parseGenericWorkbook,
+  weeklyPaymentApplications,
+  groupInvoicesByOwner,
+  canSeeAllRole,
+  publicSettingsForUser,
+  packageStats,
+  buildSystemPackageFiles,
+  makeZip,
+  externalizeKcfxLibraryInlineRows,
+  publicKcfxLibrary,
+  normalizeKcfxIds,
+  kcfxPreloadCacheHasIds,
+  filterKcfxPreloadCacheByIds,
+  kcfxTargetIdsArePriority,
+  scheduleKcfxPreloadRefresh,
+  kcfxPreloadLoadingResponse,
+  buildPreloadedKcfxLibrary,
+  getKcfxReceiptSummaryResponse,
+  getKcfxTrendSummaryResponse,
+  recoverKcfxRecordFromRowsFile,
+  ensureKcfxRecordRows,
+  externalizeKcfxRecordRows,
+  attachKcfxRecordRows,
+  sanitizeKcfxLibraryRecord,
+  removeKcfxStoredFile,
+  removeKcfxRecordRows,
+  normalizeUploadedFileName,
+  parseKcfxSlotPayload,
+  saveKcfxOriginalFile,
+  parseKcfxClientRecordPayload,
+  buildKcfxClientParsedFileRecord,
+  preserveKcfxRowsMetadata,
+  buildQueuedKcfxFileRecord,
+  scheduleKcfxFileParse,
+  scheduleKcfxReceiptSummaryRefresh,
+  scheduleKcfxTrendSummaryRefresh
+};
+Object.defineProperties(gongyingContext, {
+  kcfxPreloadCache: { get: () => kcfxPreloadCache, set: (value) => { kcfxPreloadCache = value; } },
+  kcfxPreloadPromise: { get: () => kcfxPreloadPromise, set: (value) => { kcfxPreloadPromise = value; } }
 });
+app.locals.gongying = gongyingContext;
 
-app.get('/api/kcfx-library/receipt-summary', async (req, res) => {
-  try {
-    res.setHeader('Cache-Control', 'no-store');
-    res.json(await getKcfxReceiptSummaryResponse());
-  } catch (error) {
-    res.status(500).json({
-      ok: false,
-      status: 'failed',
-      source: 'server-receipt-summary',
-      error: error?.message || String(error)
-    });
-  }
-});
+registerAuthRoutes(app, routeRegistrationDb);
+registerUserRoutes(app, routeRegistrationDb);
+registerInvoiceRoutes(app, routeRegistrationDb);
+registerSupplierRoutes(app, routeRegistrationDb);
+registerQualityRoutes(app, routeRegistrationDb);
+registerReminderRoutes(app, routeRegistrationDb);
+registerSystemRoutes(app, routeRegistrationDb);
+registerKcfxRoutes(app, routeRegistrationDb);
 
-app.get('/api/kcfx-library/trend-summary', async (req, res) => {
-  try {
-    res.setHeader('Cache-Control', 'no-store');
-    res.json(await getKcfxTrendSummaryResponse());
-  } catch (error) {
-    res.status(500).json({
-      ok: false,
-      status: 'failed',
-      error: error?.message || String(error)
-    });
-  }
-});
-
-app.get('/api/kcfx-library/records/:id', async (req, res) => {
-  const db = await initDb(dataDir);
-  const id = String(req.params.id || '').trim();
-  let record = db.kcfxLibrary.records[id] || await recoverKcfxRecordFromRowsFile(id);
-  if (!record) return res.status(404).json({ error: 'record not found' });
-  record = await ensureKcfxRecordRows(db, id, record);
-  if (Array.isArray(record.rows)) {
-    record = await externalizeKcfxRecordRows(record, id);
-    db.kcfxLibrary.records[id] = record;
-    db.kcfxLibrary.savedAt = new Date().toISOString();
-    await db.save();
-  }
-  res.json({ ok: true, record: await attachKcfxRecordRows(record) });
-});
-
-app.post('/api/kcfx-library/records/:id/upload', upload.single('file'), async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = requireSystemOwner(db, req, res);
-  if (!requestUser) {
-    if (req.file) await removeUploadedFile(req.file.filename);
-    return;
-  }
-  const id = String(req.params.id || '').trim();
-  if (!KC_LIBRARY_SLOT_IDS.has(id)) {
-    if (req.file) await removeUploadedFile(req.file.filename);
-    return res.status(400).json({ error: 'invalid slot' });
-  }
-  if (!req.file) return res.status(400).json({ error: 'missing file' });
-  req.file.originalname = normalizeUploadedFileName(req.file.originalname);
-  if (!/\.(xlsx|xlsm|xls|csv)$/i.test(req.file.originalname || '')) {
-    await removeUploadedFile(req.file.filename);
-    return res.status(400).json({ error: 'unsupported file type' });
-  }
-
-  const previousRecord = db.kcfxLibrary.records[id];
-  let storedFile = null;
-  try {
-    const slot = parseKcfxSlotPayload(id, req.body.slot);
-    storedFile = await saveKcfxOriginalFile(id, req.file);
-    const clientRecord = parseKcfxClientRecordPayload(req.body.record);
-    if (clientRecord) {
-      const record = await externalizeKcfxRecordRows(buildKcfxClientParsedFileRecord(req.file, storedFile, slot, clientRecord), id);
-      db.kcfxLibrary.records[id] = {
-        ...record,
-        serverSavedAt: new Date().toISOString(),
-        serverSavedBy: requestUser.name
-      };
-      db.kcfxLibrary.savedAt = new Date().toISOString();
-      await removeKcfxStoredFile(previousRecord);
-      pushLog(db, 'kcfx file library uploaded', requestUser.name, `${requestUser.name} uploaded browser-parsed ${record.title || id}`);
-      await db.save();
-      scheduleKcfxPreloadRefresh(db);
-      scheduleKcfxReceiptSummaryRefresh(db);
-      scheduleKcfxTrendSummaryRefresh();
-      return res.json({ ok: true, parsedOnClient: true, library: publicKcfxLibrary(db), record: db.kcfxLibrary.records[id] });
-    }
-    const queuedRecord = buildQueuedKcfxFileRecord(req.file, storedFile, slot, previousRecord, requestUser.name);
-    db.kcfxLibrary.records[id] = queuedRecord;
-    db.kcfxLibrary.savedAt = new Date().toISOString();
-    pushLog(db, 'kcfx file library uploaded', requestUser.name, `${requestUser.name} uploaded ${queuedRecord.title || id}, background parse queued`);
-    await db.save();
-    res.status(202).json({ ok: true, queued: true, library: publicKcfxLibrary(db), record: db.kcfxLibrary.records[id] });
-    scheduleKcfxFileParse({
-      id,
-      slot,
-      file: {
-        originalname: req.file.originalname,
-        size: req.file.size
-      },
-      storedFile,
-      previousRecord,
-      requestUserName: requestUser.name
-    });
-    return;
-  } catch (error) {
-    if (storedFile?.fullPath) {
-      try {
-        await unlink(storedFile.fullPath);
-      } catch {}
-    } else if (req.file) {
-      await removeUploadedFile(req.file.filename);
-    }
-    res.status(400).json({ error: error?.message || 'parse failed' });
-  }
-});
-
-app.put('/api/kcfx-library/records/:id', async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = requireSystemOwner(db, req, res);
-  if (!requestUser) return;
-  const id = String(req.params.id || '').trim();
-  if (!id) return res.status(400).json({ error: 'missing id' });
-  const record = await externalizeKcfxRecordRows(sanitizeKcfxLibraryRecord(id, req.body.record || req.body), id);
-  db.kcfxLibrary.records[id] = {
-    ...record,
-    serverSavedAt: new Date().toISOString(),
-    serverSavedBy: requestUser.name
-  };
-  db.kcfxLibrary.savedAt = new Date().toISOString();
-  pushLog(db, '文件库更新', requestUser.name, `${requestUser.name} 更新销售及库存看板文件库：${record.title || id}`);
-  await db.save();
-  scheduleKcfxPreloadRefresh(db);
-  scheduleKcfxReceiptSummaryRefresh(db);
-  scheduleKcfxTrendSummaryRefresh();
-  res.json({ ok: true, library: publicKcfxLibrary(db), record: db.kcfxLibrary.records[id] });
-});
-
-app.delete('/api/kcfx-library/records/:id', async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = requireSystemOwner(db, req, res);
-  if (!requestUser) return;
-  const id = String(req.params.id || '').trim();
-  if (!id) return res.status(400).json({ error: 'missing id' });
-  await removeKcfxStoredFile(db.kcfxLibrary.records[id]);
-  await removeKcfxRecordRows(db.kcfxLibrary.records[id] || { id });
-  delete db.kcfxLibrary.records[id];
-  db.kcfxLibrary.savedAt = new Date().toISOString();
-  pushLog(db, '文件库删除', requestUser.name, `${requestUser.name} 删除销售及库存看板文件库：${id}`);
-  await db.save();
-  scheduleKcfxPreloadRefresh(db);
-  scheduleKcfxReceiptSummaryRefresh(db);
-  scheduleKcfxTrendSummaryRefresh();
-  res.status(204).end();
-});
-
-app.get('/api/system-file-library', async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = requireSystemOwner(db, req, res);
-  if (!requestUser) return;
-  const packages = await Promise.all(SYSTEM_FILE_PACKAGES.map(async (item) => ({
-    ...item,
-    ...(await packageStats(item.id, db))
-  })));
-  res.json(packages);
-});
-
-app.get('/api/system-file-library/:id/download', async (req, res) => {
-  const db = await initDb(dataDir);
-  const requestUser = requireSystemOwner(db, req, res);
-  if (!requestUser) return;
-  const packageInfo = SYSTEM_FILE_PACKAGES.find((item) => item.id === req.params.id);
-  if (!packageInfo) return res.status(404).json({ error: 'package not found' });
-  const files = await buildSystemPackageFiles(packageInfo.id, db, true);
-  const buffer = makeZip(files);
-  const asciiFallback = packageInfo.fileName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
-  res.setHeader('Content-Type', 'application/zip');
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(packageInfo.fileName)}`
-  );
-  res.send(buffer);
-});
+export { requirePermission, requireSystemOwner };
 
 const distDir = path.join(rootDir, 'dist');
 app.use(express.static(distDir));
