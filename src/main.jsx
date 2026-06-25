@@ -6,8 +6,11 @@ import {
   EMBEDDED_KCFX_PAGES,
   INSPECTION_LIBRARY_RECORD_IDS,
   INSPECTION_NOTICE_FIELDS,
+  KCFX_CORE_RECORD_IDS,
   KCFX_ERROR_RECORD_IDS,
   KCFX_INVENTORY_STATIC_REPORT_RECORD_IDS,
+  KCFX_LIBRARY_TABS,
+  KCFX_REACT_DATA_TABS,
   KCFX_SALES_TREND_RECORD_IDS,
   MAINTENANCE_LIBRARY_PAGES,
   MAINTENANCE_LIBRARY_TABS,
@@ -51,6 +54,18 @@ import AuthPage from './components/AuthPage.jsx';
 import ErrorsPage from './components/ErrorsPage.jsx';
 import SalesTrendPage from './components/SalesTrendPage.jsx';
 import InventoryStaticReportPage from './components/InventoryStaticReportPage.jsx';
+import ReceiptSummaryPage from './components/ReceiptSummaryPage.jsx';
+import InventoryTrendPage from './components/InventoryTrendPage.jsx';
+import SalesAnalysisPage from './components/SalesAnalysisPage.jsx';
+import ComparisonPage from './components/ComparisonPage.jsx';
+import FactLibraryPage from './components/FactLibraryPage.jsx';
+import SalesLibraryPage from './components/SalesLibraryPage.jsx';
+import FileLibraryPage from './components/FileLibraryPage.jsx';
+import DomesticReportPage from './components/DomesticReportPage.jsx';
+import OverseasReportPage from './components/OverseasReportPage.jsx';
+import OverseasSecondReportPage from './components/OverseasSecondReportPage.jsx';
+import GlobalBusinessReportPage from './components/GlobalBusinessReportPage.jsx';
+import Over120Page from './components/Over120Page.jsx';
 import './styles.css';
 
 function App() {
@@ -94,6 +109,14 @@ function App() {
   const [kcfxInventoryStaticReportLoading, setKcfxInventoryStaticReportLoading] = useState(false);
   const [kcfxInventoryStaticReportMessage, setKcfxInventoryStaticReportMessage] = useState('');
   const [kcfxInventoryStaticReportLoadedAt, setKcfxInventoryStaticReportLoadedAt] = useState('');
+  const [kcfxCoreRecords, setKcfxCoreRecords] = useState({});
+  const [kcfxCoreLoading, setKcfxCoreLoading] = useState(false);
+  const [kcfxCoreMessage, setKcfxCoreMessage] = useState('');
+  const [kcfxCoreLoadedAt, setKcfxCoreLoadedAt] = useState('');
+  const [kcfxLibrary, setKcfxLibrary] = useState({ records: {} });
+  const [kcfxLibraryLoading, setKcfxLibraryLoading] = useState(false);
+  const [kcfxLibraryMessage, setKcfxLibraryMessage] = useState('');
+  const [kcfxLibraryLoadedAt, setKcfxLibraryLoadedAt] = useState('');
   const [mountedKcfxTabs, setMountedKcfxTabs] = useState(() => new Set());
   const [supplierImportResult, setSupplierImportResult] = useState(null);
   const [ownerImportResult, setOwnerImportResult] = useState(null);
@@ -338,6 +361,42 @@ function App() {
     }
   }
 
+  async function loadKcfxCoreRecords() {
+    setKcfxCoreLoading(true);
+    setKcfxCoreMessage('');
+    try {
+      const ids = KCFX_CORE_RECORD_IDS.join(',');
+      const response = await fetch(`${API}/api/kcfx-library/preloaded?ids=${encodeURIComponent(ids)}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      const records = Object.fromEntries(
+        KCFX_CORE_RECORD_IDS.map((id) => [id, payload.records?.[id] || { id, rows: [] }])
+      );
+      setKcfxCoreRecords(records);
+      setKcfxCoreLoadedAt(new Date().toLocaleString('zh-CN'));
+    } catch (error) {
+      setKcfxCoreMessage(error?.message || String(error));
+    } finally {
+      setKcfxCoreLoading(false);
+    }
+  }
+
+  async function loadKcfxLibrary() {
+    setKcfxLibraryLoading(true);
+    setKcfxLibraryMessage('');
+    try {
+      const response = await fetch(`${API}/api/kcfx-library?includeRows=0`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      setKcfxLibrary(payload || { records: {} });
+      setKcfxLibraryLoadedAt(new Date().toLocaleString('zh-CN'));
+    } catch (error) {
+      setKcfxLibraryMessage(error?.message || String(error));
+    } finally {
+      setKcfxLibraryLoading(false);
+    }
+  }
+
   async function hydrateInspectionLibraryRecords(records = {}) {
     const nextRecords = { ...records };
     const missingIds = INSPECTION_LIBRARY_RECORD_IDS.filter((id) => {
@@ -503,6 +562,18 @@ function App() {
   useEffect(() => {
     if (!authChecked || !user || activeTab !== 'salesInventoryInventoryStaticReport' || !canAccessTab('salesInventoryInventoryStaticReport')) return undefined;
     loadKcfxInventoryStaticReportRecords();
+    return undefined;
+  }, [activeTab, authChecked, user]);
+
+  useEffect(() => {
+    if (!authChecked || !user || !KCFX_REACT_DATA_TABS.has(activeTab) || !canAccessTab(activeTab)) return undefined;
+    loadKcfxCoreRecords();
+    return undefined;
+  }, [activeTab, authChecked, user]);
+
+  useEffect(() => {
+    if (!authChecked || !user || !KCFX_LIBRARY_TABS.has(activeTab) || !canAccessTab(activeTab)) return undefined;
+    loadKcfxLibrary();
     return undefined;
   }, [activeTab, authChecked, user]);
 
@@ -1791,6 +1862,129 @@ function App() {
             deleteInspectionNoticeRow={deleteInspectionNoticeRow}
             addInspectionNoticeRow={addInspectionNoticeRow}
             confirmInspectionNotice={confirmInspectionNotice}
+          />
+        )}
+
+        {activeTab === 'salesInventoryReceiptSummary' && canAccessTab('salesInventoryReceiptSummary') && (
+          <ReceiptSummaryPage
+            kcfxRecords={kcfxCoreRecords}
+            loading={kcfxCoreLoading}
+            error={kcfxCoreMessage}
+            lastLoadedAt={kcfxCoreLoadedAt}
+            onRefresh={loadKcfxCoreRecords}
+          />
+        )}
+
+        {activeTab === 'salesInventoryInventoryTrend' && canAccessTab('salesInventoryInventoryTrend') && (
+          <InventoryTrendPage
+            kcfxRecords={kcfxCoreRecords}
+            loading={kcfxCoreLoading}
+            error={kcfxCoreMessage}
+            lastLoadedAt={kcfxCoreLoadedAt}
+            onRefresh={loadKcfxCoreRecords}
+          />
+        )}
+
+        {activeTab === 'salesInventorySalesAnalysis' && canAccessTab('salesInventorySalesAnalysis') && (
+          <SalesAnalysisPage
+            kcfxRecords={kcfxCoreRecords}
+            loading={kcfxCoreLoading}
+            error={kcfxCoreMessage}
+            lastLoadedAt={kcfxCoreLoadedAt}
+            onRefresh={loadKcfxCoreRecords}
+          />
+        )}
+
+        {activeTab === 'salesInventoryComparison' && canAccessTab('salesInventoryComparison') && (
+          <ComparisonPage
+            kcfxRecords={kcfxCoreRecords}
+            loading={kcfxCoreLoading}
+            error={kcfxCoreMessage}
+            lastLoadedAt={kcfxCoreLoadedAt}
+            onRefresh={loadKcfxCoreRecords}
+          />
+        )}
+
+        {activeTab === 'salesInventoryDomesticReport' && canAccessTab('salesInventoryDomesticReport') && (
+          <DomesticReportPage
+            kcfxRecords={kcfxCoreRecords}
+            loading={kcfxCoreLoading}
+            error={kcfxCoreMessage}
+            lastLoadedAt={kcfxCoreLoadedAt}
+            onRefresh={loadKcfxCoreRecords}
+          />
+        )}
+
+        {activeTab === 'salesInventoryOverseasReport' && canAccessTab('salesInventoryOverseasReport') && (
+          <OverseasReportPage
+            kcfxRecords={kcfxCoreRecords}
+            loading={kcfxCoreLoading}
+            error={kcfxCoreMessage}
+            lastLoadedAt={kcfxCoreLoadedAt}
+            onRefresh={loadKcfxCoreRecords}
+          />
+        )}
+
+        {activeTab === 'salesInventoryOverseasSecondReport' && canAccessTab('salesInventoryOverseasSecondReport') && (
+          <OverseasSecondReportPage
+            kcfxRecords={kcfxCoreRecords}
+            loading={kcfxCoreLoading}
+            error={kcfxCoreMessage}
+            lastLoadedAt={kcfxCoreLoadedAt}
+            onRefresh={loadKcfxCoreRecords}
+          />
+        )}
+
+        {activeTab === 'salesInventoryGlobalBusinessReport' && canAccessTab('salesInventoryGlobalBusinessReport') && (
+          <GlobalBusinessReportPage
+            kcfxRecords={kcfxCoreRecords}
+            loading={kcfxCoreLoading}
+            error={kcfxCoreMessage}
+            lastLoadedAt={kcfxCoreLoadedAt}
+            onRefresh={loadKcfxCoreRecords}
+          />
+        )}
+
+        {activeTab === 'salesInventoryOver120' && canAccessTab('salesInventoryOver120') && (
+          <Over120Page
+            kcfxRecords={kcfxCoreRecords}
+            loading={kcfxCoreLoading}
+            error={kcfxCoreMessage}
+            lastLoadedAt={kcfxCoreLoadedAt}
+            onRefresh={loadKcfxCoreRecords}
+          />
+        )}
+
+        {activeTab === 'maintenanceFactLibrary' && canAccessTab('maintenanceFactLibrary') && (
+          <FactLibraryPage
+            library={kcfxLibrary}
+            user={user}
+            loading={kcfxLibraryLoading}
+            error={kcfxLibraryMessage}
+            lastLoadedAt={kcfxLibraryLoadedAt}
+            onRefresh={loadKcfxLibrary}
+          />
+        )}
+
+        {activeTab === 'maintenanceSalesLibrary' && canAccessTab('maintenanceSalesLibrary') && (
+          <SalesLibraryPage
+            library={kcfxLibrary}
+            user={user}
+            loading={kcfxLibraryLoading}
+            error={kcfxLibraryMessage}
+            lastLoadedAt={kcfxLibraryLoadedAt}
+            onRefresh={loadKcfxLibrary}
+          />
+        )}
+
+        {activeTab === 'maintenanceFileLibrary' && canAccessTab('maintenanceFileLibrary') && (
+          <FileLibraryPage
+            library={kcfxLibrary}
+            user={user}
+            loading={kcfxLibraryLoading}
+            error={kcfxLibraryMessage}
+            lastLoadedAt={kcfxLibraryLoadedAt}
+            onRefresh={loadKcfxLibrary}
           />
         )}
 

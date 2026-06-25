@@ -25,6 +25,23 @@ const INSPECTION_LIBRARY_RECORD_IDS = ['dim-purchase-division', 'dim-product'];
 const KCFX_ERROR_RECORD_IDS = ['fact-inventory', 'fact-2', 'sales-data', 'dim-product', 'dim-warehouse', 'dim-warehouse-material', 'dim-store-name', 'dim-customer-material'];
 const KCFX_SALES_TREND_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
 const KCFX_INVENTORY_STATIC_REPORT_RECORD_IDS = ['fact-2', 'dim-product', 'dim-warehouse', 'dim-warehouse-material'];
+const KCFX_CORE_RECORD_IDS = [
+  'fact-inventory',
+  'fact-2',
+  'fact-3',
+  'fact-4',
+  'fact-5',
+  'fact-6',
+  'fact-7',
+  'fact-8',
+  'sales-data',
+  'dim-product',
+  'dim-warehouse',
+  'dim-warehouse-material',
+  'dim-store-name',
+  'dim-customer-material',
+  'dim-purchase-division'
+];
 const PURCHASE_DIVISION_SUPPLIER_COLUMN = 9;
 const PURCHASE_DIVISION_ADDRESS_COLUMN = 12;
 const PRODUCT_LINE_COLUMN = 7;
@@ -39,6 +56,11 @@ const SALES_INVENTORY_PAGES = [
   { tab: 'salesInventorySalesAnalysis', key: 'salesAnalysis', label: '月度销售数据', sourceFile: 'sales-analysis.html' },
   { tab: 'salesInventorySalesTrend', key: 'salesTrend', label: '销售趋势变化', sourceFile: 'sales-trend.html' },
   { tab: 'salesInventoryComparison', key: 'comparison', label: '表格对比分析', sourceFile: 'comparison.html' },
+  { tab: 'salesInventoryDomesticReport', key: 'domesticReport', label: '国内仓报告', sourceFile: 'domestic-report.html' },
+  { tab: 'salesInventoryOverseasReport', key: 'overseasReport', label: '海外仓报告', sourceFile: 'overseas-report.html' },
+  { tab: 'salesInventoryOverseasSecondReport', key: 'overseasSecondReport', label: '海外二仓报告', sourceFile: 'overseas-second-report.html' },
+  { tab: 'salesInventoryGlobalBusinessReport', key: 'globalBusinessReport', label: '全球业务报告', sourceFile: 'global-business-report.html' },
+  { tab: 'salesInventoryOver120', key: 'over120', label: '超120天库存', sourceFile: 'over-120.html' },
   { tab: 'salesInventoryErrors', key: 'errors', label: '报错信息提示', sourceFile: 'errors.html' }
 ];
 
@@ -48,11 +70,10 @@ const MAINTENANCE_LIBRARY_PAGES = [
   { tab: 'maintenanceFileLibrary', key: 'fileLibrary', label: '维度表文件库', sourceFile: 'file-library.html' }
 ];
 
-const EMBEDDED_KCFX_PAGES = [
-  ...SALES_INVENTORY_PAGES.filter((page) => !['salesInventoryErrors', 'salesInventorySalesTrend', 'salesInventoryInventoryStaticReport'].includes(page.tab)),
-  ...MAINTENANCE_LIBRARY_PAGES
-];
+const EMBEDDED_KCFX_PAGES = [];
 const PRIORITY_KCFX_PRELOAD_TABS = new Set(['salesInventorySalesAnalysis']);
+const KCFX_REACT_DATA_TABS = new Set(SALES_INVENTORY_PAGES.map((page) => page.tab));
+const KCFX_LIBRARY_TABS = new Set(MAINTENANCE_LIBRARY_PAGES.map((page) => page.tab));
 
 const SYSTEM_FILE_LIBRARY_PAGES = [
   { tab: 'systemMigrationPackage', key: 'migrationPackage', label: '迁移备份包' },
@@ -138,8 +159,11 @@ export {
   INSPECTION_DEPARTMENT_OPTIONS,
   INSPECTION_LIBRARY_RECORD_IDS,
   INSPECTION_NOTICE_FIELDS,
+  KCFX_CORE_RECORD_IDS,
   KCFX_ERROR_RECORD_IDS,
   KCFX_INVENTORY_STATIC_REPORT_RECORD_IDS,
+  KCFX_LIBRARY_TABS,
+  KCFX_REACT_DATA_TABS,
   KCFX_SALES_TREND_RECORD_IDS,
   KCFX_INDEXED_DB_NAME,
   KCFX_INDEXED_DB_STORE,
