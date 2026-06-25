@@ -15,15 +15,21 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
             set -e
-            cd /home/ubuntu/zhuge-ai-lab/gongyinglianaixitong
-            mkdir -p /home/ubuntu/backups/gongyinglianaixitong
+            cd /home/ubuntu/zhuge-ai-lab/gongyingaixitong
+            mkdir -p /home/ubuntu/backups/gongyingaixitong
             if [ -d data ]; then
-              tar -czf /home/ubuntu/backups/gongyinglianaixitong/data-$(date +%Y%m%d-%H%M%S).tar.gz data
+              tar -czf /home/ubuntu/backups/gongyingaixitong/data-$(date +%Y%m%d-%H%M%S).tar.gz data
             fi
-            git fetch
+            for attempt in 1 2 3; do
+              git fetch origin main && break
+              if [ "$attempt" = "3" ]; then
+                exit 1
+              fi
+              sleep 10
+            done
             git reset --hard origin/main
             npm ci
             npm run build
-            pm2 restart gongyinglianaixitong --update-env
+            pm2 restart gongyingaixitong --update-env
             pm2 save
           EOF
