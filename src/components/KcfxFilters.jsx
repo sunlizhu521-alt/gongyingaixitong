@@ -127,7 +127,6 @@ function linkedFilterValues(rows, filters, targetFilter, selections) {
       if (targetFilter.sortByName) return a[0].localeCompare(b[0], 'zh-CN');
       return b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN');
     })
-    .slice(0, targetFilter.limit || 300)
     .map(([value]) => value);
   return targetFilter.preferredOrder ? sortByPreferredOrder(values, targetFilter.preferredOrder) : values;
 }

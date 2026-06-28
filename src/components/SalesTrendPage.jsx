@@ -88,7 +88,12 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
   return (
     <KcfxPageShell title="销售趋势变化" status={status} loading={pageLoading} onRefresh={refresh}>
       <section className="toolbar trend-filter-toolbar">
-        {TREND_FILTERS.map((filter) => (
+        <MonthCalendarFilter
+          value={(normalizedSelections.salesMonth || [])[0] || ''}
+          options={linkedOptions.salesMonth || []}
+          onChange={(value) => setFilterValue('salesMonth', value ? [value] : [])}
+        />
+        {TREND_FILTERS.filter((filter) => filter.id !== 'salesMonth').map((filter) => (
           <MultiFilter
             key={filter.id}
             id={`sales-trend-${filter.id}`}
@@ -184,6 +189,24 @@ function VerticalTrendChart({ months, grouped }) {
   );
 }
 
+function MonthCalendarFilter({ value, options, onChange }) {
+  const optionValues = options.map((option) => option.value).filter(Boolean).sort();
+  const min = optionValues[0] || '';
+  const max = optionValues[optionValues.length - 1] || '';
+  return (
+    <label className="month-calendar-filter">
+      <span>全部销售月份</span>
+      <input
+        type="month"
+        value={value}
+        min={min}
+        max={max}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
 function linkedFilterOptions(rows, targetFilter, selections) {
   const totals = new Map();
   for (const row of rows) {
@@ -195,7 +218,6 @@ function linkedFilterOptions(rows, targetFilter, selections) {
   return [...totals.entries()]
     .filter(([, value]) => value !== 0)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN'))
-    .slice(0, targetFilter.limit || 300)
     .map(([name]) => name);
 }
 

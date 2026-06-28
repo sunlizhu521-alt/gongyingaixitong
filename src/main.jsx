@@ -9,6 +9,7 @@ import {
   KCFX_DASHBOARD_PRELOAD_RECORD_IDS,
   KCFX_LIBRARY_TABS,
   KCFX_PRIORITY_PRELOAD_RECORD_IDS,
+  KCFX_REACT_DATA_TABS,
   MAINTENANCE_LIBRARY_PAGES,
   MAINTENANCE_LIBRARY_TABS,
   PRIORITY_KCFX_PRELOAD_TABS,
@@ -16,6 +17,7 @@ import {
   PRODUCT_SERIES_COLUMN,
   PURCHASE_DIVISION_ADDRESS_COLUMN,
   PURCHASE_DIVISION_SUPPLIER_COLUMN,
+  SALES_INVENTORY_PAGES,
   embeddedKcfxPageMap,
   legacyPermissionMap,
   permissionGroups,
@@ -106,6 +108,7 @@ function App() {
   const [kcfxLibraryMessage, setKcfxLibraryMessage] = useState('');
   const [kcfxLibraryLoadedAt, setKcfxLibraryLoadedAt] = useState('');
   const [mountedKcfxTabs, setMountedKcfxTabs] = useState(() => new Set());
+  const [mountedReactKcfxTabs, setMountedReactKcfxTabs] = useState(() => new Set(['salesInventoryReceiptSummary']));
   const [supplierImportResult, setSupplierImportResult] = useState(null);
   const [ownerImportResult, setOwnerImportResult] = useState(null);
   const [inspectionInitialData, setInspectionInitialData] = useState({ sheetName: '', columns: [], rows: [], updatedAt: '' });
@@ -209,6 +212,29 @@ function App() {
   const canAccessSalesInventory = canAccessGroup('salesInventory');
   const canAccessMaintenanceLibrary = canAccessGroup('maintenanceLibrary');
   const canAccessSystemFileLibrary = canAccessGroup('systemFileLibrary');
+
+  useEffect(() => {
+    if (!authChecked || !user) return;
+    if (!KCFX_REACT_DATA_TABS.has(activeTab) || !canAccessTab(activeTab)) return;
+    setMountedReactKcfxTabs((current) => (
+      current.has(activeTab) ? current : new Set([...current, activeTab])
+    ));
+  }, [activeTab, authChecked, user]);
+
+  useEffect(() => {
+    if (!authChecked || !user || !canAccessSalesInventory) return undefined;
+    const tabs = SALES_INVENTORY_PAGES
+      .map((page) => page.tab)
+      .filter((tab) => KCFX_REACT_DATA_TABS.has(tab) && canAccessTab(tab));
+    const timers = tabs.map((tab, index) => window.setTimeout(() => {
+      setMountedReactKcfxTabs((current) => (
+        current.has(tab) ? current : new Set([...current, tab])
+      ));
+    }, 120 * (index + 1)));
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [authChecked, user, canAccessSalesInventory]);
 
   useEffect(() => {
     if (!authChecked || !user || !kcfxData || !canAccessSalesInventory) return undefined;
@@ -1801,48 +1827,56 @@ function App() {
           />
         )}
 
-        {activeTab === 'salesInventoryReceiptSummary' && canAccessTab('salesInventoryReceiptSummary') && (
-          <ReceiptSummaryPage
-            kcfxData={kcfxData}
-            kcfxRecords={kcfxCoreRecords}
-            loading={false}
-            error={kcfxCoreMessage}
-            lastLoadedAt={kcfxCoreLoadedAt}
-            onRefresh={loadKcfxMetadata}
-          />
+        {mountedReactKcfxTabs.has('salesInventoryReceiptSummary') && canAccessTab('salesInventoryReceiptSummary') && (
+          <div className={activeTab === 'salesInventoryReceiptSummary' ? '' : 'kept-page-hidden'}>
+            <ReceiptSummaryPage
+              kcfxData={kcfxData}
+              kcfxRecords={kcfxCoreRecords}
+              loading={false}
+              error={kcfxCoreMessage}
+              lastLoadedAt={kcfxCoreLoadedAt}
+              onRefresh={loadKcfxMetadata}
+            />
+          </div>
         )}
 
-        {activeTab === 'salesInventoryInventoryTrend' && canAccessTab('salesInventoryInventoryTrend') && (
-          <InventoryTrendPage
-            kcfxData={kcfxData}
-            kcfxRecords={kcfxCoreRecords}
-            loading={false}
-            error={kcfxCoreMessage}
-            lastLoadedAt={kcfxCoreLoadedAt}
-            onRefresh={loadKcfxMetadata}
-          />
+        {mountedReactKcfxTabs.has('salesInventoryInventoryTrend') && canAccessTab('salesInventoryInventoryTrend') && (
+          <div className={activeTab === 'salesInventoryInventoryTrend' ? '' : 'kept-page-hidden'}>
+            <InventoryTrendPage
+              kcfxData={kcfxData}
+              kcfxRecords={kcfxCoreRecords}
+              loading={false}
+              error={kcfxCoreMessage}
+              lastLoadedAt={kcfxCoreLoadedAt}
+              onRefresh={loadKcfxMetadata}
+            />
+          </div>
         )}
 
-        {activeTab === 'salesInventorySalesAnalysis' && canAccessTab('salesInventorySalesAnalysis') && (
-          <SalesAnalysisPage
-            kcfxData={kcfxData}
-            kcfxRecords={kcfxCoreRecords}
-            loading={false}
-            error={kcfxCoreMessage}
-            lastLoadedAt={kcfxCoreLoadedAt}
-            onRefresh={loadKcfxMetadata}
-          />
+        {mountedReactKcfxTabs.has('salesInventorySalesAnalysis') && canAccessTab('salesInventorySalesAnalysis') && (
+          <div className={activeTab === 'salesInventorySalesAnalysis' ? '' : 'kept-page-hidden'}>
+            <SalesAnalysisPage
+              kcfxData={kcfxData}
+              kcfxRecords={kcfxCoreRecords}
+              loading={false}
+              error={kcfxCoreMessage}
+              lastLoadedAt={kcfxCoreLoadedAt}
+              onRefresh={loadKcfxMetadata}
+            />
+          </div>
         )}
 
-        {activeTab === 'salesInventoryComparison' && canAccessTab('salesInventoryComparison') && (
-          <ComparisonPage
-            kcfxData={kcfxData}
-            kcfxRecords={kcfxCoreRecords}
-            loading={false}
-            error={kcfxCoreMessage}
-            lastLoadedAt={kcfxCoreLoadedAt}
-            onRefresh={loadKcfxMetadata}
-          />
+        {mountedReactKcfxTabs.has('salesInventoryComparison') && canAccessTab('salesInventoryComparison') && (
+          <div className={activeTab === 'salesInventoryComparison' ? '' : 'kept-page-hidden'}>
+            <ComparisonPage
+              kcfxData={kcfxData}
+              kcfxRecords={kcfxCoreRecords}
+              loading={false}
+              error={kcfxCoreMessage}
+              lastLoadedAt={kcfxCoreLoadedAt}
+              onRefresh={loadKcfxMetadata}
+            />
+          </div>
         )}
 
         {activeTab === 'maintenanceFactLibrary' && canAccessTab('maintenanceFactLibrary') && (
@@ -1881,26 +1915,30 @@ function App() {
           />
         )}
 
-        {activeTab === 'salesInventoryErrors' && canAccessTab('salesInventoryErrors') && (
-          <ErrorsPage
-            kcfxData={kcfxData}
-            kcfxRecords={kcfxErrorRecords}
-            loading={false}
-            error={kcfxErrorMessage}
-            lastLoadedAt={kcfxErrorLoadedAt}
-            onRefresh={loadKcfxMetadata}
-          />
+        {mountedReactKcfxTabs.has('salesInventoryErrors') && canAccessTab('salesInventoryErrors') && (
+          <div className={activeTab === 'salesInventoryErrors' ? '' : 'kept-page-hidden'}>
+            <ErrorsPage
+              kcfxData={kcfxData}
+              kcfxRecords={kcfxErrorRecords}
+              loading={false}
+              error={kcfxErrorMessage}
+              lastLoadedAt={kcfxErrorLoadedAt}
+              onRefresh={loadKcfxMetadata}
+            />
+          </div>
         )}
 
-        {activeTab === 'salesInventorySalesTrend' && canAccessTab('salesInventorySalesTrend') && (
-          <SalesTrendPage
-            kcfxData={kcfxData}
-            kcfxRecords={kcfxSalesTrendRecords}
-            loading={false}
-            error={kcfxSalesTrendMessage}
-            lastLoadedAt={kcfxSalesTrendLoadedAt}
-            onRefresh={loadKcfxMetadata}
-          />
+        {mountedReactKcfxTabs.has('salesInventorySalesTrend') && canAccessTab('salesInventorySalesTrend') && (
+          <div className={activeTab === 'salesInventorySalesTrend' ? '' : 'kept-page-hidden'}>
+            <SalesTrendPage
+              kcfxData={kcfxData}
+              kcfxRecords={kcfxSalesTrendRecords}
+              loading={false}
+              error={kcfxSalesTrendMessage}
+              lastLoadedAt={kcfxSalesTrendLoadedAt}
+              onRefresh={loadKcfxMetadata}
+            />
+          </div>
         )}
 
         <EmbeddedDashboard

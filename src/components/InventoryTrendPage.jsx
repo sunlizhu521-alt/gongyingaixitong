@@ -96,7 +96,7 @@ export default function InventoryTrendPage({ kcfxData = null, kcfxRecords = {}, 
         </div>
       </section>
 
-      <PanelGrid>
+      <PanelGrid className="inventory-trend-three-grid">
         <BarPanel title="事业部库存货值" rows={groupSum(filteredItems, 'department', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
         <BarPanel title="销售产品线库存货值" rows={groupSum(filteredItems, 'productLine', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
         <BarPanel title="仓库位置库存货值" rows={groupSum(filteredItems, 'warehouseLocation', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />

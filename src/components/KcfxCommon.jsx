@@ -70,8 +70,8 @@ export function BarPanel({ title, rows, total, valueFormatter = formatNumber }) 
   );
 }
 
-export function PanelGrid({ children }) {
-  return <div className="dashboard-grid receipt-chart-grid">{children}</div>;
+export function PanelGrid({ children, className = '' }) {
+  return <div className={`dashboard-grid receipt-chart-grid ${className}`.trim()}>{children}</div>;
 }
 
 export function SimpleTable({ columns, rows, maxRows = 100 }) {
