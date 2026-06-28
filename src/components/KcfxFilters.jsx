@@ -1,10 +1,28 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import MultiFilter from './MultiFilter.jsx';
+import MonthCalendarFilter from './MonthCalendarFilter.jsx';
 import { normalizeText } from './kcfxUtils.js';
 
-export function useDashboardFilters(rows, filters, { searchFields = [], searchValue = '' } = {}) {
+export function useDashboardFilters(rows, filters, { searchFields = [], searchValue = '', defaultSelections = {} } = {}) {
   const [openFilter, setOpenFilter] = useState('');
-  const [selections, setSelections] = useState(() => emptySelections(filters));
+  const [selections, setSelections] = useState(() => emptySelections(filters, defaultSelections));
+  const defaultSelectionKey = useMemo(() => JSON.stringify(defaultSelections || {}), [defaultSelections]);
+
+  useEffect(() => {
+    setSelections((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const filter of filters) {
+        const currentValues = current[filter.id] || [];
+        const defaultValues = defaultSelections[filter.id] || [];
+        if (!currentValues.length && defaultValues.length) {
+          next[filter.id] = defaultValues;
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [defaultSelectionKey, filters]);
 
   const normalizedSelections = useMemo(() => {
     const optionsById = buildLinkedOptions(rows, filters, selections);
@@ -29,7 +47,7 @@ export function useDashboardFilters(rows, filters, { searchFields = [], searchVa
   }
 
   function resetFilters() {
-    setSelections(emptySelections(filters));
+    setSelections(emptySelections(filters, defaultSelections));
     setOpenFilter('');
   }
 
@@ -49,17 +67,31 @@ export function FilterToolbar({ filters, optionsById, selections, openFilter, se
     <section className="toolbar filter-toolbar" onClick={(event) => event.stopPropagation()}>
       <div className="filter-row">
         {filters.map((filter) => (
-          <MultiFilter
-            key={filter.id}
-            id={filter.id}
-            label={filter.allLabel}
-            allLabel={filter.allLabel}
-            options={optionsById[filter.id] || []}
-            selected={selections[filter.id] || []}
-            onChange={(value) => setFilterValue(filter.id, value)}
-            openFilter={openFilter}
-            setOpenFilter={setOpenFilter}
-          />
+          filter.type === 'month' ? (
+            <MonthCalendarFilter
+              key={filter.id}
+              id={filter.id}
+              label={filter.allLabel}
+              allLabel={filter.monthAllLabel || filter.allLabel}
+              options={optionsById[filter.id] || []}
+              selected={selections[filter.id] || []}
+              onChange={(value) => setFilterValue(filter.id, value)}
+              openFilter={openFilter}
+              setOpenFilter={setOpenFilter}
+            />
+          ) : (
+            <MultiFilter
+              key={filter.id}
+              id={filter.id}
+              label={filter.allLabel}
+              allLabel={filter.allLabel}
+              options={optionsById[filter.id] || []}
+              selected={selections[filter.id] || []}
+              onChange={(value) => setFilterValue(filter.id, value)}
+              openFilter={openFilter}
+              setOpenFilter={setOpenFilter}
+            />
+          )
         ))}
         {setSearchValue && (
           <input
@@ -140,6 +172,6 @@ function sortByPreferredOrder(values, preferredOrder) {
   });
 }
 
-function emptySelections(filters) {
-  return Object.fromEntries(filters.map((filter) => [filter.id, []]));
+function emptySelections(filters, defaultSelections = {}) {
+  return Object.fromEntries(filters.map((filter) => [filter.id, [...(defaultSelections[filter.id] || [])]]));
 }

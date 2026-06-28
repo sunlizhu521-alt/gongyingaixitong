@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import MultiFilter from './MultiFilter.jsx';
+import MonthCalendarFilter from './MonthCalendarFilter.jsx';
 import { BarPanel, KcfxPageShell, PanelGrid } from './KcfxCommon.jsx';
 import { KCFX_COLORS, formatNumber, formatQuantity, getSalesRows, groupSum, recordSourceText, sum } from './kcfxUtils.js';
 import { useKcfxRecordMap } from './kcfxRecordLoader.js';
@@ -7,7 +8,7 @@ import { useKcfxRecordMap } from './kcfxRecordLoader.js';
 const TREND_YEARS = ['2025', '2026'];
 const TREND_YEAR_COLORS = { 2025: '#007aff', 2026: '#34c759' };
 const TREND_FILTERS = [
-  { id: 'salesMonth', field: 'salesMonth', allLabel: '全部销售月份', matchMonthNumber: true, limit: 300 },
+  { id: 'salesMonth', field: 'salesMonth', allLabel: '全部销售月份', monthAllLabel: '全部数据月份', matchMonthNumber: true, limit: 300 },
   { id: 'salesOrg', field: 'salesOrg', allLabel: '全部销售部门', limit: 300 },
   { id: 'storeShortName', field: 'storeShortName', allLabel: '店铺简称', limit: 300 },
   { id: 'productLine', field: 'productLine', allLabel: '全部销售产品线', limit: 300 },
@@ -89,9 +90,14 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
     <KcfxPageShell title="销售趋势变化" status={status} loading={pageLoading} onRefresh={refresh}>
       <section className="toolbar trend-filter-toolbar">
         <MonthCalendarFilter
-          value={(normalizedSelections.salesMonth || [])[0] || ''}
+          id="sales-trend-salesMonth"
+          label="全部销售月份"
+          allLabel="全部数据月份"
+          selected={normalizedSelections.salesMonth || []}
           options={linkedOptions.salesMonth || []}
-          onChange={(value) => setFilterValue('salesMonth', value ? [value] : [])}
+          onChange={(value) => setFilterValue('salesMonth', value)}
+          openFilter={openFilter}
+          setOpenFilter={setOpenFilter}
         />
         {TREND_FILTERS.filter((filter) => filter.id !== 'salesMonth').map((filter) => (
           <MultiFilter
@@ -186,24 +192,6 @@ function VerticalTrendChart({ months, grouped }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function MonthCalendarFilter({ value, options, onChange }) {
-  const optionValues = options.map((option) => option.value).filter(Boolean).sort();
-  const min = optionValues[0] || '';
-  const max = optionValues[optionValues.length - 1] || '';
-  return (
-    <label className="month-calendar-filter">
-      <span>全部销售月份</span>
-      <input
-        type="month"
-        value={value}
-        min={min}
-        max={max}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
   );
 }
 

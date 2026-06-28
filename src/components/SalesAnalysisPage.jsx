@@ -6,7 +6,7 @@ import { useKcfxRecordMap } from './kcfxRecordLoader.js';
 
 const SALES_ANALYSIS_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
 const SALES_FILTERS = [
-  { id: 'salesMonth', field: 'salesMonth', allLabel: '全部销售月份', sortByName: true, matchMonthNumber: true, sortValueField: 'qty' },
+  { id: 'salesMonth', field: 'salesMonth', allLabel: '全部销售月份', monthAllLabel: '全部数据月份', type: 'month', sortByName: true, matchMonthNumber: true, sortValueField: 'qty' },
   { id: 'salesOrg', field: 'salesOrg', allLabel: '全部销售部门', sortValueField: 'qty' },
   { id: 'storeShortName', field: 'storeShortName', allLabel: '店铺简称', sortValueField: 'qty' },
   { id: 'productLine', field: 'productLine', allLabel: '全部销售产品线', sortValueField: 'qty' },
@@ -21,7 +21,13 @@ export default function SalesAnalysisPage({ kcfxData = null, kcfxRecords = {}, e
   const records = useMemo(() => ({ ...kcfxRecords, ...loadedRecords }), [kcfxRecords, loadedRecords]);
   const pageError = recordsError || error;
   const rows = useMemo(() => getSalesRows(records), [records]);
-  const filterState = useDashboardFilters(rows, SALES_FILTERS, { searchFields: SALES_SEARCH_FIELDS, searchValue: search });
+  const latestSalesMonth = useMemo(() => (
+    [...new Set(rows.map((row) => row.salesMonth).filter(Boolean))].sort().at(-1) || ''
+  ), [rows]);
+  const defaultSelections = useMemo(() => (
+    latestSalesMonth ? { salesMonth: [latestSalesMonth] } : {}
+  ), [latestSalesMonth]);
+  const filterState = useDashboardFilters(rows, SALES_FILTERS, { searchFields: SALES_SEARCH_FIELDS, searchValue: search, defaultSelections });
   const filteredRows = filterState.filteredRows;
   const totalQty = useMemo(() => sum(filteredRows, 'qty'), [filteredRows]);
   const status = recordsLoading
