@@ -1266,22 +1266,24 @@ th {
 
 .receipt-summary-amount-grid,
 .kcfx-react-page .dashboard-grid.receipt-chart-grid.receipt-summary-amount-grid {
-  grid-template-columns: minmax(0, 1fr);
-  overflow-x: visible;
+  grid-template-columns: repeat(5, minmax(390px, 1fr));
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-bottom: 8px;
 }
 
 .kcfx-react-page .dashboard-grid.receipt-chart-grid.receipt-summary-amount-grid .panel {
-  min-height: auto;
-  padding: 16px;
+  min-height: 286px;
+  padding: 14px 10px;
 }
 
 .kcfx-react-page .dashboard-grid.receipt-chart-grid.receipt-summary-amount-grid .panel h2 {
-  font-size: 15px;
+  font-size: 13px;
 }
 
 .kcfx-react-page .dashboard-grid.receipt-chart-grid.receipt-summary-amount-grid .bar-row {
-  grid-template-columns: minmax(150px, 18%) minmax(220px, 1fr) minmax(240px, max-content);
-  column-gap: 14px;
+  grid-template-columns: minmax(72px, 22%) minmax(72px, 1fr) minmax(176px, max-content);
+  column-gap: 8px;
 }
 
 .kcfx-react-page .dashboard-grid.receipt-chart-grid.receipt-summary-amount-grid .bar-label {
@@ -1293,16 +1295,16 @@ th {
 }
 
 .kcfx-react-page .dashboard-grid.receipt-chart-grid.receipt-summary-amount-grid .bar-track {
-  min-width: 220px;
+  min-width: 72px;
   height: 15px;
 }
 
 .kcfx-react-page .dashboard-grid.receipt-chart-grid.receipt-summary-amount-grid .bar-value {
-  min-width: 240px;
+  min-width: 176px;
   max-width: none;
   overflow: visible;
   color: #334155;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   text-overflow: clip;
   white-space: nowrap;
@@ -1339,7 +1341,7 @@ th {
 
 @media (max-width: 760px) {
   .kcfx-react-page .dashboard-grid.receipt-chart-grid.receipt-summary-amount-grid .bar-row {
-    grid-template-columns: minmax(0, 1fr) minmax(240px, max-content);
+    grid-template-columns: minmax(0, 1fr) minmax(176px, max-content);
     grid-template-areas:
       "label value"
       "track track";
