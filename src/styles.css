@@ -92,12 +92,12 @@ select {
   align-items: center;
   justify-items: center;
   overflow: hidden;
-  opacity: .36;
+  opacity: .42;
   mix-blend-mode: multiply;
 }
 
 .security-watermark span {
-  color: rgba(30, 64, 175, .18);
+  color: rgba(30, 64, 175, .24);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0;
