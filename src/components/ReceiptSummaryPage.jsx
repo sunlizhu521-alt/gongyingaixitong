@@ -49,6 +49,7 @@ export default function ReceiptSummaryPage({ kcfxData = null, kcfxRecords = {}, 
   const filteredRows = filterState.filteredRows;
   const totalAmount = useMemo(() => sum(filteredRows, 'amount'), [filteredRows]);
   const totalQty = useMemo(() => sum(filteredRows, 'qty'), [filteredRows]);
+  const ageAmountRows = useMemo(() => orderedAgeGroupSum(filteredRows), [filteredRows]);
   const status = summaryLoading
     ? '数据加载中...'
     : pageError || `已读取 ${formatNumber(rows.length)} 行关账库存，筛选后 ${formatNumber(filteredRows.length)} 行，库存金额 ${moneyWan(totalAmount)}${lastLoadedAt ? `；读取时间：${lastLoadedAt}` : ''}`;
@@ -77,7 +78,7 @@ export default function ReceiptSummaryPage({ kcfxData = null, kcfxRecords = {}, 
 
       <PanelGrid className="receipt-summary-amount-grid">
         <BarPanel title="仓库类型库存金额" rows={groupSum(filteredRows, 'warehouseType', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
-        <BarPanel title="库龄段库存金额" rows={groupSum(filteredRows, 'ageGroup', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
+        <BarPanel title="库龄段库存金额" rows={ageAmountRows} total={totalAmount} valueFormatter={moneyWan} />
         <BarPanel title="销售产品线库存金额" rows={groupSum(filteredRows, 'productLine', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
         <BarPanel title="销售系列库存金额" rows={groupSum(filteredRows, 'productSeries', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
         <BarPanel title="仓库位置库存金额" rows={groupSum(filteredRows, 'warehouseLocation', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
@@ -144,4 +145,23 @@ function dominantAgeBucket(ageQuantities = {}, ageSettlementAmounts = {}) {
     value: Number(ageSettlementAmounts[bucket]) || Number(ageQuantities[bucket]) || 0
   }));
   return entries.sort((a, b) => b.value - a.value)[0]?.bucket || '';
+}
+
+function orderedAgeGroupSum(rows) {
+  const totals = new Map(AGE_BUCKET_ORDER.map((bucket) => [bucket, 0]));
+  for (const row of rows) {
+    const name = String(row.ageGroup || '').trim();
+    if (!name) continue;
+    totals.set(name, (totals.get(name) || 0) + (Number(row.amount) || 0));
+  }
+  return [...totals.entries()]
+    .map(([name, value]) => ({ name, value }))
+    .filter((row) => row.value !== 0)
+    .sort((a, b) => {
+      const ai = AGE_BUCKET_ORDER.indexOf(a.name);
+      const bi = AGE_BUCKET_ORDER.indexOf(b.name);
+      const aIndex = ai >= 0 ? ai : Number.MAX_SAFE_INTEGER;
+      const bIndex = bi >= 0 ? bi : Number.MAX_SAFE_INTEGER;
+      return aIndex - bIndex || a.name.localeCompare(b.name, 'zh-CN');
+    });
 }
