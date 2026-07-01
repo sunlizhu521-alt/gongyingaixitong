@@ -2,8 +2,8 @@ import React, { useMemo, useState } from 'react';
 import MultiFilter from './MultiFilter.jsx';
 import MonthCalendarFilter from './MonthCalendarFilter.jsx';
 import { BarPanel, KcfxPageShell, PanelGrid } from './KcfxCommon.jsx';
-import { KCFX_COLORS, formatNumber, formatQuantity, groupSum, recordSourceText, sum } from './kcfxUtils.js';
-import { useKcfxSalesRows } from './kcfxRecordLoader.js';
+import { KCFX_COLORS, formatNumber, formatQuantity, getCachedSalesRows, groupSum, recordSourceText, sum } from './kcfxUtils.js';
+import { useKcfxRecordMap, useKcfxSalesRows } from './kcfxRecordLoader.js';
 
 const TREND_YEARS = ['2025', '2026'];
 const TREND_YEAR_COLORS = { 2025: '#007aff', 2026: '#34c759' };
@@ -16,11 +16,31 @@ const TREND_FILTERS = [
   { id: 'model', field: 'model', allLabel: '型号', limit: 300 }
 ];
 const EMPTY_SELECTIONS = Object.fromEntries(TREND_FILTERS.map((filter) => [filter.id, []]));
+const SALES_TREND_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
 
 export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const [openFilter, setOpenFilter] = useState('');
   const [selections, setSelections] = useState(EMPTY_SELECTIONS);
-  const { rows: salesRows, records: loadedRecords, loading: recordsLoading, error: recordsError, reload } = useKcfxSalesRows(kcfxData);
+  const salesRowsResult = useKcfxSalesRows(kcfxData);
+  const shouldUseFallbackRecords = salesRowsResult.loaded && !salesRowsResult.loading && salesRowsResult.rows.length === 0;
+  const fallbackRecordsResult = useKcfxRecordMap(kcfxData, shouldUseFallbackRecords ? SALES_TREND_RECORD_IDS : []);
+  const fallbackRows = shouldUseFallbackRecords
+    ? getCachedSalesRows({ ...kcfxRecords, ...fallbackRecordsResult.records })
+    : [];
+  const salesRows = salesRowsResult.rows.length
+    ? salesRowsResult.rows
+    : fallbackRows;
+  const usingFallbackRows = !salesRowsResult.rows.length && fallbackRows.length > 0;
+  const loadedRecords = salesRowsResult.rows.length ? salesRowsResult.records : fallbackRecordsResult.records;
+  const recordsLoading = salesRowsResult.loading || fallbackRecordsResult.loading;
+  const recordsError = usingFallbackRows ? fallbackRecordsResult.error : (salesRowsResult.error || fallbackRecordsResult.error);
+  const reload = async ({ force = false } = {}) => {
+    const result = await salesRowsResult.reload({ force });
+    if (!Array.isArray(result?.rows) || result.rows.length === 0) {
+      await fallbackRecordsResult.reload({ force });
+    }
+    return result;
+  };
   const records = useMemo(() => ({ ...kcfxRecords, ...loadedRecords }), [kcfxRecords, loadedRecords]);
   const pageLoading = recordsLoading;
   const pageError = recordsError || error;

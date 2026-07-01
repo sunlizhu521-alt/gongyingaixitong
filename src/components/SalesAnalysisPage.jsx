@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { BarPanel, KcfxPageShell, MetricCards, PanelGrid, SimpleTable, SourcePanel } from './KcfxCommon.jsx';
 import { FilterToolbar, useDashboardFilters } from './KcfxFilters.jsx';
-import { formatNumber, groupSum, recordSourceText, sum, uniqueCount } from './kcfxUtils.js';
-import { useKcfxSalesRows } from './kcfxRecordLoader.js';
+import { formatNumber, getCachedSalesRows, groupSum, recordSourceText, sum, uniqueCount } from './kcfxUtils.js';
+import { useKcfxRecordMap, useKcfxSalesRows } from './kcfxRecordLoader.js';
 
+const SALES_ANALYSIS_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
 const SALES_FILTERS = [
   { id: 'salesMonth', field: 'salesMonth', allLabel: '全部销售月份', monthAllLabel: '全部数据月份', type: 'month', sortByName: true, matchMonthNumber: true, sortValueField: 'qty' },
   { id: 'salesOrg', field: 'salesOrg', allLabel: '全部销售部门', sortValueField: 'qty' },
@@ -16,7 +17,26 @@ const SALES_SEARCH_FIELDS = ['customer', 'storeShortName', 'model', 'materialCod
 
 export default function SalesAnalysisPage({ kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const [search, setSearch] = useState('');
-  const { rows, records: loadedRecords, loading: recordsLoading, error: recordsError, reload } = useKcfxSalesRows(kcfxData);
+  const salesRowsResult = useKcfxSalesRows(kcfxData);
+  const shouldUseFallbackRecords = salesRowsResult.loaded && !salesRowsResult.loading && salesRowsResult.rows.length === 0;
+  const fallbackRecordsResult = useKcfxRecordMap(kcfxData, shouldUseFallbackRecords ? SALES_ANALYSIS_RECORD_IDS : []);
+  const fallbackRows = shouldUseFallbackRecords
+    ? getCachedSalesRows({ ...kcfxRecords, ...fallbackRecordsResult.records })
+    : [];
+  const rows = salesRowsResult.rows.length
+    ? salesRowsResult.rows
+    : fallbackRows;
+  const usingFallbackRows = !salesRowsResult.rows.length && fallbackRows.length > 0;
+  const loadedRecords = salesRowsResult.rows.length ? salesRowsResult.records : fallbackRecordsResult.records;
+  const recordsLoading = salesRowsResult.loading || fallbackRecordsResult.loading;
+  const recordsError = usingFallbackRows ? fallbackRecordsResult.error : (salesRowsResult.error || fallbackRecordsResult.error);
+  const reload = async ({ force = false } = {}) => {
+    const result = await salesRowsResult.reload({ force });
+    if (!Array.isArray(result?.rows) || result.rows.length === 0) {
+      await fallbackRecordsResult.reload({ force });
+    }
+    return result;
+  };
   const records = useMemo(() => ({ ...kcfxRecords, ...loadedRecords }), [kcfxRecords, loadedRecords]);
   const pageError = recordsError || error;
   const latestSalesMonth = useMemo(() => (

@@ -7,6 +7,7 @@ const inflightRecordRequests = new Map();
 let salesRowsPayloadCache = null;
 let inflightSalesRowsRequest = null;
 let recordCacheVersion = '';
+const salesRowsCacheVersion = 'v2';
 
 function uniqueRecordIds(ids = []) {
   return [...new Set((ids || []).map((id) => String(id || '').trim()).filter(Boolean))];
@@ -100,7 +101,7 @@ export function kcfxRecordsArrayToMap(records) {
 }
 
 function salesRowsCacheKey(savedAt = '') {
-  return `kcfx:sales-rows:${savedAt || recordCacheVersion || 'latest'}`;
+  return `kcfx:sales-rows:${salesRowsCacheVersion}:${savedAt || recordCacheVersion || 'latest'}`;
 }
 
 export async function fetchKcfxSalesRows(kcfxData, { force = false } = {}) {
@@ -129,7 +130,9 @@ export async function fetchKcfxSalesRows(kcfxData, { force = false } = {}) {
         records: payload?.records || {}
       };
       salesRowsPayloadCache = { cacheKey, payload: normalizedPayload };
-      void setCache(cacheKey, normalizedPayload, 10 * 60 * 1000);
+      if (normalizedPayload.rows.length > 0) {
+        void setCache(cacheKey, normalizedPayload, 10 * 60 * 1000);
+      }
       return normalizedPayload;
     })
     .finally(() => {
@@ -146,6 +149,10 @@ export function useKcfxSalesRows(kcfxData) {
     const cacheKey = salesRowsCacheKey(savedAt);
     return salesRowsPayloadCache?.cacheKey === cacheKey ? salesRowsPayloadCache.payload : { rows: [], records: {} };
   });
+  const [loaded, setLoaded] = useState(() => {
+    const cacheKey = salesRowsCacheKey(savedAt);
+    return salesRowsPayloadCache?.cacheKey === cacheKey;
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -160,6 +167,7 @@ export function useKcfxSalesRows(kcfxData) {
       setError(loadError?.message || String(loadError));
       return { rows: [], records: {} };
     } finally {
+      setLoaded(true);
       setLoading(false);
     }
   }, [kcfxData]);
@@ -173,6 +181,7 @@ export function useKcfxSalesRows(kcfxData) {
     rows: Array.isArray(payload?.rows) ? payload.rows : [],
     records: payload?.records || {},
     loading,
+    loaded,
     error,
     reload,
     payload
