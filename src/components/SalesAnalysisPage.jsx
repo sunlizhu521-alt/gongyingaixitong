@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import { API } from '../constants.js';
 import { BarPanel, KcfxPageShell, MetricCards, PanelGrid, SimpleTable, SourcePanel } from './KcfxCommon.jsx';
 import { FilterToolbar, useDashboardFilters } from './KcfxFilters.jsx';
 import { downloadKcfxRowsAsXlsx } from './kcfxExport.js';
@@ -25,7 +26,7 @@ const SALES_TABLE_COLUMNS = [
   { key: 'qty', label: '销售数量', render: (row) => formatNumber(row.qty, 2), exportValue: (row) => Number(row.qty) || 0 }
 ];
 
-export default function SalesAnalysisPage({ kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
+export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const [search, setSearch] = useState('');
   const salesRowsResult = useKcfxSalesRows(kcfxData);
   const shouldUseFallbackRecords = salesRowsResult.loaded && !salesRowsResult.loading && salesRowsResult.rows.length === 0;
@@ -70,6 +71,53 @@ export default function SalesAnalysisPage({ kcfxData = null, kcfxRecords = {}, e
     downloadKcfxRowsAsXlsx('月度销售数据', filteredRows, SALES_TABLE_COLUMNS, '月度销售数据');
   }, [filteredRows]);
 
+  const submitSalesFeedback = useCallback(async (row) => {
+    const feedback = window.prompt('请输入这条月度销售数据的反馈内容');
+    if (!feedback || !feedback.trim()) return;
+    const rowKey = [row.salesMonth, row.salesOrg, row.storeShortName, row.materialCode, row.model].filter(Boolean).join('|');
+    const rowSummary = [row.salesMonth, row.storeShortName, row.model].filter(Boolean).join(' / ');
+    const response = await fetch(`${API}/api/kcfx-feedback/sales`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user: user?.name,
+        feedback,
+        rowKey,
+        rowSummary,
+        rowData: {
+          salesMonth: row.salesMonth,
+          salesOrg: row.salesOrg,
+          storeShortName: row.storeShortName,
+          productLine: row.productLine,
+          productSeries: row.productSeries,
+          model: row.model,
+          materialCode: row.materialCode,
+          materialName: row.materialName,
+          customer: row.customer,
+          qty: Number(row.qty) || 0
+        }
+      })
+    });
+    if (!response.ok) {
+      window.alert('反馈提交失败，请稍后重试');
+      return;
+    }
+    window.alert('反馈已提交');
+  }, [user?.name]);
+
+  const salesTableColumns = useMemo(() => [
+    ...SALES_TABLE_COLUMNS,
+    {
+      key: 'feedbackAction',
+      label: '操作',
+      render: (row) => (
+        <button type="button" className="ghost compact-button" onClick={() => submitSalesFeedback(row)}>
+          提交
+        </button>
+      )
+    }
+  ], [submitSalesFeedback]);
+
   return (
     <KcfxPageShell title="月度销售数据" status={status} loading={recordsLoading} onRefresh={refresh}>
       <FilterToolbar
@@ -101,7 +149,7 @@ export default function SalesAnalysisPage({ kcfxData = null, kcfxRecords = {}, e
             导出
           </button>
         </div>
-        <SimpleTable rows={filteredRows} maxRows={150} columns={SALES_TABLE_COLUMNS} />
+        <SimpleTable rows={filteredRows} maxRows={150} columns={salesTableColumns} />
       </section>
       <SourcePanel sources={[
         { label: '销售数据文件', value: recordSourceText(records['sales-data']) },

@@ -28,7 +28,7 @@ const RECEIPT_TABLE_COLUMNS = [
   { key: 'amount', label: '库存金额合计', render: (row) => moneyWan(row.amount), exportValue: (row) => Number(row.amount) || 0 }
 ];
 
-export default function ReceiptSummaryPage({ kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
+export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const [search, setSearch] = useState('');
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -73,6 +73,51 @@ export default function ReceiptSummaryPage({ kcfxData = null, kcfxRecords = {}, 
     downloadKcfxRowsAsXlsx('关账库存分析', filteredRows, RECEIPT_TABLE_COLUMNS, '关账库存分析');
   }, [filteredRows]);
 
+  const submitReceiptFeedback = useCallback(async (row) => {
+    const feedback = window.prompt('请输入这条关账库存数据的反馈内容');
+    if (!feedback || !feedback.trim()) return;
+    const rowKey = [row.materialCode, row.warehouse, row.department, row.productLine, row.productSeries].filter(Boolean).join('|');
+    const rowSummary = [row.materialCode, row.materialName, row.warehouse].filter(Boolean).join(' / ');
+    const response = await fetch(`${API}/api/kcfx-feedback/receipt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user: user?.name,
+        feedback,
+        rowKey,
+        rowSummary,
+        rowData: {
+          department: row.department,
+          productLine: row.productLine,
+          productSeries: row.productSeries,
+          materialCode: row.materialCode,
+          materialName: row.materialName,
+          warehouse: row.warehouse,
+          qty: Number(row.qty) || 0,
+          amount: Number(row.amount) || 0
+        }
+      })
+    });
+    if (!response.ok) {
+      window.alert('反馈提交失败，请稍后重试');
+      return;
+    }
+    window.alert('反馈已提交');
+  }, [user?.name]);
+
+  const receiptTableColumns = useMemo(() => [
+    ...RECEIPT_TABLE_COLUMNS,
+    {
+      key: 'feedbackAction',
+      label: '操作',
+      render: (row) => (
+        <button type="button" className="ghost compact-button" onClick={() => submitReceiptFeedback(row)}>
+          提交
+        </button>
+      )
+    }
+  ], [submitReceiptFeedback]);
+
   return (
     <KcfxPageShell title="关账库存分析" status={status} loading={summaryLoading} onRefresh={refresh}>
       <FilterToolbar
@@ -106,7 +151,7 @@ export default function ReceiptSummaryPage({ kcfxData = null, kcfxRecords = {}, 
             导出
           </button>
         </div>
-        <SimpleTable rows={filteredRows} maxRows={120} columns={RECEIPT_TABLE_COLUMNS} />
+        <SimpleTable rows={filteredRows} maxRows={120} columns={receiptTableColumns} />
       </section>
 
       <SourcePanel sources={[

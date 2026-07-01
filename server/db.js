@@ -127,6 +127,20 @@ const ARRAY_TABLES = {
       target: '',
       content: ''
     }
+  },
+  kcfxFeedbacks: {
+    table: 'kcfx_feedbacks',
+    columns: ['id', 'type', 'createdAt', 'userName', 'feedback', 'rowKey', 'rowSummary', 'rowData'],
+    defaults: {
+      type: '',
+      createdAt: () => new Date().toISOString(),
+      userName: '',
+      feedback: '',
+      rowKey: '',
+      rowSummary: '',
+      rowData: {}
+    },
+    jsonColumns: ['rowData']
   }
 };
 
@@ -218,6 +232,16 @@ const CREATE_TABLE_SQL = [
   `CREATE TABLE IF NOT EXISTS kcfx_meta (
     key TEXT PRIMARY KEY,
     value TEXT DEFAULT ''
+  )`,
+  `CREATE TABLE IF NOT EXISTS kcfx_feedbacks (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL DEFAULT '',
+    createdAt TEXT NOT NULL,
+    userName TEXT DEFAULT '',
+    feedback TEXT DEFAULT '',
+    rowKey TEXT DEFAULT '',
+    rowSummary TEXT DEFAULT '',
+    rowData TEXT NOT NULL DEFAULT '{}'
   )`
 ];
 

@@ -57,6 +57,7 @@ import ComparisonPage from './components/ComparisonPage.jsx';
 import FactLibraryPage from './components/FactLibraryPage.jsx';
 import SalesLibraryPage from './components/SalesLibraryPage.jsx';
 import FileLibraryPage from './components/FileLibraryPage.jsx';
+import KcfxFeedbackPage from './components/KcfxFeedbackPage.jsx';
 import { prefetchKcfxRecords } from './components/kcfxRecordLoader.js';
 import { getCache, setCache } from './indexedDbCache.js';
 import './styles.css';
@@ -1849,6 +1850,7 @@ function App() {
         {mountedReactKcfxTabs.has('salesInventoryReceiptSummary') && canAccessTab('salesInventoryReceiptSummary') && (
           <div className={activeTab === 'salesInventoryReceiptSummary' ? '' : 'kept-page-hidden'}>
             <ReceiptSummaryPage
+              user={user}
               kcfxData={kcfxData}
               kcfxRecords={kcfxCoreRecords}
               loading={false}
@@ -1875,6 +1877,7 @@ function App() {
         {mountedReactKcfxTabs.has('salesInventorySalesAnalysis') && canAccessTab('salesInventorySalesAnalysis') && (
           <div className={activeTab === 'salesInventorySalesAnalysis' ? '' : 'kept-page-hidden'}>
             <SalesAnalysisPage
+              user={user}
               kcfxData={kcfxData}
               kcfxRecords={kcfxCoreRecords}
               loading={false}
@@ -1883,6 +1886,14 @@ function App() {
               onRefresh={loadKcfxMetadata}
             />
           </div>
+        )}
+
+        {activeTab === 'salesInventoryReceiptFeedback' && canAccessTab('salesInventoryReceiptFeedback') && (
+          <KcfxFeedbackPage type="receipt" user={user} />
+        )}
+
+        {activeTab === 'salesInventorySalesFeedback' && canAccessTab('salesInventorySalesFeedback') && (
+          <KcfxFeedbackPage type="sales" user={user} />
         )}
 
         {mountedReactKcfxTabs.has('salesInventoryComparison') && canAccessTab('salesInventoryComparison') && (

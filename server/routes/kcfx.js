@@ -5,6 +5,39 @@ const crypto = { randomUUID };
 const SALES_ROW_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
 let salesRowsPayloadCache = { key: '', payload: null };
 
+const KCFX_FEEDBACK_TYPES = {
+  receipt: {
+    submitPermission: 'salesInventory.receiptSummary',
+    viewPermission: 'salesInventory.receiptFeedback',
+    label: '关账库存反馈'
+  },
+  sales: {
+    submitPermission: 'salesInventory.salesAnalysis',
+    viewPermission: 'salesInventory.salesFeedback',
+    label: '月度销售数据反馈'
+  }
+};
+
+function feedbackTypeConfig(type) {
+  const key = String(type || '').trim();
+  return KCFX_FEEDBACK_TYPES[key] ? { key, ...KCFX_FEEDBACK_TYPES[key] } : null;
+}
+
+function normalizeFeedbackRow(type, body = {}, requestUser) {
+  const createdAt = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
+  const rowData = body.rowData && typeof body.rowData === 'object' ? body.rowData : {};
+  return {
+    id: body.id || crypto.randomUUID(),
+    type,
+    createdAt,
+    userName: requestUser?.name || String(body.userName || ''),
+    feedback: String(body.feedback || '').trim(),
+    rowKey: String(body.rowKey || ''),
+    rowSummary: String(body.rowSummary || ''),
+    rowData
+  };
+}
+
 export default function registerKcfxRoutes(app, db) {
   const {
     initDb,
@@ -79,6 +112,32 @@ export default function registerKcfxRoutes(app, db) {
     scheduleKcfxReceiptSummaryRefresh,
     scheduleKcfxTrendSummaryRefresh
   } = app.locals.gongying;
+
+app.get('/api/kcfx-feedback/:type', async (req, res) => {
+  const config = feedbackTypeConfig(req.params.type);
+  if (!config) return res.status(400).json({ error: 'invalid feedback type' });
+  const db = await initDb(dataDir);
+  const requestUser = requirePermission(db, req, res, config.viewPermission);
+  if (!requestUser) return;
+  const rows = db.kcfxFeedbacks
+    .filter((item) => item.type === config.key)
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  res.json({ ok: true, type: config.key, rows });
+});
+
+app.post('/api/kcfx-feedback/:type', async (req, res) => {
+  const config = feedbackTypeConfig(req.params.type);
+  if (!config) return res.status(400).json({ error: 'invalid feedback type' });
+  const db = await initDb(dataDir);
+  const requestUser = requirePermission(db, req, res, config.submitPermission);
+  if (!requestUser) return;
+  const row = normalizeFeedbackRow(config.key, req.body, requestUser);
+  if (!row.feedback) return res.status(400).json({ error: 'missing feedback' });
+  db.kcfxFeedbacks.push(row);
+  pushLog(db, `${config.label}提交`, requestUser.name, `${requestUser.name} 提交${config.label}：${row.rowSummary || row.rowKey || row.id}`);
+  await db.save();
+  res.json({ ok: true, row });
+});
 
 async function buildSalesRowsPayload(db, { force = false } = {}) {
   const records = {};

@@ -140,8 +140,10 @@ const USER_STATUS_APPROVED = 'approved';
 const USER_STATUS_PENDING = 'pending';
 const SALES_INVENTORY_PERMISSIONS = [
   'salesInventory.receiptSummary',
+  'salesInventory.receiptFeedback',
   'salesInventory.inventoryTrend',
   'salesInventory.salesAnalysis',
+  'salesInventory.salesFeedback',
   'salesInventory.salesTrend',
   'salesInventory.comparison',
   'salesInventory.errors'
@@ -639,6 +641,10 @@ function canSeeAllRole(role) {
 }
 
 const LEGACY_PERMISSION_ALIASES = {
+  'salesInventory.receiptSummary': ['salesInventory'],
+  'salesInventory.receiptFeedback': ['salesInventory'],
+  'salesInventory.salesAnalysis': ['salesInventory'],
+  'salesInventory.salesFeedback': ['salesInventory'],
   'systemFileLibrary.invoiceInventory': ['supplierPayment.invoiceInventory', 'invoiceInventory'],
   'maintenanceLibrary.supplierManagement': ['supplierPayment.supplierManagement', 'supplierManagement'],
   'systemManagement.reminders': ['supplierPayment.reminders']
