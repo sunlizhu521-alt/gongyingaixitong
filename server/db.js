@@ -1,7 +1,11 @@
 import initSqlJs from 'sql.js';
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+
+const SQLITE_BACKUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const SQLITE_BACKUP_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const sqliteBackupTimers = new Map();
 
 const ARRAY_TABLES = {
   users: {
@@ -222,6 +226,8 @@ export async function initDb(dataDir) {
   const sqlitePath = path.join(resolvedDataDir, 'supply.db');
   const jsonPath = path.join(resolvedDataDir, 'db.json');
   await mkdir(resolvedDataDir, { recursive: true });
+  await backupSqliteOnStartup(sqlitePath);
+  scheduleSqliteBackups(sqlitePath);
 
   const SQL = await initSqlJs();
   const sqliteExists = await fileExists(sqlitePath);
@@ -645,6 +651,50 @@ function isArrayIndex(prop) {
 async function saveDatabase(database, sqlitePath) {
   await mkdir(path.dirname(sqlitePath), { recursive: true });
   await writeFile(sqlitePath, Buffer.from(database.export()));
+}
+
+async function backupSqliteOnStartup(sqlitePath) {
+  try {
+    if (!await fileExists(sqlitePath)) return;
+    await copyFile(sqlitePath, path.join(path.dirname(sqlitePath), 'supply.backup.db'));
+  } catch {
+    // Backup failures must not block app startup.
+  }
+}
+
+function scheduleSqliteBackups(sqlitePath) {
+  if (sqliteBackupTimers.has(sqlitePath)) return;
+  const timer = setInterval(() => {
+    backupSqliteSnapshot(sqlitePath).catch(() => {});
+  }, SQLITE_BACKUP_INTERVAL_MS);
+  if (typeof timer.unref === 'function') timer.unref();
+  sqliteBackupTimers.set(sqlitePath, timer);
+}
+
+async function backupSqliteSnapshot(sqlitePath) {
+  try {
+    if (!await fileExists(sqlitePath)) return;
+    const backupDir = path.join(path.dirname(sqlitePath), 'backups');
+    await mkdir(backupDir, { recursive: true });
+
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const hourStr = String(now.getHours()).padStart(2, '0');
+    await copyFile(sqlitePath, path.join(backupDir, `supply-${dateStr}-${hourStr}.db`));
+
+    const expiresBefore = Date.now() - SQLITE_BACKUP_RETENTION_MS;
+    const files = await readdir(backupDir);
+    await Promise.all(files.map(async (file) => {
+      if (!file.endsWith('.db') && !file.endsWith('.sqlite')) return;
+      const filePath = path.join(backupDir, file);
+      const fileStat = await stat(filePath);
+      if (fileStat.mtimeMs < expiresBefore) {
+        await unlink(filePath);
+      }
+    }));
+  } catch {
+    // Periodic backups are best-effort and should never crash the service.
+  }
 }
 
 async function fileExists(filePath) {
