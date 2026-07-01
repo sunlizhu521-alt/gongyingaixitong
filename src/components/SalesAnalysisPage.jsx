@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { BarPanel, KcfxPageShell, MetricCards, PanelGrid, SimpleTable, SourcePanel } from './KcfxCommon.jsx';
 import { FilterToolbar, useDashboardFilters } from './KcfxFilters.jsx';
+import { downloadKcfxRowsAsXlsx } from './kcfxExport.js';
 import { formatNumber, getCachedSalesRows, groupSum, recordSourceText, sum, uniqueCount } from './kcfxUtils.js';
 import { useKcfxRecordMap, useKcfxSalesRows } from './kcfxRecordLoader.js';
 
@@ -14,6 +15,15 @@ const SALES_FILTERS = [
   { id: 'model', field: 'model', allLabel: '型号', limit: 300, sortValueField: 'qty' }
 ];
 const SALES_SEARCH_FIELDS = ['customer', 'storeShortName', 'model', 'materialCode', 'materialName', 'salesOrg', 'productLine', 'productSeries'];
+const SALES_TABLE_COLUMNS = [
+  { key: 'salesMonth', label: '销售月份' },
+  { key: 'salesOrg', label: '销售部门' },
+  { key: 'storeShortName', label: '店铺简称' },
+  { key: 'productLine', label: '销售产品线' },
+  { key: 'productSeries', label: '销售系列' },
+  { key: 'model', label: '型号' },
+  { key: 'qty', label: '销售数量', render: (row) => formatNumber(row.qty, 2), exportValue: (row) => Number(row.qty) || 0 }
+];
 
 export default function SalesAnalysisPage({ kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const [search, setSearch] = useState('');
@@ -56,6 +66,10 @@ export default function SalesAnalysisPage({ kcfxData = null, kcfxRecords = {}, e
     await Promise.all([reload({ force: true }), onRefresh?.()]);
   };
 
+  const downloadSalesRows = useCallback(() => {
+    downloadKcfxRowsAsXlsx('月度销售数据', filteredRows, SALES_TABLE_COLUMNS, '月度销售数据');
+  }, [filteredRows]);
+
   return (
     <KcfxPageShell title="月度销售数据" status={status} loading={recordsLoading} onRefresh={refresh}>
       <FilterToolbar
@@ -81,20 +95,13 @@ export default function SalesAnalysisPage({ kcfxData = null, kcfxRecords = {}, e
         <BarPanel title="型号" rows={groupSum(filteredRows, 'model', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
       </PanelGrid>
       <section className="kcfx-panel">
-        <h3>销售数据明细</h3>
-        <SimpleTable
-          rows={filteredRows}
-          maxRows={150}
-          columns={[
-            { key: 'salesMonth', label: '销售月份' },
-            { key: 'salesOrg', label: '销售部门' },
-            { key: 'storeShortName', label: '店铺简称' },
-            { key: 'productLine', label: '销售产品线' },
-            { key: 'productSeries', label: '销售系列' },
-            { key: 'model', label: '型号' },
-            { key: 'qty', label: '销售数量', render: (row) => formatNumber(row.qty, 2) }
-          ]}
-        />
+        <div className="table-title-row">
+          <h3>销售数据明细</h3>
+          <button type="button" className="ghost compact-button" onClick={downloadSalesRows} disabled={recordsLoading || !filteredRows.length}>
+            导出
+          </button>
+        </div>
+        <SimpleTable rows={filteredRows} maxRows={150} columns={SALES_TABLE_COLUMNS} />
       </section>
       <SourcePanel sources={[
         { label: '销售数据文件', value: recordSourceText(records['sales-data']) },

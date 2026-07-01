@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API } from '../constants.js';
 import { BarPanel, KcfxPageShell, MetricCards, PanelGrid, SimpleTable, SourcePanel } from './KcfxCommon.jsx';
 import { FilterToolbar, useDashboardFilters } from './KcfxFilters.jsx';
+import { downloadKcfxRowsAsXlsx } from './kcfxExport.js';
 import { formatNumber, groupSum, moneyWan, recordSourceText, sum, uniqueCount } from './kcfxUtils.js';
 
 const AGE_BUCKET_ORDER = ['0-30天', '31-60天', '61-90天', '91-120天', '121-150天', '150天以上'];
@@ -16,6 +17,16 @@ const RECEIPT_FILTERS = [
   { id: 'receiptWarehouseLocation', field: 'warehouseLocation', allLabel: '全部仓库位置', sortValueField: 'amount' }
 ];
 const RECEIPT_SEARCH_FIELDS = ['materialCode', 'materialName', 'warehouse', 'organization', 'department', 'warehouseType', 'saleStatus', 'productCategory', 'productLine', 'productSeries', 'warehouseLocation'];
+const RECEIPT_TABLE_COLUMNS = [
+  { key: 'department', label: '事业部' },
+  { key: 'productLine', label: '销售产品线' },
+  { key: 'productSeries', label: '销售系列' },
+  { key: 'materialCode', label: '物料编码' },
+  { key: 'materialName', label: '物料名称' },
+  { key: 'warehouse', label: '仓库' },
+  { key: 'qty', label: '关账结存库存', render: (row) => formatNumber(row.qty, 2), exportValue: (row) => Number(row.qty) || 0 },
+  { key: 'amount', label: '库存金额合计', render: (row) => moneyWan(row.amount), exportValue: (row) => Number(row.amount) || 0 }
+];
 
 export default function ReceiptSummaryPage({ kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const [search, setSearch] = useState('');
@@ -58,6 +69,10 @@ export default function ReceiptSummaryPage({ kcfxData = null, kcfxRecords = {}, 
     await Promise.all([loadSummary(), onRefresh?.()]);
   };
 
+  const downloadReceiptRows = useCallback(() => {
+    downloadKcfxRowsAsXlsx('关账库存分析', filteredRows, RECEIPT_TABLE_COLUMNS, '关账库存分析');
+  }, [filteredRows]);
+
   return (
     <KcfxPageShell title="关账库存分析" status={status} loading={summaryLoading} onRefresh={refresh}>
       <FilterToolbar
@@ -85,21 +100,13 @@ export default function ReceiptSummaryPage({ kcfxData = null, kcfxRecords = {}, 
       </PanelGrid>
 
       <section className="kcfx-panel">
-        <h3>库存分析月份表</h3>
-        <SimpleTable
-          rows={filteredRows}
-          maxRows={120}
-          columns={[
-            { key: 'department', label: '事业部' },
-            { key: 'productLine', label: '销售产品线' },
-            { key: 'productSeries', label: '销售系列' },
-            { key: 'materialCode', label: '物料编码' },
-            { key: 'materialName', label: '物料名称' },
-            { key: 'warehouse', label: '仓库' },
-            { key: 'qty', label: '关账结存库存', render: (row) => formatNumber(row.qty, 2) },
-            { key: 'amount', label: '库存金额合计', render: (row) => moneyWan(row.amount) }
-          ]}
-        />
+        <div className="table-title-row">
+          <h3>库存分析月份表</h3>
+          <button type="button" className="ghost compact-button" onClick={downloadReceiptRows} disabled={summaryLoading || !filteredRows.length}>
+            导出
+          </button>
+        </div>
+        <SimpleTable rows={filteredRows} maxRows={120} columns={RECEIPT_TABLE_COLUMNS} />
       </section>
 
       <SourcePanel sources={[
