@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import * as XLSX from 'xlsx';
 import { useKcfxRecordMap } from './kcfxRecordLoader.js';
 
 const EMPTY_TABLES = {
@@ -109,23 +108,25 @@ export default function ErrorsPage({
     await Promise.all([reload(), onRefresh?.()]);
   };
 
-  function downloadSingle(source, tableName) {
+  async function downloadSingle(source, tableName) {
     const result = checks[source];
     const config = ERROR_DOWNLOAD_CONFIG[tableName];
     if (!result || !config || !config.sources.includes(source)) {
       setDownloadMessage('未找到对应的报错明细。');
       return;
     }
-    downloadRowsAsWorkbook(`${errorSourceLabel(source)}-${config.name}`, downloadTimestamp(), result[tableName] || [], config.columns);
+    const XLSX = await import('xlsx');
+    downloadRowsAsWorkbook(XLSX, `${errorSourceLabel(source)}-${config.name}`, downloadTimestamp(), result[tableName] || [], config.columns);
     setDownloadMessage('下载已生成。');
   }
 
-  function downloadAll() {
+  async function downloadAll() {
+    const XLSX = await import('xlsx');
     const stamp = downloadTimestamp();
     for (const source of ['closed', 'detail', 'sales']) {
       for (const [tableName, config] of Object.entries(ERROR_DOWNLOAD_CONFIG)) {
         if (!config.sources.includes(source)) continue;
-        downloadRowsAsWorkbook(`${errorSourceLabel(source)}-${config.name}`, stamp, checks[source][tableName] || [], config.columns);
+        downloadRowsAsWorkbook(XLSX, `${errorSourceLabel(source)}-${config.name}`, stamp, checks[source][tableName] || [], config.columns);
       }
     }
     setDownloadMessage('全部报错明细已生成。');
@@ -979,7 +980,7 @@ function downloadTimestamp() {
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
-function downloadRowsAsWorkbook(prefix, stamp, rows, columns) {
+function downloadRowsAsWorkbook(XLSX, prefix, stamp, rows, columns) {
   const data = rows.map((row) => {
     const item = {};
     for (const [key, label] of columns) {

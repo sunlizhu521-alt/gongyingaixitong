@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import * as XLSX from 'xlsx';
 import {
   API,
   EMBEDDED_KCFX_PAGES,
@@ -1345,8 +1344,9 @@ function App() {
     await loadData();
   }
 
-  function downloadImportResult(type, result) {
+  async function downloadImportResult(type, result) {
     if (!result) return;
+    const XLSX = await import('xlsx');
     const workbook = XLSX.utils.book_new();
     const isSupplier = type === 'supplier';
     const successRows = isSupplier
@@ -1379,7 +1379,7 @@ function App() {
     XLSX.writeFile(workbook, fileName);
   }
 
-  function downloadAppliedPreview() {
+  async function downloadAppliedPreview() {
     const rows = filteredAppliedDimensionRows.map((row) => ({
       供应商: row.supplier,
       供应商简称: row.shortName,
@@ -1388,6 +1388,7 @@ function App() {
       账期: row.termDays ? `${row.termDays} 天` : '',
       备注信息: row.remark
     }));
+    const XLSX = await import('xlsx');
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), '应用的表预览');
     XLSX.writeFile(workbook, '供应商管理维度表_应用的表预览.xlsx');
