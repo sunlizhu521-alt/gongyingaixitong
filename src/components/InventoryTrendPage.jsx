@@ -43,7 +43,9 @@ export default function InventoryTrendPage({ kcfxData = null, kcfxRecords = {}, 
   const pageError = summaryError || error;
   const monthRows = useMemo(() => expandTrendSummaryRows(summary), [summary]);
   const items = useMemo(() => monthRows.flatMap((row) => (row.items || []).map((item) => ({ ...item, month: row.label }))), [monthRows]);
-  const filterState = useDashboardFilters(items, INVENTORY_TREND_FILTERS);
+  const filterState = useDashboardFilters(items, INVENTORY_TREND_FILTERS, {
+    storageKey: 'gongyingai:filters:inventory-trend:v1'
+  });
   const filteredItems = filterState.filteredRows;
   const filteredMonthRows = useMemo(() => (
     monthRows.map((row) => {

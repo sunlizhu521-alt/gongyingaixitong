@@ -60,7 +60,11 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
   const records = summary?.records || kcfxRecords || {};
   const pageError = summaryError || error;
   const rows = useMemo(() => expandReceiptSummaryRows(summary), [summary]);
-  const filterState = useDashboardFilters(rows, RECEIPT_FILTERS, { searchFields: RECEIPT_SEARCH_FIELDS, searchValue: search });
+  const filterState = useDashboardFilters(rows, RECEIPT_FILTERS, {
+    searchFields: RECEIPT_SEARCH_FIELDS,
+    searchValue: search,
+    storageKey: 'gongyingai:filters:receipt-summary:v1'
+  });
   const filteredRows = filterState.filteredRows;
   const totalAmount = useMemo(() => sum(filteredRows, 'amount'), [filteredRows]);
   const totalQty = useMemo(() => sum(filteredRows, 'qty'), [filteredRows]);

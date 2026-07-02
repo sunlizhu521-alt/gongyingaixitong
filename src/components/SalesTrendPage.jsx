@@ -16,11 +16,12 @@ const TREND_FILTERS = [
   { id: 'model', field: 'model', allLabel: '型号', limit: 300 }
 ];
 const EMPTY_SELECTIONS = Object.fromEntries(TREND_FILTERS.map((filter) => [filter.id, []]));
+const SALES_TREND_FILTER_STORAGE_KEY = 'gongyingai:filters:sales-trend:v1';
 const SALES_TREND_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
 
 export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const [openFilter, setOpenFilter] = useState('');
-  const [selections, setSelections] = useState(EMPTY_SELECTIONS);
+  const [selections, setSelections] = useState(() => readTrendSelections());
   const salesRowsResult = useKcfxSalesRows(kcfxData);
   const shouldUseFallbackRecords = salesRowsResult.loaded && !salesRowsResult.loading && salesRowsResult.rows.length === 0;
   const fallbackRecordsResult = useKcfxRecordMap(kcfxData, shouldUseFallbackRecords ? SALES_TREND_RECORD_IDS : []);
@@ -95,11 +96,16 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
   };
 
   function setFilterValue(id, value) {
-    setSelections((current) => ({ ...current, [id]: value }));
+    setSelections((current) => {
+      const next = { ...current, [id]: value };
+      writeTrendSelections(next);
+      return next;
+    });
   }
 
   function clearFilters() {
     setSelections(EMPTY_SELECTIONS);
+    writeTrendSelections(EMPTY_SELECTIONS);
     setOpenFilter('');
   }
 
@@ -243,4 +249,27 @@ function rowMatchesSelections(row, selections, excludedFilterId = '') {
 function formatMonthLabel(value) {
   const [year, month] = String(value || '').split('-');
   return year && month ? `${year}年${Number(month)}月` : value;
+}
+
+function readTrendSelections() {
+  if (typeof window === 'undefined') return EMPTY_SELECTIONS;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(SALES_TREND_FILTER_STORAGE_KEY) || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return EMPTY_SELECTIONS;
+    return Object.fromEntries(TREND_FILTERS.map((filter) => [
+      filter.id,
+      Array.isArray(parsed[filter.id]) ? parsed[filter.id].map(String).filter(Boolean) : []
+    ]));
+  } catch {
+    return EMPTY_SELECTIONS;
+  }
+}
+
+function writeTrendSelections(selections) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(SALES_TREND_FILTER_STORAGE_KEY, JSON.stringify(selections || EMPTY_SELECTIONS));
+  } catch {
+    // Filter persistence is best-effort.
+  }
 }

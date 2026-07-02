@@ -3,9 +3,9 @@ import MultiFilter from './MultiFilter.jsx';
 import MonthCalendarFilter from './MonthCalendarFilter.jsx';
 import { normalizeText } from './kcfxUtils.js';
 
-export function useDashboardFilters(rows, filters, { searchFields = [], searchValue = '', defaultSelections = {} } = {}) {
+export function useDashboardFilters(rows, filters, { searchFields = [], searchValue = '', defaultSelections = {}, storageKey = '' } = {}) {
   const [openFilter, setOpenFilter] = useState('');
-  const [selections, setSelections] = useState(() => emptySelections(filters, defaultSelections));
+  const [selections, setSelections] = useState(() => readStoredSelections(storageKey, filters, defaultSelections));
   const defaultSelectionKey = useMemo(() => JSON.stringify(defaultSelections || {}), [defaultSelections]);
 
   useEffect(() => {
@@ -49,11 +49,17 @@ export function useDashboardFilters(rows, filters, { searchFields = [], searchVa
   }, [filters, normalizedSelections, rows, searchFields, searchValue]);
 
   function setFilterValue(id, value) {
-    setSelections((current) => ({ ...current, [id]: value }));
+    setSelections((current) => {
+      const next = { ...current, [id]: value };
+      writeStoredSelections(storageKey, next);
+      return next;
+    });
   }
 
   function resetFilters() {
-    setSelections(emptySelections(filters, defaultSelections));
+    const next = emptySelections(filters, defaultSelections);
+    setSelections(next);
+    writeStoredSelections(storageKey, next);
     setOpenFilter('');
   }
 
@@ -180,4 +186,33 @@ function sortByPreferredOrder(values, preferredOrder) {
 
 function emptySelections(filters, defaultSelections = {}) {
   return Object.fromEntries(filters.map((filter) => [filter.id, [...(defaultSelections[filter.id] || [])]]));
+}
+
+function readStoredSelections(storageKey, filters, defaultSelections = {}) {
+  if (!storageKey || typeof window === 'undefined') return emptySelections(filters, defaultSelections);
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(storageKey) || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return emptySelections(filters, defaultSelections);
+    return Object.fromEntries(filters.map((filter) => {
+      const values = Array.isArray(parsed[filter.id]) ? parsed[filter.id].map(String).filter(Boolean) : [];
+      return [filter.id, values.length ? values : [...(defaultSelections[filter.id] || [])]];
+    }));
+  } catch {
+    return emptySelections(filters, defaultSelections);
+  }
+}
+
+function writeStoredSelections(storageKey, selections) {
+  if (!storageKey || typeof window === 'undefined') return;
+  try {
+    const cleaned = Object.fromEntries(
+      Object.entries(selections || {}).map(([key, values]) => [
+        key,
+        Array.isArray(values) ? values.map(String).filter(Boolean) : []
+      ])
+    );
+    window.localStorage.setItem(storageKey, JSON.stringify(cleaned));
+  } catch {
+    // Filter persistence is best-effort and must not block dashboard interaction.
+  }
 }

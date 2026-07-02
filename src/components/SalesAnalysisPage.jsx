@@ -59,7 +59,12 @@ export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRe
   const defaultSelections = useMemo(() => (
     latestSalesMonth ? { salesMonth: [latestSalesMonth] } : {}
   ), [latestSalesMonth]);
-  const filterState = useDashboardFilters(rows, SALES_FILTERS, { searchFields: SALES_SEARCH_FIELDS, searchValue: search, defaultSelections });
+  const filterState = useDashboardFilters(rows, SALES_FILTERS, {
+    searchFields: SALES_SEARCH_FIELDS,
+    searchValue: search,
+    defaultSelections,
+    storageKey: 'gongyingai:filters:sales-analysis:v1'
+  });
   const filteredRows = filterState.filteredRows;
   const totalQty = useMemo(() => sum(filteredRows, 'qty'), [filteredRows]);
   const status = recordsLoading

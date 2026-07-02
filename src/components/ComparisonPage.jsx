@@ -18,7 +18,9 @@ export default function ComparisonPage({ kcfxData = null, kcfxRecords = {}, erro
   const records = useMemo(() => ({ ...kcfxRecords, ...loadedRecords }), [kcfxRecords, loadedRecords]);
   const pageError = recordsError || error;
   const comparison = useMemo(() => buildComparison(records), [records]);
-  const filterState = useDashboardFilters(comparison.rows, COMPARISON_FILTERS);
+  const filterState = useDashboardFilters(comparison.rows, COMPARISON_FILTERS, {
+    storageKey: 'gongyingai:filters:comparison:v1'
+  });
   const filteredRows = filterState.filteredRows;
   const status = recordsLoading
     ? '数据加载中...'
