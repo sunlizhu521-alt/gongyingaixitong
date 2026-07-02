@@ -91,9 +91,17 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
     const rowSummary = [row.materialCode, row.materialName, row.warehouse].filter(Boolean).join(' / ');
     const response = await fetch(`${API}/api/kcfx-feedback/receipt`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(user?.id ? { 'x-user-id': user.id } : {}),
+        ...(user?.sessionToken ? { 'x-session-token': user.sessionToken } : {}),
+        ...(user?.deviceId ? { 'x-device-id': user.deviceId } : {})
+      },
       body: JSON.stringify({
         user: user?.name,
+        userId: user?.id,
+        sessionToken: user?.sessionToken,
+        deviceId: user?.deviceId,
         feedback,
         rowKey,
         rowSummary,
@@ -110,7 +118,12 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
       })
     });
     if (!response.ok) {
-      window.alert('反馈提交失败，请稍后重试');
+      let message = `HTTP ${response.status}`;
+      try {
+        const payload = await response.json();
+        message = payload?.error || payload?.message || message;
+      } catch {}
+      window.alert(`反馈提交失败：${message}`);
       return;
     }
     setFeedbackDrafts((current) => ({ ...current, [rowKey]: '' }));

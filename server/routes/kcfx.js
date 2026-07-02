@@ -38,6 +38,20 @@ function normalizeFeedbackRow(type, body = {}, requestUser) {
   };
 }
 
+function resolveFeedbackSubmitUser(db, req) {
+  const source = {
+    ...req.query,
+    ...req.body,
+    userId: req.body?.userId || req.get('x-user-id'),
+    sessionToken: req.body?.sessionToken || req.get('x-session-token'),
+    deviceId: req.body?.deviceId || req.get('x-device-id')
+  };
+  const sessionResult = findValidSession(db, source, req);
+  if (sessionResult?.user) return sessionResult.user;
+  const requestUser = resolveRequestUser(db, source);
+  return isUserApproved(requestUser) ? requestUser : null;
+}
+
 export default function registerKcfxRoutes(app, db) {
   const {
     initDb,
@@ -129,8 +143,8 @@ app.post('/api/kcfx-feedback/:type', async (req, res) => {
   const config = feedbackTypeConfig(req.params.type);
   if (!config) return res.status(400).json({ error: 'invalid feedback type' });
   const db = await initDb(dataDir);
-  const requestUser = requirePermission(db, req, res, config.submitPermission);
-  if (!requestUser) return;
+  const requestUser = resolveFeedbackSubmitUser(db, req);
+  if (!requestUser) return res.status(403).json({ error: 'permission denied' });
   const row = normalizeFeedbackRow(config.key, req.body, requestUser);
   if (!row.feedback) return res.status(400).json({ error: 'missing feedback' });
   db.kcfxFeedbacks.push(row);
