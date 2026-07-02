@@ -8,26 +8,63 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to server
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+
+      - name: Package source
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='data' \
+            -czf app.tar.gz .
+
+      - name: Upload package
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no app.tar.gz \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/gongyingaixitong-app.tar.gz
+
+      - name: Deploy on server
+        run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
             set -e
-            cd /home/ubuntu/zhuge-ai-lab/gongyingaixitong
-            mkdir -p /home/ubuntu/backups/gongyingaixitong
+
+            APP_DIR=/home/ubuntu/zhuge-ai-lab/gongyingaixitong
+            RELEASE_DIR=/tmp/gongyingaixitong-release
+            BACKUP_DIR=/home/ubuntu/backups/gongyingaixitong
+
+            mkdir -p "$BACKUP_DIR"
+            rm -rf "$RELEASE_DIR"
+            mkdir -p "$RELEASE_DIR"
+
+            cd "$APP_DIR"
+
             if [ -d data ]; then
-              tar -czf /home/ubuntu/backups/gongyingaixitong/data-$(date +%Y%m%d-%H%M%S).tar.gz data
+              BACKUP_FILE="$BACKUP_DIR/data-$(date +%Y%m%d-%H%M%S).tar.gz"
+              tar -czf "$BACKUP_FILE" data
+              ls -lh "$BACKUP_FILE"
             fi
-            for attempt in 1 2 3; do
-              git fetch origin main && break
-              if [ "$attempt" = "3" ]; then
-                exit 1
-              fi
-              sleep 10
-            done
-            git reset --hard origin/main
+
+            tar -xzf /tmp/gongyingaixitong-app.tar.gz -C "$RELEASE_DIR"
+
+            find "$APP_DIR" -mindepth 1 -maxdepth 1 \
+              ! -name 'data' \
+              ! -name 'node_modules' \
+              ! -name 'dist' \
+              ! -name '.env' \
+              ! -name '.git' \
+              -exec rm -rf {} +
+
+            cp -a "$RELEASE_DIR"/. "$APP_DIR"/
+
+            cd "$APP_DIR"
             npm ci
             npm run build
             pm2 restart gongyingaixitong --update-env
