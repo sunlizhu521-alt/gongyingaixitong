@@ -126,7 +126,6 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
       window.alert(`反馈提交失败：${message}`);
       return;
     }
-    setFeedbackDrafts((current) => ({ ...current, [rowKey]: '' }));
     window.alert('反馈已提交');
   }, [feedbackDrafts, receiptFeedbackKey, user?.name]);
 

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { API } from '../constants.js';
+import { API, systemOwnerName } from '../constants.js';
 import { KcfxPageShell, SimpleTable } from './KcfxCommon.jsx';
+import { downloadKcfxRowsAsXlsx } from './kcfxExport.js';
 import { formatNumber, moneyWan } from './kcfxUtils.js';
 
 const FEEDBACK_CONFIG = {
@@ -73,8 +74,20 @@ export default function KcfxFeedbackPage({ type, user }) {
     return `共 ${formatNumber(rows.length)} 条反馈${loadedAt ? `；读取时间：${loadedAt}` : ''}`;
   }, [error, loadedAt, loading, rows.length]);
 
+  const canExport = user?.name === systemOwnerName;
+  const downloadFeedbackRows = useCallback(() => {
+    downloadKcfxRowsAsXlsx(config.title, rows, config.columns, config.title);
+  }, [config.columns, config.title, rows]);
+
   return (
     <KcfxPageShell title={config.title} status={status} loading={loading} onRefresh={loadFeedback}>
+      {canExport && (
+        <div className="kcfx-actions-row">
+          <button type="button" onClick={downloadFeedbackRows} disabled={!rows.length}>
+            导出反馈
+          </button>
+        </div>
+      )}
       <section className="kcfx-panel">
         <SimpleTable rows={rows} maxRows={500} columns={config.columns} />
       </section>

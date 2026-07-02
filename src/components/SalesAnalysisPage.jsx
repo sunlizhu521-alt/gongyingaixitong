@@ -125,7 +125,6 @@ export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRe
       window.alert(`反馈提交失败：${message}`);
       return;
     }
-    setFeedbackDrafts((current) => ({ ...current, [rowKey]: '' }));
     window.alert('反馈已提交');
   }, [feedbackDrafts, salesFeedbackKey, user?.name]);
 
