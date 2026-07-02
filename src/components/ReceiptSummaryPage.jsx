@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API } from '../constants.js';
 import { BarPanel, KcfxPageShell, MetricCards, PanelGrid, SimpleTable, SourcePanel } from './KcfxCommon.jsx';
 import { FilterToolbar, useDashboardFilters } from './KcfxFilters.jsx';
+import { readFeedbackDrafts, writeFeedbackDrafts } from './feedbackDraftStorage.js';
 import { downloadKcfxRowsAsXlsx } from './kcfxExport.js';
 import { formatNumber, groupSum, moneyWan, recordSourceText, sum, uniqueCount } from './kcfxUtils.js';
 
@@ -27,10 +28,11 @@ const RECEIPT_TABLE_COLUMNS = [
   { key: 'qty', label: '关账结存库存', render: (row) => formatNumber(row.qty, 2), exportValue: (row) => Number(row.qty) || 0 },
   { key: 'amount', label: '库存金额合计', render: (row) => moneyWan(row.amount), exportValue: (row) => Number(row.amount) || 0 }
 ];
+const RECEIPT_FEEDBACK_DRAFT_STORAGE_KEY = 'gongyingai:receipt-feedback-drafts:v1';
 
 export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const [search, setSearch] = useState('');
-  const [feedbackDrafts, setFeedbackDrafts] = useState({});
+  const [feedbackDrafts, setFeedbackDrafts] = useState(() => readFeedbackDrafts(RECEIPT_FEEDBACK_DRAFT_STORAGE_KEY));
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState('');
@@ -81,7 +83,13 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
 
   const updateReceiptFeedbackDraft = useCallback((row, value) => {
     const key = receiptFeedbackKey(row);
-    setFeedbackDrafts((current) => ({ ...current, [key]: value }));
+    setFeedbackDrafts((current) => {
+      const next = { ...current };
+      if (String(value || '').trim()) next[key] = value;
+      else delete next[key];
+      writeFeedbackDrafts(RECEIPT_FEEDBACK_DRAFT_STORAGE_KEY, next);
+      return next;
+    });
   }, [receiptFeedbackKey]);
 
   const submitReceiptFeedback = useCallback(async (row) => {
@@ -127,7 +135,7 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
       return;
     }
     window.alert('反馈已提交');
-  }, [feedbackDrafts, receiptFeedbackKey, user?.name]);
+  }, [feedbackDrafts, receiptFeedbackKey, user?.deviceId, user?.id, user?.name, user?.sessionToken]);
 
   const receiptTableColumns = useMemo(() => [
     ...RECEIPT_TABLE_COLUMNS,

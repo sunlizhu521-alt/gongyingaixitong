@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { API } from '../constants.js';
 import { BarPanel, KcfxPageShell, MetricCards, PanelGrid, SimpleTable, SourcePanel } from './KcfxCommon.jsx';
 import { FilterToolbar, useDashboardFilters } from './KcfxFilters.jsx';
+import { readFeedbackDrafts, writeFeedbackDrafts } from './feedbackDraftStorage.js';
 import { downloadKcfxRowsAsXlsx } from './kcfxExport.js';
 import { formatNumber, getCachedSalesRows, groupSum, recordSourceText, sum, uniqueCount } from './kcfxUtils.js';
 import { useKcfxRecordMap, useKcfxSalesRows } from './kcfxRecordLoader.js';
@@ -25,10 +26,11 @@ const SALES_TABLE_COLUMNS = [
   { key: 'model', label: '型号' },
   { key: 'qty', label: '销售数量', render: (row) => formatNumber(row.qty, 2), exportValue: (row) => Number(row.qty) || 0 }
 ];
+const SALES_FEEDBACK_DRAFT_STORAGE_KEY = 'gongyingai:sales-feedback-drafts:v1';
 
 export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const [search, setSearch] = useState('');
-  const [feedbackDrafts, setFeedbackDrafts] = useState({});
+  const [feedbackDrafts, setFeedbackDrafts] = useState(() => readFeedbackDrafts(SALES_FEEDBACK_DRAFT_STORAGE_KEY));
   const salesRowsResult = useKcfxSalesRows(kcfxData);
   const shouldUseFallbackRecords = salesRowsResult.loaded && !salesRowsResult.loading && salesRowsResult.rows.length === 0;
   const fallbackRecordsResult = useKcfxRecordMap(kcfxData, shouldUseFallbackRecords ? SALES_ANALYSIS_RECORD_IDS : []);
@@ -78,7 +80,13 @@ export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRe
 
   const updateSalesFeedbackDraft = useCallback((row, value) => {
     const key = salesFeedbackKey(row);
-    setFeedbackDrafts((current) => ({ ...current, [key]: value }));
+    setFeedbackDrafts((current) => {
+      const next = { ...current };
+      if (String(value || '').trim()) next[key] = value;
+      else delete next[key];
+      writeFeedbackDrafts(SALES_FEEDBACK_DRAFT_STORAGE_KEY, next);
+      return next;
+    });
   }, [salesFeedbackKey]);
 
   const submitSalesFeedback = useCallback(async (row) => {
@@ -126,7 +134,7 @@ export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRe
       return;
     }
     window.alert('反馈已提交');
-  }, [feedbackDrafts, salesFeedbackKey, user?.name]);
+  }, [feedbackDrafts, salesFeedbackKey, user?.deviceId, user?.id, user?.name, user?.sessionToken]);
 
   const salesTableColumns = useMemo(() => [
     ...SALES_TABLE_COLUMNS,
