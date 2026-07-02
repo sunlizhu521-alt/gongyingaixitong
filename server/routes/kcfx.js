@@ -23,8 +23,8 @@ function feedbackTypeConfig(type) {
   return KCFX_FEEDBACK_TYPES[key] ? { key, ...KCFX_FEEDBACK_TYPES[key] } : null;
 }
 
-function normalizeFeedbackRow(type, body = {}, requestUser) {
-  const createdAt = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
+function normalizeFeedbackRow(type, body = {}, requestUser, formatDate) {
+  const createdAt = formatDate(new Date(), 'yyyy-MM-dd HH:mm:ss');
   const rowData = body.rowData && typeof body.rowData === 'object' ? body.rowData : {};
   return {
     id: body.id || crypto.randomUUID(),
@@ -38,7 +38,8 @@ function normalizeFeedbackRow(type, body = {}, requestUser) {
   };
 }
 
-function resolveFeedbackSubmitUser(db, req) {
+function resolveFeedbackSubmitUser(db, req, helpers) {
+  const { findValidSession, resolveRequestUser, isUserApproved } = helpers;
   const source = {
     ...req.query,
     ...req.body,
@@ -143,9 +144,9 @@ app.post('/api/kcfx-feedback/:type', async (req, res) => {
   const config = feedbackTypeConfig(req.params.type);
   if (!config) return res.status(400).json({ error: 'invalid feedback type' });
   const db = await initDb(dataDir);
-  const requestUser = resolveFeedbackSubmitUser(db, req);
+  const requestUser = resolveFeedbackSubmitUser(db, req, { findValidSession, resolveRequestUser, isUserApproved });
   if (!requestUser) return res.status(403).json({ error: 'permission denied' });
-  const row = normalizeFeedbackRow(config.key, req.body, requestUser);
+  const row = normalizeFeedbackRow(config.key, req.body, requestUser, format);
   if (!row.feedback) return res.status(400).json({ error: 'missing feedback' });
   db.kcfxFeedbacks.push(row);
   pushLog(db, `${config.label}提交`, requestUser.name, `${requestUser.name} 提交${config.label}：${row.rowSummary || row.rowKey || row.id}`);
