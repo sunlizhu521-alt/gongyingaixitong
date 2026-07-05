@@ -77,6 +77,23 @@ export default function registerUserRoutes(app, db) {
     scheduleKcfxTrendSummaryRefresh
   } = app.locals.gongying;
 
+function requireSystemOwnerSession(db, req, res) {
+  const source = {
+    ...req.query,
+    ...req.body,
+    userId: req.get('x-user-id'),
+    sessionToken: req.get('x-session-token'),
+    deviceId: req.get('x-device-id')
+  };
+  const sessionResult = findValidSession(db, source, req);
+  const requestUser = sessionResult?.user || resolveRequestUser(db, source);
+  if (requestUser?.name !== SYSTEM_OWNER_NAME) {
+    res.status(403).json({ error: 'system owner only' });
+    return null;
+  }
+  return requestUser;
+}
+
 app.get('/api/users', async (req, res) => {
   const db = await initDb(dataDir);
   if (!requireSystemOwner(db, req, res)) return;
@@ -85,7 +102,7 @@ app.get('/api/users', async (req, res) => {
 
 app.get('/api/user-login-logs', async (req, res) => {
   const db = await initDb(dataDir);
-  if (!requireSystemOwner(db, req, res)) return;
+  if (!requireSystemOwnerSession(db, req, res)) return;
   const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 2000);
   const rows = [...(db.loginLogs || [])]
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
