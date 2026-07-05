@@ -28,6 +28,19 @@ const ARRAY_TABLES = {
       lastSeenAt: () => new Date().toISOString()
     }
   },
+  loginLogs: {
+    table: 'login_logs',
+    columns: ['id', 'userId', 'userName', 'role', 'deviceId', 'ip', 'userAgent', 'createdAt'],
+    defaults: {
+      userId: '',
+      userName: '',
+      role: '',
+      deviceId: '',
+      ip: '',
+      userAgent: '',
+      createdAt: () => new Date().toISOString()
+    }
+  },
   suppliers: {
     table: 'suppliers',
     columns: ['id', 'name', 'shortName', 'hasAnnualFrame', 'remark', 'termDays'],
@@ -166,6 +179,16 @@ const CREATE_TABLE_SQL = [
     userAgent TEXT DEFAULT '',
     createdAt TEXT NOT NULL,
     lastSeenAt TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS login_logs (
+    id TEXT PRIMARY KEY,
+    userId TEXT DEFAULT '',
+    userName TEXT NOT NULL DEFAULT '',
+    role TEXT DEFAULT '',
+    deviceId TEXT DEFAULT '',
+    ip TEXT DEFAULT '',
+    userAgent TEXT DEFAULT '',
+    createdAt TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS suppliers (
     id TEXT PRIMARY KEY,

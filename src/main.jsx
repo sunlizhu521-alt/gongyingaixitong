@@ -16,6 +16,7 @@ import {
   PRODUCT_SERIES_COLUMN,
   PURCHASE_DIVISION_ADDRESS_COLUMN,
   PURCHASE_DIVISION_SUPPLIER_COLUMN,
+  QUALITY_INSPECTION_PAGES,
   embeddedKcfxPageMap,
   legacyPermissionMap,
   permissionGroups,
@@ -43,6 +44,7 @@ import PermissionManagementPage from './components/PermissionManagementPage.jsx'
 import InspectionInitialDataPage from './components/InspectionInitialDataPage.jsx';
 import SupplierManagementPage from './components/SupplierManagementPage.jsx';
 import RemindersPage from './components/RemindersPage.jsx';
+import UserLoginLogsPage from './components/UserLoginLogsPage.jsx';
 import SystemFileLibraryPage from './components/SystemFileLibraryPage.jsx';
 import PreviewModal from './components/PreviewModal.jsx';
 import EmbeddedDashboard from './components/EmbeddedDashboard.jsx';
@@ -63,6 +65,12 @@ import { getCache, setCache } from './indexedDbCache.js';
 import './styles.css';
 
 const SALES_KCFX_TABS = new Set(['salesInventorySalesAnalysis', 'salesInventorySalesTrend']);
+const QUALITY_INSPECTION_REAL_TABS = new Set(['inspectionNotice', 'inspectionInitialData']);
+const qualityInspectionPlaceholderPages = Object.fromEntries(
+  QUALITY_INSPECTION_PAGES
+    .filter((page) => !QUALITY_INSPECTION_REAL_TABS.has(page.tab))
+    .map((page) => [page.tab, page])
+);
 
 function priorityKcfxRecordIdsForTab(tab) {
   if (SALES_KCFX_TABS.has(tab)) return [];
@@ -216,6 +224,7 @@ function App() {
   const canManagePermissions = user?.name === systemOwnerName;
   const canManageSystemFiles = user?.name === systemOwnerName;
   const canManageMaintenanceLibrary = user?.name === systemOwnerName;
+  const canAccessQualityInspection = canAccessGroup('qualityInspection');
   const canAccessSalesInventory = canAccessGroup('salesInventory');
   const canAccessMaintenanceLibrary = canAccessGroup('maintenanceLibrary');
   const canAccessSystemFileLibrary = canAccessGroup('systemFileLibrary');
@@ -608,7 +617,7 @@ function App() {
     if (authChecked && user && !canManagePermissions && activeTab === 'permissionManagement') {
       openFirstAllowedTab();
     }
-  }, [activeTab, authChecked, canAccessMaintenanceLibrary, canAccessSalesInventory, canAccessSystemFileLibrary, canManagePermissions, user]);
+  }, [activeTab, authChecked, canAccessMaintenanceLibrary, canAccessQualityInspection, canAccessSalesInventory, canAccessSystemFileLibrary, canManagePermissions, user]);
 
   useEffect(() => {
     if (!activeEmbeddedKcfxPage) {
@@ -1812,6 +1821,10 @@ function App() {
           />
         )}
 
+        {activeTab === 'userLoginLogs' && canAccessTab('userLoginLogs') && (
+          <UserLoginLogsPage authFetch={authFetch} />
+        )}
+
         {canManageSystemFiles && (
           <SystemFileLibraryPage
             activeTab={activeTab}
@@ -1845,6 +1858,13 @@ function App() {
             addInspectionNoticeRow={addInspectionNoticeRow}
             confirmInspectionNotice={confirmInspectionNotice}
           />
+        )}
+
+        {qualityInspectionPlaceholderPages[activeTab] && canAccessTab(activeTab) && (
+          <section className="placeholder-panel">
+            <h2>{qualityInspectionPlaceholderPages[activeTab].label}</h2>
+            <p>当前页面已建立入口，具体业务内容待配置。</p>
+          </section>
         )}
 
         {mountedReactKcfxTabs.has('salesInventoryReceiptSummary') && canAccessTab('salesInventoryReceiptSummary') && (

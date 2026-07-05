@@ -427,6 +427,28 @@ h3 {
   color: #64748b;
 }
 
+.section-subtitle {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.inline-error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.login-log-metrics {
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+}
+
+.login-log-table table {
+  min-width: 980px;
+}
+
 .filter-row {
   display: flex;
   align-items: flex-end;

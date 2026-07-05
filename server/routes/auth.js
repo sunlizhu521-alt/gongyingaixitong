@@ -80,6 +80,31 @@ export default function registerAuthRoutes(app, db) {
 
 const strictLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: '请求过于频繁，请15分钟后再试' } });
 
+function requestIp(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  const realIp = String(req.headers['x-real-ip'] || '').trim();
+  return (forwarded || realIp || req.ip || req.socket?.remoteAddress || '')
+    .replace(/^::ffff:/, '');
+}
+
+function pushLoginLog(db, user, session, req) {
+  db.loginLogs.push({
+    id: crypto.randomUUID(),
+    userId: user.id,
+    userName: user.name,
+    role: user.role,
+    deviceId: session.deviceId,
+    ip: requestIp(req),
+    userAgent: req.get('user-agent') || '',
+    createdAt: new Date().toISOString()
+  });
+  while (db.loginLogs.length > 2000) {
+    const oldest = [...db.loginLogs].sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')))[0];
+    if (!oldest) break;
+    db.loginLogs.remove((item) => item.id === oldest.id);
+  }
+}
+
 app.post('/api/login', strictLimiter, async (req, res) => {
   const db = await initDb(dataDir);
   const name = String(req.body.name || '').trim();
@@ -90,6 +115,7 @@ app.post('/api/login', strictLimiter, async (req, res) => {
   if (!user) return res.status(401).json({ error: 'invalid credentials' });
   if (!isUserApproved(user)) return res.status(403).json({ error: 'pending approval' });
   const session = createUserSession(db, user, deviceId, req);
+  pushLoginLog(db, user, session, req);
   await db.save();
   res.json(publicSessionUser(user, session));
 });

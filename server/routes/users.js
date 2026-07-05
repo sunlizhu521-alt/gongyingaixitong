@@ -83,6 +83,16 @@ app.get('/api/users', async (req, res) => {
   res.json(db.users.map(publicUser));
 });
 
+app.get('/api/user-login-logs', async (req, res) => {
+  const db = await initDb(dataDir);
+  if (!requireSystemOwner(db, req, res)) return;
+  const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 2000);
+  const rows = [...(db.loginLogs || [])]
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+    .slice(0, limit);
+  res.json(rows);
+});
+
 app.post('/api/users', async (req, res) => {
   const db = await initDb(dataDir);
   if (!requireSystemOwner(db, req, res)) return;
