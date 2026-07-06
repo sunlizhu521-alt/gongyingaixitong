@@ -269,6 +269,14 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
         { label: '事业部数量', value: formatNumber(uniqueCount(filteredRows, 'department')) }
       ]} />
 
+      <PanelGrid className="receipt-summary-amount-grid">
+        <BarPanel title="仓库类型库存金额" rows={groupSum(filteredRows, 'warehouseType', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
+        <BarPanel title="库龄段库存金额" rows={ageAmountRows} total={totalAmount} valueFormatter={moneyWan} />
+        <BarPanel title="销售产品线库存金额" rows={groupSum(filteredRows, 'productLine', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
+        <BarPanel title="销售系列库存金额" rows={groupSum(filteredRows, 'productSeries', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
+        <BarPanel title="仓库位置库存金额" rows={groupSum(filteredRows, 'warehouseLocation', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
+      </PanelGrid>
+
       <section className="kcfx-panel kcfx-filter-feedback-panel">
         <div className="table-title-row">
           <div>
@@ -296,14 +304,6 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
           placeholder="填写当前筛选条件下发现的问题"
         />
       </section>
-
-      <PanelGrid className="receipt-summary-amount-grid">
-        <BarPanel title="仓库类型库存金额" rows={groupSum(filteredRows, 'warehouseType', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
-        <BarPanel title="库龄段库存金额" rows={ageAmountRows} total={totalAmount} valueFormatter={moneyWan} />
-        <BarPanel title="销售产品线库存金额" rows={groupSum(filteredRows, 'productLine', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
-        <BarPanel title="销售系列库存金额" rows={groupSum(filteredRows, 'productSeries', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
-        <BarPanel title="仓库位置库存金额" rows={groupSum(filteredRows, 'warehouseLocation', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
-      </PanelGrid>
 
       <section className="kcfx-panel">
         <div className="table-title-row">
