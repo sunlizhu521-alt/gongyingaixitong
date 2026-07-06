@@ -29,10 +29,15 @@ const RECEIPT_TABLE_COLUMNS = [
   { key: 'amount', label: '库存金额合计', render: (row) => moneyWan(row.amount), exportValue: (row) => Number(row.amount) || 0 }
 ];
 const RECEIPT_FEEDBACK_DRAFT_STORAGE_KEY = 'gongyingai:receipt-feedback-drafts:v1';
+const RECEIPT_FILTER_FEEDBACK_DRAFT_STORAGE_KEY = 'gongyingai:receipt-filter-feedback-draft:v1';
 
 export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const [search, setSearch] = useState('');
   const [feedbackDrafts, setFeedbackDrafts] = useState(() => readFeedbackDrafts(RECEIPT_FEEDBACK_DRAFT_STORAGE_KEY));
+  const [filterFeedbackDraft, setFilterFeedbackDraft] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return window.localStorage.getItem(RECEIPT_FILTER_FEEDBACK_DRAFT_STORAGE_KEY) || '';
+  });
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState('');
@@ -80,6 +85,78 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
   const downloadReceiptRows = useCallback(() => {
     downloadKcfxRowsAsXlsx('关账库存分析', filteredRows, RECEIPT_TABLE_COLUMNS, '关账库存分析');
   }, [filteredRows]);
+
+  const filterFeedbackSnapshot = useMemo(() => buildReceiptFilterFeedbackSnapshot({
+    filters: RECEIPT_FILTERS,
+    selections: filterState.selections,
+    search,
+    filteredRowCount: filteredRows.length,
+    totalQty,
+    totalAmount,
+    materialCount: uniqueCount(filteredRows, 'materialCode'),
+    warehouseCount: uniqueCount(filteredRows, 'warehouse')
+  }), [filterState.selections, filteredRows, search, totalAmount, totalQty]);
+
+  const updateFilterFeedbackDraft = useCallback((value) => {
+    setFilterFeedbackDraft(value);
+    if (typeof window !== 'undefined') {
+      if (String(value || '').trim()) window.localStorage.setItem(RECEIPT_FILTER_FEEDBACK_DRAFT_STORAGE_KEY, value);
+      else window.localStorage.removeItem(RECEIPT_FILTER_FEEDBACK_DRAFT_STORAGE_KEY);
+    }
+  }, []);
+
+  const submitFilterFeedback = useCallback(async () => {
+    const feedback = String(filterFeedbackDraft || '').trim();
+    if (!feedback) return;
+    const response = await fetch(`${API}/api/kcfx-feedback/receipt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(user?.id ? { 'x-user-id': user.id } : {}),
+        ...(user?.sessionToken ? { 'x-session-token': user.sessionToken } : {}),
+        ...(user?.deviceId ? { 'x-device-id': user.deviceId } : {})
+      },
+      body: JSON.stringify({
+        user: user?.name,
+        userId: user?.id,
+        sessionToken: user?.sessionToken,
+        deviceId: user?.deviceId,
+        feedback,
+        rowKey: filterFeedbackSnapshot.rowKey,
+        rowSummary: filterFeedbackSnapshot.summary,
+        rowData: {
+          feedbackScope: 'filter',
+          feedbackScopeLabel: '筛选条件',
+          filterKey: filterFeedbackSnapshot.rowKey,
+          filterWarehouseType: filterFeedbackSnapshot.values.receiptWarehouseType,
+          filterDepartment: filterFeedbackSnapshot.values.receiptDepartment,
+          filterAgeGroup: filterFeedbackSnapshot.values.receiptAgeGroup,
+          filterSaleStatus: filterFeedbackSnapshot.values.receiptSaleStatus,
+          filterProductCategory: filterFeedbackSnapshot.values.receiptProductCategory,
+          filterProductLine: filterFeedbackSnapshot.values.receiptProductLine,
+          filterProductSeries: filterFeedbackSnapshot.values.receiptProductSeries,
+          filterWarehouseLocation: filterFeedbackSnapshot.values.receiptWarehouseLocation,
+          filterSearch: filterFeedbackSnapshot.search,
+          filteredRowCount: filterFeedbackSnapshot.filteredRowCount,
+          qty: filterFeedbackSnapshot.totalQty,
+          amount: filterFeedbackSnapshot.totalAmount,
+          materialCount: filterFeedbackSnapshot.materialCount,
+          warehouseCount: filterFeedbackSnapshot.warehouseCount
+        }
+      })
+    });
+    if (!response.ok) {
+      let message = `HTTP ${response.status}`;
+      try {
+        const payload = await response.json();
+        message = payload?.error || payload?.message || message;
+      } catch {}
+      window.alert(`反馈提交失败：${message}`);
+      return;
+    }
+    updateFilterFeedbackDraft('');
+    window.alert('反馈已提交');
+  }, [filterFeedbackDraft, filterFeedbackSnapshot, updateFilterFeedbackDraft, user?.deviceId, user?.id, user?.name, user?.sessionToken]);
 
   const receiptFeedbackKey = useCallback((row) => (
     [row.materialCode, row.warehouse, row.department, row.productLine, row.productSeries].filter(Boolean).join('|')
@@ -192,6 +269,34 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
         { label: '事业部数量', value: formatNumber(uniqueCount(filteredRows, 'department')) }
       ]} />
 
+      <section className="kcfx-panel kcfx-filter-feedback-panel">
+        <div className="table-title-row">
+          <div>
+            <h3>当前筛选条件问题反馈</h3>
+            <p className="kcfx-table-note">{filterFeedbackSnapshot.summary}</p>
+          </div>
+          <button
+            type="button"
+            className="ghost compact-button"
+            onClick={submitFilterFeedback}
+            disabled={!String(filterFeedbackDraft || '').trim()}
+          >
+            提交反馈
+          </button>
+        </div>
+        <div className="kcfx-filter-feedback-tags">
+          {filterFeedbackSnapshot.displayPairs.map((item) => (
+            <span key={item.label}><strong>{item.label}</strong>{item.value}</span>
+          ))}
+        </div>
+        <textarea
+          className="kcfx-filter-feedback-textarea"
+          value={filterFeedbackDraft}
+          onChange={(event) => updateFilterFeedbackDraft(event.target.value)}
+          placeholder="填写当前筛选条件下发现的问题"
+        />
+      </section>
+
       <PanelGrid className="receipt-summary-amount-grid">
         <BarPanel title="仓库类型库存金额" rows={groupSum(filteredRows, 'warehouseType', 'amount', 10)} total={totalAmount} valueFormatter={moneyWan} />
         <BarPanel title="库龄段库存金额" rows={ageAmountRows} total={totalAmount} valueFormatter={moneyWan} />
@@ -219,6 +324,56 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
       ]} />
     </KcfxPageShell>
   );
+}
+
+function buildReceiptFilterFeedbackSnapshot({
+  filters,
+  selections,
+  search,
+  filteredRowCount,
+  totalQty,
+  totalAmount,
+  materialCount,
+  warehouseCount
+}) {
+  const values = Object.fromEntries(filters.map((filter) => [
+    filter.id,
+    selectedFilterValue(selections?.[filter.id], filter.allLabel)
+  ]));
+  const normalizedSearch = String(search || '').trim();
+  const displayPairs = [
+    { label: '仓库类型', value: values.receiptWarehouseType },
+    { label: '事业部', value: values.receiptDepartment },
+    { label: '库龄', value: values.receiptAgeGroup },
+    { label: '可售状态', value: values.receiptSaleStatus },
+    { label: '商品分类', value: values.receiptProductCategory },
+    { label: '销售产品线', value: values.receiptProductLine },
+    { label: '销售系列', value: values.receiptProductSeries },
+    { label: '仓库位置', value: values.receiptWarehouseLocation },
+    { label: '搜索词', value: normalizedSearch || '全部' }
+  ];
+  const keyParts = [
+    'filter',
+    ...filters.map((filter) => `${filter.id}:${values[filter.id] || ''}`),
+    `search:${normalizedSearch}`
+  ];
+  return {
+    values,
+    search: normalizedSearch,
+    rowKey: keyParts.join('|'),
+    summary: `筛选后 ${formatNumber(filteredRowCount)} 行，库存 ${formatNumber(totalQty, 2)}，金额 ${moneyWan(totalAmount)}`,
+    displayPairs,
+    filteredRowCount,
+    totalQty: Number(totalQty) || 0,
+    totalAmount: Number(totalAmount) || 0,
+    materialCount: Number(materialCount) || 0,
+    warehouseCount: Number(warehouseCount) || 0
+  };
+}
+
+function selectedFilterValue(values = [], allLabel = '全部') {
+  if (!Array.isArray(values) || !values.length) return allLabel || '全部';
+  return values.join('、');
 }
 
 function expandReceiptSummaryRows(summary) {
