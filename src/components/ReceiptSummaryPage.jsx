@@ -355,12 +355,12 @@ function buildReceiptFilterFeedbackSnapshot({
     { label: '搜索词', value: normalizedSearch || '全部' }
   ];
   const keyParts = [
-    'filter',
-    ...filters.map((filter) => `${filter.id}:${values[filter.id] || ''}`),
-    `search:${normalizedSearch}`
+    '筛选条件',
+    ...displayPairs.filter((item) => item.label !== '搜索词').map((item) => `${item.label}:${item.value}`),
+    `搜索词:${normalizedSearch}`
   ];
   const rowKey = keyParts.reduce((key, part) => (
-    part.startsWith('receiptProductSeries:') ? `${key}+${part}` : `${key}|${part}`
+    part.startsWith('销售系列:') ? `${key}+${part}` : `${key}|${part}`
   ));
   return {
     values,
