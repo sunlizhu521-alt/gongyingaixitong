@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   MAINTENANCE_LIBRARY_MENU_PAGES,
-  QUALITY_INSPECTION_PAGES,
   SALES_INVENTORY_PAGES,
   SYSTEM_FILE_LIBRARY_MENU_PAGES,
   permissionGroups,
@@ -24,7 +23,6 @@ export default function Sidebar({
   const isExpanded = (groupValue) => (
     expandedMenuGroups instanceof Set ? expandedMenuGroups.has(groupValue) : isMenuGroupExpanded(groupValue)
   );
-  const canAccessQualityInspection = groupExists('qualityInspection') && canAccessGroup('qualityInspection');
   const canAccessSalesInventory = groupExists('salesInventory') && canAccessGroup('salesInventory');
   const canAccessMaintenanceLibrary = groupExists('maintenanceLibrary') && canAccessGroup('maintenanceLibrary');
   const canAccessSystemFileLibrary = groupExists('systemFileLibrary') && canAccessGroup('systemFileLibrary');
@@ -35,32 +33,6 @@ export default function Sidebar({
       <h1>库存和销售数据看板</h1>
       <div className="app-version-time">版本时间：{appVersionTime}</div>
       <nav className="sidebar-menu" aria-label="系统菜单">
-        {canAccessQualityInspection && (
-          <div className="menu-group">
-            <button
-              type="button"
-              className={`menu-group-toggle ${isExpanded('qualityInspection') ? 'active' : ''}`}
-              onClick={() => toggleMenuGroup('qualityInspection')}
-              aria-expanded={isExpanded('qualityInspection')}
-            >
-              品质验货
-              <span>{isExpanded('qualityInspection') ? '▾' : '▸'}</span>
-            </button>
-            {isExpanded('qualityInspection') && (
-              <div className="submenu-list">
-                {QUALITY_INSPECTION_PAGES.filter((page) => canAccessTab(page.tab)).map((page) => (
-                  <button
-                    key={page.tab}
-                    className={activeTab === page.tab ? 'active' : ''}
-                    onClick={() => openMenuTab(page.tab, 'qualityInspection')}
-                  >
-                    {page.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
         {canAccessSalesInventory && (
           <div className="menu-group">
             <button

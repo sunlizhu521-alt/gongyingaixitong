@@ -75,16 +75,6 @@ const SALES_INVENTORY_PAGES = [
   { tab: 'salesInventoryErrors', key: 'errors', label: '报错信息提示', sourceFile: 'errors.html' }
 ];
 
-const QUALITY_INSPECTION_PAGES = [
-  { tab: 'inspectionNotice', key: 'inspectionNotice', label: '验货通知' },
-  { tab: 'inspectionSchedule', key: 'inspectionSchedule', label: '验货安排' },
-  { tab: 'inspectionReportUpload', key: 'inspectionReportUpload', label: '检验报告单回传' },
-  { tab: 'inspectionFeedback', key: 'inspectionFeedback', label: '验货反馈' },
-  { tab: 'inspectionReportQuery', key: 'inspectionReportQuery', label: '检验报告单查询' },
-  { tab: 'inspectionSummary', key: 'inspectionSummary', label: '验货信息汇总表' },
-  { tab: 'inspectionInitialData', key: 'inspectionInitialData', label: '验货信息初始数据' }
-];
-
 const MAINTENANCE_LIBRARY_PAGES = [
   { tab: 'maintenanceFactLibrary', key: 'factLibrary', label: '库存数据文件', sourceFile: 'fact-library.html' },
   { tab: 'maintenanceSalesLibrary', key: 'salesLibrary', label: '销售数据文件', sourceFile: 'sales-library.html' },
@@ -122,15 +112,6 @@ const SYSTEM_FILE_LIBRARY_MENU_PAGES = [
 
 const systemOwnerName = '孙立柱';
 const permissionGroups = [
-  {
-    value: 'qualityInspection',
-    label: '品质验货',
-    children: QUALITY_INSPECTION_PAGES.map((page) => ({
-      value: `qualityInspection.${page.key}`,
-      tab: page.tab,
-      label: page.label
-    }))
-  },
   {
     value: 'salesInventory',
     label: '库存和销售数据看板',
@@ -176,7 +157,6 @@ const tabPermissionMap = Object.fromEntries(
 );
 
 const legacyPermissionMap = {
-  ...Object.fromEntries(QUALITY_INSPECTION_PAGES.map((page) => [`qualityInspection.${page.key}`, ['qualityInspection']])),
   ...Object.fromEntries(SALES_INVENTORY_PAGES.map((page) => [`salesInventory.${page.key}`, ['salesInventory']])),
   'maintenanceLibrary.factLibrary': ['maintenanceLibrary', 'salesInventory', 'salesInventory.factLibrary'],
   'maintenanceLibrary.salesLibrary': ['maintenanceLibrary', 'salesInventory', 'salesInventory.salesLibrary'],
@@ -215,7 +195,6 @@ export {
   PRODUCT_SERIES_COLUMN,
   PURCHASE_DIVISION_ADDRESS_COLUMN,
   PURCHASE_DIVISION_SUPPLIER_COLUMN,
-  QUALITY_INSPECTION_PAGES,
   SALES_INVENTORY_PAGES,
   SYSTEM_FILE_LIBRARY_MENU_PAGES,
   SYSTEM_FILE_LIBRARY_PAGES,
