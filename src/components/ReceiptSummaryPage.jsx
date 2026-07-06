@@ -359,10 +359,13 @@ function buildReceiptFilterFeedbackSnapshot({
     ...filters.map((filter) => `${filter.id}:${values[filter.id] || ''}`),
     `search:${normalizedSearch}`
   ];
+  const rowKey = keyParts.reduce((key, part) => (
+    part.startsWith('receiptProductSeries:') ? `${key}+${part}` : `${key}|${part}`
+  ));
   return {
     values,
     search: normalizedSearch,
-    rowKey: keyParts.join('|'),
+    rowKey,
     summary: `筛选后 ${formatNumber(filteredRowCount)} 行，库存 ${formatNumber(totalQty, 2)}，金额 ${moneyWan(totalAmount)}`,
     displayPairs,
     filteredRowCount,
