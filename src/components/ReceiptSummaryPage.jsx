@@ -280,17 +280,19 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
       <section className="kcfx-panel kcfx-filter-feedback-panel">
         <div className="table-title-row">
           <div>
-            <h3>当前筛选条件问题反馈</h3>
+            <div className="kcfx-filter-feedback-heading">
+              <h3>当前筛选条件问题反馈</h3>
+              <button
+                type="button"
+                className="ghost compact-button"
+                onClick={submitFilterFeedback}
+                disabled={!String(filterFeedbackDraft || '').trim()}
+              >
+                提交反馈
+              </button>
+            </div>
             <p className="kcfx-table-note">{filterFeedbackSnapshot.summary}</p>
           </div>
-          <button
-            type="button"
-            className="ghost compact-button"
-            onClick={submitFilterFeedback}
-            disabled={!String(filterFeedbackDraft || '').trim()}
-          >
-            提交反馈
-          </button>
         </div>
         <div className="kcfx-filter-feedback-tags">
           {filterFeedbackSnapshot.displayPairs.map((item) => (

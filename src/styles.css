@@ -2245,6 +2245,13 @@ th {
   align-items: stretch;
 }
 
+.kcfx-filter-feedback-heading {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .kcfx-filter-feedback-tags {
   display: flex;
   flex-wrap: wrap;
