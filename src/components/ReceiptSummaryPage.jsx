@@ -30,6 +30,23 @@ const RECEIPT_TABLE_COLUMNS = [
 ];
 const RECEIPT_FEEDBACK_DRAFT_STORAGE_KEY = 'gongyingai:receipt-feedback-drafts:v1';
 const RECEIPT_FILTER_FEEDBACK_DRAFT_STORAGE_KEY = 'gongyingai:receipt-filter-feedback-draft:v1';
+const RECEIPT_FILTER_REQUIRED_FIELDS = [
+  {
+    key: 'operationStatus',
+    label: '销售/运营状态',
+    options: ['正常在售', '低动销', '已停售', '计划下市', 'Listing异常', '从未上架', '渠道转卖中', '促销清货中', '认证/合规不可售', '非可销成品', '售后备件库存', '库存数据异常']
+  },
+  {
+    key: 'inventoryCause',
+    label: '库存形成原因',
+    options: ['销售预测偏高', '采购/MOQ备货过量', '项目/客户取消', '产品迭代下市', '退货未拆检', '质量/电池/功能问题', '缺包装/缺配件/需换标', 'Listing/广告/链接异常', '认证合规问题', '调拨/在途/FBA差异', '非运营备货', '历史遗留']
+  },
+  {
+    key: 'consumptionPlan',
+    label: '初步消耗方案',
+    options: ['正常销售消耗', '降价促销', '跨渠道转卖', '跨仓/跨区域调拨', '组合赠品/搭售', '翻新/换包/换标后销售', '转售后备件', '退供/返厂', '报废/销毁', '账务差异核销', '需管理层决策']
+  }
+];
 
 export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const [search, setSearch] = useState('');
@@ -38,6 +55,9 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
     if (typeof window === 'undefined') return '';
     return window.localStorage.getItem(RECEIPT_FILTER_FEEDBACK_DRAFT_STORAGE_KEY) || '';
   });
+  const [filterFeedbackRequired, setFilterFeedbackRequired] = useState(() => (
+    Object.fromEntries(RECEIPT_FILTER_REQUIRED_FIELDS.map((field) => [field.key, '']))
+  ));
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState('');
@@ -108,6 +128,11 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
   const submitFilterFeedback = useCallback(async () => {
     const feedback = String(filterFeedbackDraft || '').trim();
     if (!feedback) return;
+    const missingField = RECEIPT_FILTER_REQUIRED_FIELDS.find((field) => !String(filterFeedbackRequired[field.key] || '').trim());
+    if (missingField) {
+      window.alert(`请选择${missingField.label}`);
+      return;
+    }
     const response = await fetch(`${API}/api/kcfx-feedback/receipt`, {
       method: 'POST',
       headers: {
@@ -127,6 +152,9 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
         rowData: {
           feedbackScope: 'filter',
           feedbackScopeLabel: '筛选条件',
+          operationStatus: filterFeedbackRequired.operationStatus,
+          inventoryCause: filterFeedbackRequired.inventoryCause,
+          consumptionPlan: filterFeedbackRequired.consumptionPlan,
           filterKey: filterFeedbackSnapshot.rowKey,
           filterWarehouseType: filterFeedbackSnapshot.values.receiptWarehouseType,
           filterDepartment: filterFeedbackSnapshot.values.receiptDepartment,
@@ -155,8 +183,9 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
       return;
     }
     updateFilterFeedbackDraft('');
+    setFilterFeedbackRequired(Object.fromEntries(RECEIPT_FILTER_REQUIRED_FIELDS.map((field) => [field.key, ''])));
     window.alert('反馈已提交');
-  }, [filterFeedbackDraft, filterFeedbackSnapshot, updateFilterFeedbackDraft, user?.deviceId, user?.id, user?.name, user?.sessionToken]);
+  }, [filterFeedbackDraft, filterFeedbackRequired, filterFeedbackSnapshot, updateFilterFeedbackDraft, user?.deviceId, user?.id, user?.name, user?.sessionToken]);
 
   const receiptFeedbackKey = useCallback((row) => (
     [row.materialCode, row.warehouse, row.department, row.productLine, row.productSeries].filter(Boolean).join('|')
@@ -286,7 +315,7 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
                 type="button"
                 className="ghost compact-button"
                 onClick={submitFilterFeedback}
-                disabled={!String(filterFeedbackDraft || '').trim()}
+                disabled={!String(filterFeedbackDraft || '').trim() || RECEIPT_FILTER_REQUIRED_FIELDS.some((field) => !String(filterFeedbackRequired[field.key] || '').trim())}
               >
                 提交反馈
               </button>
@@ -297,6 +326,22 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
         <div className="kcfx-filter-feedback-tags">
           {filterFeedbackSnapshot.displayPairs.map((item) => (
             <span key={item.label}><strong>{item.label}</strong>{item.value}</span>
+          ))}
+        </div>
+        <div className="kcfx-filter-feedback-required-grid">
+          {RECEIPT_FILTER_REQUIRED_FIELDS.map((field) => (
+            <label key={field.key} className="kcfx-filter-feedback-field">
+              <span>{field.label}<em>*</em></span>
+              <select
+                value={filterFeedbackRequired[field.key]}
+                onChange={(event) => setFilterFeedbackRequired((current) => ({ ...current, [field.key]: event.target.value }))}
+              >
+                <option value="">请选择</option>
+                {field.options.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </label>
           ))}
         </div>
         <textarea
