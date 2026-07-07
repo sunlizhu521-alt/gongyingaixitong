@@ -30,7 +30,7 @@ const RECEIPT_TABLE_COLUMNS = [
 ];
 const RECEIPT_FEEDBACK_DRAFT_STORAGE_KEY = 'gongyingai:receipt-feedback-drafts:v1';
 const RECEIPT_FILTER_FEEDBACK_DRAFT_STORAGE_KEY = 'gongyingai:receipt-filter-feedback-draft:v1';
-const RECEIPT_FILTER_REQUIRED_FIELDS = [
+const RECEIPT_FEEDBACK_REQUIRED_FIELDS = [
   {
     key: 'operationStatus',
     label: '销售/运营状态',
@@ -55,9 +55,7 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
     if (typeof window === 'undefined') return '';
     return window.localStorage.getItem(RECEIPT_FILTER_FEEDBACK_DRAFT_STORAGE_KEY) || '';
   });
-  const [filterFeedbackRequired, setFilterFeedbackRequired] = useState(() => (
-    Object.fromEntries(RECEIPT_FILTER_REQUIRED_FIELDS.map((field) => [field.key, '']))
-  ));
+  const [receiptFeedbackRequired, setReceiptFeedbackRequired] = useState({});
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState('');
@@ -128,11 +126,6 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
   const submitFilterFeedback = useCallback(async () => {
     const feedback = String(filterFeedbackDraft || '').trim();
     if (!feedback) return;
-    const missingField = RECEIPT_FILTER_REQUIRED_FIELDS.find((field) => !String(filterFeedbackRequired[field.key] || '').trim());
-    if (missingField) {
-      window.alert(`请选择${missingField.label}`);
-      return;
-    }
     const response = await fetch(`${API}/api/kcfx-feedback/receipt`, {
       method: 'POST',
       headers: {
@@ -152,9 +145,6 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
         rowData: {
           feedbackScope: 'filter',
           feedbackScopeLabel: '筛选条件',
-          operationStatus: filterFeedbackRequired.operationStatus,
-          inventoryCause: filterFeedbackRequired.inventoryCause,
-          consumptionPlan: filterFeedbackRequired.consumptionPlan,
           filterKey: filterFeedbackSnapshot.rowKey,
           filterWarehouseType: filterFeedbackSnapshot.values.receiptWarehouseType,
           filterDepartment: filterFeedbackSnapshot.values.receiptDepartment,
@@ -183,9 +173,8 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
       return;
     }
     updateFilterFeedbackDraft('');
-    setFilterFeedbackRequired(Object.fromEntries(RECEIPT_FILTER_REQUIRED_FIELDS.map((field) => [field.key, ''])));
     window.alert('反馈已提交');
-  }, [filterFeedbackDraft, filterFeedbackRequired, filterFeedbackSnapshot, updateFilterFeedbackDraft, user?.deviceId, user?.id, user?.name, user?.sessionToken]);
+  }, [filterFeedbackDraft, filterFeedbackSnapshot, updateFilterFeedbackDraft, user?.deviceId, user?.id, user?.name, user?.sessionToken]);
 
   const receiptFeedbackKey = useCallback((row) => (
     [row.materialCode, row.warehouse, row.department, row.productLine, row.productSeries].filter(Boolean).join('|')
@@ -202,10 +191,27 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
     });
   }, [receiptFeedbackKey]);
 
+  const updateReceiptFeedbackRequired = useCallback((row, fieldKey, value) => {
+    const key = receiptFeedbackKey(row);
+    setReceiptFeedbackRequired((current) => ({
+      ...current,
+      [key]: {
+        ...(current[key] || {}),
+        [fieldKey]: value
+      }
+    }));
+  }, [receiptFeedbackKey]);
+
   const submitReceiptFeedback = useCallback(async (row) => {
     const rowKey = receiptFeedbackKey(row);
     const feedback = feedbackDrafts[rowKey] || '';
     if (!feedback.trim()) return;
+    const requiredValues = receiptFeedbackRequired[rowKey] || {};
+    const missingField = RECEIPT_FEEDBACK_REQUIRED_FIELDS.find((field) => !String(requiredValues[field.key] || '').trim());
+    if (missingField) {
+      window.alert(`请选择${missingField.label}`);
+      return;
+    }
     const rowSummary = [row.materialCode, row.materialName, row.warehouse].filter(Boolean).join(' / ');
     const response = await fetch(`${API}/api/kcfx-feedback/receipt`, {
       method: 'POST',
@@ -230,6 +236,9 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
           materialCode: row.materialCode,
           materialName: row.materialName,
           warehouse: row.warehouse,
+          operationStatus: requiredValues.operationStatus,
+          inventoryCause: requiredValues.inventoryCause,
+          consumptionPlan: requiredValues.consumptionPlan,
           qty: Number(row.qty) || 0,
           amount: Number(row.amount) || 0
         }
@@ -245,10 +254,30 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
       return;
     }
     window.alert('反馈已提交');
-  }, [feedbackDrafts, receiptFeedbackKey, user?.deviceId, user?.id, user?.name, user?.sessionToken]);
+  }, [feedbackDrafts, receiptFeedbackKey, receiptFeedbackRequired, user?.deviceId, user?.id, user?.name, user?.sessionToken]);
 
   const receiptTableColumns = useMemo(() => [
     ...RECEIPT_TABLE_COLUMNS,
+    ...RECEIPT_FEEDBACK_REQUIRED_FIELDS.map((field) => ({
+      key: field.key,
+      label: field.label,
+      render: (row) => {
+        const rowKey = receiptFeedbackKey(row);
+        const values = receiptFeedbackRequired[rowKey] || {};
+        return (
+          <select
+            className="table-input kcfx-feedback-select"
+            value={values[field.key] || ''}
+            onChange={(event) => updateReceiptFeedbackRequired(row, field.key, event.target.value)}
+          >
+            <option value="">请选择</option>
+            {field.options.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        );
+      }
+    })),
     {
       key: 'feedbackText',
       label: '问题反馈',
@@ -267,18 +296,23 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
     {
       key: 'feedbackAction',
       label: '操作',
-      render: (row) => (
-        <button
-          type="button"
-          className="ghost compact-button"
-          onClick={() => submitReceiptFeedback(row)}
-          disabled={!String(feedbackDrafts[receiptFeedbackKey(row)] || '').trim()}
-        >
-          提交
-        </button>
-      )
+      render: (row) => {
+        const rowKey = receiptFeedbackKey(row);
+        const requiredValues = receiptFeedbackRequired[rowKey] || {};
+        const missingRequired = RECEIPT_FEEDBACK_REQUIRED_FIELDS.some((field) => !String(requiredValues[field.key] || '').trim());
+        return (
+          <button
+            type="button"
+            className="ghost compact-button"
+            onClick={() => submitReceiptFeedback(row)}
+            disabled={!String(feedbackDrafts[rowKey] || '').trim() || missingRequired}
+          >
+            提交
+          </button>
+        );
+      }
     }
-  ], [feedbackDrafts, receiptFeedbackKey, submitReceiptFeedback, updateReceiptFeedbackDraft]);
+  ], [feedbackDrafts, receiptFeedbackKey, receiptFeedbackRequired, submitReceiptFeedback, updateReceiptFeedbackDraft, updateReceiptFeedbackRequired]);
 
   return (
     <KcfxPageShell title="关账库存分析" status={status} loading={summaryLoading} onRefresh={refresh}>
@@ -315,7 +349,7 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
                 type="button"
                 className="ghost compact-button"
                 onClick={submitFilterFeedback}
-                disabled={!String(filterFeedbackDraft || '').trim() || RECEIPT_FILTER_REQUIRED_FIELDS.some((field) => !String(filterFeedbackRequired[field.key] || '').trim())}
+                disabled={!String(filterFeedbackDraft || '').trim()}
               >
                 提交反馈
               </button>
@@ -326,22 +360,6 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
         <div className="kcfx-filter-feedback-tags">
           {filterFeedbackSnapshot.displayPairs.map((item) => (
             <span key={item.label}><strong>{item.label}</strong>{item.value}</span>
-          ))}
-        </div>
-        <div className="kcfx-filter-feedback-required-grid">
-          {RECEIPT_FILTER_REQUIRED_FIELDS.map((field) => (
-            <label key={field.key} className="kcfx-filter-feedback-field">
-              <span>{field.label}<em>*</em></span>
-              <select
-                value={filterFeedbackRequired[field.key]}
-                onChange={(event) => setFilterFeedbackRequired((current) => ({ ...current, [field.key]: event.target.value }))}
-              >
-                <option value="">请选择</option>
-                {field.options.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </label>
           ))}
         </div>
         <textarea
