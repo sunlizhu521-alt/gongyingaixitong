@@ -260,13 +260,14 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
     ...RECEIPT_TABLE_COLUMNS,
     ...RECEIPT_FEEDBACK_REQUIRED_FIELDS.map((field) => ({
       key: field.key,
-      label: field.label,
+      label: <span className="kcfx-required-column-label">{field.label}<em>*</em></span>,
       render: (row) => {
         const rowKey = receiptFeedbackKey(row);
         const values = receiptFeedbackRequired[rowKey] || {};
         return (
           <select
             className="table-input kcfx-feedback-select"
+            required
             value={values[field.key] || ''}
             onChange={(event) => updateReceiptFeedbackRequired(row, field.key, event.target.value)}
           >

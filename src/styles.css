@@ -2245,6 +2245,17 @@ th {
   min-width: 150px;
 }
 
+.kcfx-required-column-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.kcfx-required-column-label em {
+  color: #dc2626;
+  font-style: normal;
+}
+
 .kcfx-filter-feedback-panel {
   align-items: stretch;
 }
