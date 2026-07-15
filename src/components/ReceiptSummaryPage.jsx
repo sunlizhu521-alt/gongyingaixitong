@@ -30,6 +30,33 @@ const RECEIPT_TABLE_COLUMNS = [
 ];
 const RECEIPT_FEEDBACK_DRAFT_STORAGE_KEY = 'gongyingai:receipt-feedback-drafts:v1';
 const RECEIPT_FILTER_FEEDBACK_DRAFT_STORAGE_KEY = 'gongyingai:receipt-filter-feedback-draft:v1';
+let receiptSummaryCache = { savedAt: '', payload: null };
+let receiptSummaryPromise = null;
+let receiptSummaryPromiseSavedAt = '';
+
+async function fetchReceiptSummary(savedAt = '', { force = false } = {}) {
+  if (!force && receiptSummaryCache.payload && receiptSummaryCache.savedAt === savedAt) {
+    return receiptSummaryCache.payload;
+  }
+  if (!force && receiptSummaryPromise && receiptSummaryPromiseSavedAt === savedAt) return receiptSummaryPromise;
+  receiptSummaryPromiseSavedAt = savedAt;
+  const requestPromise = fetch(`${API}/api/kcfx-library/receipt-summary`, { cache: 'no-store' })
+    .then(async (response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      if (!payload?.ok) throw new Error(payload?.message || payload?.error || 'summary not ready');
+      receiptSummaryCache = { savedAt, payload };
+      return payload;
+    })
+    .finally(() => {
+      if (receiptSummaryPromise === requestPromise) {
+        receiptSummaryPromise = null;
+        receiptSummaryPromiseSavedAt = '';
+      }
+    });
+  receiptSummaryPromise = requestPromise;
+  return requestPromise;
+}
 const RECEIPT_FEEDBACK_REQUIRED_FIELDS = [
   {
     key: 'operationStatus',
@@ -60,21 +87,18 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState('');
 
-  const loadSummary = useCallback(async () => {
+  const loadSummary = useCallback(async ({ force = false } = {}) => {
     setSummaryLoading(true);
     setSummaryError('');
     try {
-      const response = await fetch(`${API}/api/kcfx-library/receipt-summary`, { cache: 'no-store' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = await response.json();
-      if (!payload?.ok) throw new Error(payload?.message || payload?.error || 'summary not ready');
+      const payload = await fetchReceiptSummary(kcfxData?.savedAt || '', { force });
       setSummary(payload);
     } catch (loadError) {
       setSummaryError(loadError?.message || String(loadError));
     } finally {
       setSummaryLoading(false);
     }
-  }, []);
+  }, [kcfxData?.savedAt]);
 
   useEffect(() => {
     loadSummary();
@@ -97,7 +121,7 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
     : pageError || `已读取 ${formatNumber(rows.length)} 行关账库存，筛选后 ${formatNumber(filteredRows.length)} 行，库存金额 ${moneyWan(totalAmount)}${lastLoadedAt ? `；读取时间：${lastLoadedAt}` : ''}`;
 
   const refresh = async () => {
-    await Promise.all([loadSummary(), onRefresh?.()]);
+    await Promise.all([loadSummary({ force: true }), onRefresh?.()]);
   };
 
   const downloadReceiptRows = useCallback(() => {

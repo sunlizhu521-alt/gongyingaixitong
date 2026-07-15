@@ -65,8 +65,17 @@ import './styles.css';
 
 const SALES_KCFX_TABS = new Set(['salesInventorySalesAnalysis', 'salesInventorySalesTrend']);
 function priorityKcfxRecordIdsForTab(tab) {
+  if (tab === 'salesInventoryReceiptSummary') return [];
   if (SALES_KCFX_TABS.has(tab)) return [];
   return KCFX_PRIORITY_PRELOAD_RECORD_IDS.filter((id) => id !== 'sales-data');
+}
+function deferredKcfxRecordIdsForTab(tab, priorityIds = []) {
+  if (tab === 'salesInventoryReceiptSummary') return [];
+  const prioritySet = new Set(priorityIds);
+  return KCFX_DASHBOARD_PRELOAD_RECORD_IDS.filter((id) => {
+    if (prioritySet.has(id)) return false;
+    return true;
+  });
 }
 
 function App() {
@@ -232,8 +241,7 @@ function App() {
     if (!authChecked || !user || !kcfxData || !canAccessSalesInventory) return undefined;
     const controller = new AbortController();
     const priorityIds = priorityKcfxRecordIdsForTab(activeTab);
-    const prioritySet = new Set(priorityIds);
-    const deferredIds = KCFX_DASHBOARD_PRELOAD_RECORD_IDS.filter((id) => !prioritySet.has(id));
+    const deferredIds = deferredKcfxRecordIdsForTab(activeTab, priorityIds);
     async function preloadDashboardRecords() {
       try {
         await prefetchKcfxRecords(priorityIds, { batchSize: 3, delayMs: 30, signal: controller.signal });
@@ -432,7 +440,7 @@ function App() {
       canManagePermissions ? fetch(`${API}/api/users${params}`) : Promise.resolve(null),
       canAccessTab('inspectionInitialData') ? fetch(`${API}/api/quality-inspection/initial-data${params}`) : Promise.resolve(null),
       canAccessTab('inspectionNotice') ? fetch(`${API}/api/quality-inspection/notices${params}`) : Promise.resolve(null),
-      canAccessTab('inspectionNotice') ? fetch(`${API}/api/kcfx-library`, { cache: 'no-store' }) : Promise.resolve(null),
+      Promise.resolve(null),
       canManageSystemFiles ? fetch(`${API}/api/system-file-library${params}`) : Promise.resolve(null)
     ]);
     [
