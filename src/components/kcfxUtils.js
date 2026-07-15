@@ -1,12 +1,7 @@
-export const KCFX_COLORS = ['#007aff', '#34c759', '#ff9f0a', '#af52de', '#ff375f', '#5ac8fa', '#5856d6', '#30d158', '#bf5af2', '#ff6b35'];
+import { INVENTORY_TREND_MONTHS } from '../../shared/kcfxTrendMonths.js';
 
-export const INVENTORY_TREND_MONTHS = [
-  { id: 'fact-3', label: '1月' },
-  { id: 'fact-4', label: '2月' },
-  { id: 'fact-5', label: '3月' },
-  { id: 'fact-6', label: '4月' },
-  { id: 'fact-7', label: '5月' }
-];
+export { INVENTORY_TREND_MONTHS };
+export const KCFX_COLORS = ['#007aff', '#34c759', '#ff9f0a', '#af52de', '#ff375f', '#5ac8fa', '#5856d6', '#30d158', '#bf5af2', '#ff6b35'];
 
 const AGE_BUCKETS = ['0-30天', '31-60天', '61-90天', '91-120天', '121-150天', '150天以上'];
 const AGE_BUCKET_DEFINITIONS = [
@@ -309,7 +304,9 @@ export function buildInventoryTrendRows(records) {
     warehouseMap: mapWarehouses(rowsOf(records['dim-warehouse'])),
     departmentMap: mapDepartments(rowsOf(records['dim-warehouse-material']))
   };
-  return INVENTORY_TREND_MONTHS.map((month) => summarizeTrendMonth(month, records[month.id], records['fact-2'], maps));
+  return INVENTORY_TREND_MONTHS
+    .filter((month) => records[month.id])
+    .map((month) => summarizeTrendMonth(month, records[month.id], records['fact-2'], maps));
 }
 
 function summarizeTrendMonth(month, record, inventoryMonthRecord, maps) {

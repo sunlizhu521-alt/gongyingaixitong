@@ -1,15 +1,15 @@
 import React from 'react';
 import KcfxLibraryPage from './KcfxLibraryPage.jsx';
+import { INVENTORY_TREND_MONTHS } from '../../shared/kcfxTrendMonths.js';
 
 const FACT_SLOTS = [
   { id: 'fact-inventory', label: '最近关账库存', description: '关账库存总表' },
   { id: 'fact-2', label: '库存分析月份表', description: '库存数量、金额、库龄等分析数据' },
-  { id: 'fact-3', label: '库存事实表 3' },
-  { id: 'fact-4', label: '库存事实表 4' },
-  { id: 'fact-5', label: '库存事实表 5' },
-  { id: 'fact-6', label: '库存事实表 6' },
-  { id: 'fact-7', label: '库存事实表 7' },
-  { id: 'fact-8', label: '库存事实表 8' }
+  ...INVENTORY_TREND_MONTHS.map((month, index) => ({
+    id: month.id,
+    label: `库存事实表 ${index + 3}`,
+    description: `${month.label}库存趋势数据`
+  }))
 ];
 
 export default function FactLibraryPage({ kcfxData = null, loading = false, ...props }) {

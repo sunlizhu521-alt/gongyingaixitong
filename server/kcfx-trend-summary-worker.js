@@ -1,25 +1,13 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { initDb } from './db.js';
+import { INVENTORY_TREND_MONTHS, KCFX_TREND_SCHEMA_VERSION } from '../shared/kcfxTrendMonths.js';
 
 const [dataDirArg, outputPathArg] = process.argv.slice(2);
 const dataDir = path.resolve(dataDirArg || 'data');
 const outputPath = path.resolve(outputPathArg || path.join(dataDir, 'kcfx-trend-summary.json'));
 
-const TREND_MONTHS = [
-  { id: 'fact-3', label: 'M1' },
-  { id: 'fact-4', label: 'M2' },
-  { id: 'fact-5', label: 'M3' },
-  { id: 'fact-6', label: 'M4' },
-  { id: 'fact-7', label: 'M5' }
-];
-const REQUIRED_IDS = [
-  ...TREND_MONTHS.map((month) => month.id),
-  'fact-2',
-  'dim-product',
-  'dim-warehouse',
-  'dim-warehouse-material'
-];
+const REQUIRED_DIMENSION_IDS = ['fact-2', 'dim-product', 'dim-warehouse', 'dim-warehouse-material'];
 const UNCLASSIFIED_LIMIT = 1000;
 
 function safeId(id) {
@@ -258,14 +246,17 @@ function summarizeMonth(month, record, maps) {
 
 async function main() {
   const db = await initDb(dataDir);
+  const trendMonths = INVENTORY_TREND_MONTHS.filter((month) => db.kcfxLibrary.records[month.id]);
+  const requiredIds = [...trendMonths.map((month) => month.id), ...REQUIRED_DIMENSION_IDS];
   const records = {};
-  for (const id of REQUIRED_IDS) {
+  for (const id of requiredIds) {
     records[id] = await loadRecord(db, id);
   }
   const maps = buildDimensionMaps(records);
-  const monthSummaries = TREND_MONTHS.map((month) => summarizeMonth(month, records[month.id], maps));
+  const monthSummaries = trendMonths.map((month) => summarizeMonth(month, records[month.id], maps));
   const payload = {
     ok: true,
+    schemaVersion: KCFX_TREND_SCHEMA_VERSION,
     status: 'ready',
     source: 'server-trend-summary',
     savedAt: db.kcfxLibrary.savedAt || '',

@@ -1,3 +1,5 @@
+import { INVENTORY_TREND_MONTHS } from '../shared/kcfxTrendMonths.js';
+
 const API = import.meta.env.DEV ? 'http://localhost:4001' : '';
 const AUTH_USER_STORAGE_KEY = 'invoiceUser';
 const AUTH_DEVICE_STORAGE_KEY = 'invoiceDeviceId';
@@ -43,12 +45,7 @@ const KCFX_DASHBOARD_PRELOAD_RECORD_IDS = [
 const KCFX_CORE_RECORD_IDS = [
   'fact-inventory',
   'fact-2',
-  'fact-3',
-  'fact-4',
-  'fact-5',
-  'fact-6',
-  'fact-7',
-  'fact-8',
+  ...INVENTORY_TREND_MONTHS.map((month) => month.id),
   'sales-data',
   'dim-product',
   'dim-warehouse',

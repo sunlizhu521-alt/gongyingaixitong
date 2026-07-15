@@ -39,6 +39,12 @@ export default function InventoryTrendPage({ kcfxData = null, kcfxRecords = {}, 
     loadSummary();
   }, [loadSummary, kcfxData?.savedAt]);
 
+  useEffect(() => {
+    if (!summary?.refreshing) return undefined;
+    const timer = window.setTimeout(loadSummary, 1500);
+    return () => window.clearTimeout(timer);
+  }, [loadSummary, summary?.refreshing]);
+
   const records = kcfxRecords || {};
   const pageError = summaryError || error;
   const monthRows = useMemo(() => expandTrendSummaryRows(summary), [summary]);
@@ -134,7 +140,7 @@ function expandTrendSummaryRows(summary) {
   const rows = Array.isArray(summary?.monthSummaries) ? summary.monthSummaries : [];
   return rows.map((row, index) => ({
     ...row,
-    label: `${index + 1}月`,
+    label: trendMonthLabel(row, index),
     amount: Number(row.amount ?? row.totalValue) || 0,
     qty: Number(row.qty ?? row.totalQty) || 0,
     usedRows: Number(row.usedRows) || 0,
@@ -145,6 +151,12 @@ function expandTrendSummaryRows(summary) {
       qty: Number(item.qty) || 0
     })) : []
   }));
+}
+
+function trendMonthLabel(row, index) {
+  const slotNumber = Number(String(row?.id || '').match(/^fact-(\d+)$/)?.[1]);
+  const monthNumber = slotNumber - 2;
+  return monthNumber >= 1 && monthNumber <= 12 ? `${monthNumber}月` : (row?.label || `${index + 1}月`);
 }
 
 function MonthTrendChart({ rows, formatter }) {

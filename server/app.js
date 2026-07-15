@@ -23,6 +23,7 @@ import registerQualityRoutes from './routes/quality.js';
 import registerSystemRoutes from './routes/system.js';
 import registerReminderRoutes from './routes/reminders.js';
 import { constrainWorksheetRange, createCompatibleXlsxReader } from './kcfx-workbook.js';
+import { INVENTORY_TREND_MONTHS, KCFX_TREND_SCHEMA_VERSION } from '../shared/kcfxTrendMonths.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -201,6 +202,12 @@ const KC_LIBRARY_SLOT_IDS = new Set([
   'fact-6',
   'fact-7',
   'fact-8',
+  'fact-9',
+  'fact-10',
+  'fact-11',
+  'fact-12',
+  'fact-13',
+  'fact-14',
   'sales-data'
 ]);
 const KC_PRIORITY_PRELOAD_SLOT_IDS = new Set([
@@ -1391,15 +1398,8 @@ let kcfxPreloadCache = {
 };
 let kcfxPreloadPromise = null;
 
-const KCFX_TREND_MONTHS = [
-  { id: 'fact-3', label: '1月' },
-  { id: 'fact-4', label: '2月' },
-  { id: 'fact-5', label: '3月' },
-  { id: 'fact-6', label: '4月' },
-  { id: 'fact-7', label: '5月' }
-];
 const KCFX_TREND_RECORD_IDS = new Set([
-  ...KCFX_TREND_MONTHS.map((month) => month.id),
+  ...INVENTORY_TREND_MONTHS.map((month) => month.id),
   'fact-2',
   'dim-product',
   'dim-warehouse',
@@ -1585,9 +1585,12 @@ async function buildKcfxTrendSummary() {
     records[id] = await getKcfxTrendRecord(db, id);
   }
   const maps = buildKcfxTrendDimensionMaps(records);
-  const monthSummaries = KCFX_TREND_MONTHS.map((month) => summarizeKcfxTrendMonth(month, records[month.id], maps));
+  const monthSummaries = INVENTORY_TREND_MONTHS
+    .filter((month) => records[month.id])
+    .map((month) => summarizeKcfxTrendMonth(month, records[month.id], maps));
   return {
     ok: true,
+    schemaVersion: KCFX_TREND_SCHEMA_VERSION,
     status: 'ready',
     source: 'server-trend-summary',
     savedAt: db.kcfxLibrary?.savedAt || '',
@@ -1657,6 +1660,7 @@ function runKcfxTrendSummaryWorker() {
 
 function isKcfxTrendSummaryFresh(cache, db) {
   if (!cache?.ok) return false;
+  if (cache.schemaVersion !== KCFX_TREND_SCHEMA_VERSION) return false;
   if (!db?.kcfxLibrary?.savedAt) return true;
   return cache.savedAt === db.kcfxLibrary.savedAt;
 }
