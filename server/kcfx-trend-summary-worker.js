@@ -132,11 +132,14 @@ function buildDimensionMaps(records) {
 
   const productLineByMaterial = new Map();
   const productSeriesByMaterial = new Map();
+  const skuByMaterial = new Map();
   const settlementPriceByMaterial = new Map();
   for (const row of records['dim-product']?.rows || []) {
     const materialCode = normalizeMaterialCode(nthValue(row, 1));
+    const sku = normalizeText(nthValue(row, 3));
     const productLine = normalizeText(nthValue(row, 7));
     const productSeries = normalizeText(nthValue(row, 8));
+    if (materialCode && sku && !skuByMaterial.has(materialCode)) skuByMaterial.set(materialCode, sku);
     if (materialCode && productLine && !productLineByMaterial.has(materialCode)) productLineByMaterial.set(materialCode, productLine);
     if (materialCode && productSeries && !productSeriesByMaterial.has(materialCode)) productSeriesByMaterial.set(materialCode, productSeries);
     const price = toNumber(nthValue(row, 10));
@@ -151,7 +154,7 @@ function buildDimensionMaps(records) {
     if (materialCode && price) settlementPriceByMaterial.set(materialCode, price);
   }
 
-  return { departmentByKey, warehouseTypeByName, warehouseLocationByName, productLineByMaterial, productSeriesByMaterial, settlementPriceByMaterial };
+  return { departmentByKey, warehouseTypeByName, warehouseLocationByName, productLineByMaterial, productSeriesByMaterial, skuByMaterial, settlementPriceByMaterial };
 }
 
 function summarizeMonth(month, record, maps) {
@@ -202,6 +205,7 @@ function summarizeMonth(month, record, maps) {
         organization: materialA,
         warehouse,
         materialCode: materialB,
+        sku: maps.skuByMaterial.get(materialB) || '',
         materialName,
         qty: 0,
         reason: '有库存仓库物料事业部对照表没有信息'

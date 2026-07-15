@@ -79,6 +79,7 @@ const ERROR_DOWNLOAD_CONFIG = {
       ['organization', '库存组织'],
       ['warehouse', '仓库名称'],
       ['materialCode', '物料编码'],
+      ['sku', 'SKU'],
       ['materialName', '物料名称'],
       ['qty', '数量'],
       ['reason', '缺失原因']
@@ -478,6 +479,7 @@ function buildTrendChecks(summary) {
       const organization = normalizeText(row.organization || row.materialA);
       const warehouse = normalizeText(row.warehouse);
       const materialCode = normalizeMaterialCode(row.materialCode);
+      const sku = normalizeText(row.sku);
       const materialName = normalizeText(row.materialName);
       const key = [month, organization, warehouse, materialCode].map(normalizeKey).join('|');
       if (!grouped.has(key)) {
@@ -486,6 +488,7 @@ function buildTrendChecks(summary) {
           organization,
           warehouse,
           materialCode,
+          sku,
           materialName,
           qty: 0,
           reason: '有库存仓库物料事业部对照表没有信息'
@@ -493,6 +496,7 @@ function buildTrendChecks(summary) {
       }
       const item = grouped.get(key);
       item.qty += Number(row.qty) || 0;
+      if (!item.sku) item.sku = sku;
       if (!item.materialName) item.materialName = materialName;
     }
   }
