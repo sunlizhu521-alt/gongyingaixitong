@@ -178,6 +178,10 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
 
       <PanelGrid>
         <BarPanel title="全部销售部门" rows={groupSum(filteredRows, 'salesOrg', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
+        <BarPanel title="店铺简称（日常汇报沟通简称）" rows={groupSum(filteredRows, 'storeShortName', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
+        <BarPanel title="销售产品线" rows={groupSum(filteredRows, 'productLine', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
+        <BarPanel title="销售系列" rows={groupSum(filteredRows, 'productSeries', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
+        <BarPanel title="型号" rows={groupSum(filteredRows, 'model', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
       </PanelGrid>
 
       <section className="kcfx-panel sales-trend-detail-panel">
@@ -199,13 +203,6 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
           <button type="button" className="ghost compact-button" onClick={() => setDetailPage(detailPageCount)} disabled={detailPage >= detailPageCount}>末页</button>
         </div>
       </section>
-
-      <PanelGrid>
-        <BarPanel title="店铺简称（日常汇报沟通简称）" rows={groupSum(filteredRows, 'storeShortName', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
-        <BarPanel title="销售产品线" rows={groupSum(filteredRows, 'productLine', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
-        <BarPanel title="销售系列" rows={groupSum(filteredRows, 'productSeries', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
-        <BarPanel title="型号" rows={groupSum(filteredRows, 'model', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
-      </PanelGrid>
 
       <section className="data-source-panel sales-trend-source-panel">
         <div><strong>销售数据文件</strong>：{recordSourceText(records['sales-data'])}</div>
