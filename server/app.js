@@ -22,7 +22,7 @@ import registerKcfxRoutes from './routes/kcfx.js';
 import registerQualityRoutes from './routes/quality.js';
 import registerSystemRoutes from './routes/system.js';
 import registerReminderRoutes from './routes/reminders.js';
-import { constrainWorksheetRange } from './kcfx-workbook.js';
+import { constrainWorksheetRange, createCompatibleXlsxReader } from './kcfx-workbook.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -2597,7 +2597,7 @@ function buildKcfxFileRecord(file, storedFile, slot, parsed) {
     parseCompletedAt: completedAt,
     parseDiagnostics: {
       ...buildKcfxParseDiagnostics(parsed),
-      readMode: 'server',
+      readMode: parsed.readMode || 'server',
       fallbackAttempts: []
     },
     rows: parsed.rows
@@ -2715,13 +2715,14 @@ async function removeKcfxStoredFile(record) {
 }
 
 function parseKcfxWorkbookFile(filePath, slot) {
-  const workbookIndex = xlsx.readFile(filePath, {
+  const reader = createCompatibleXlsxReader(filePath);
+  const workbookIndex = reader.read({
     bookSheets: true,
     bookProps: false
   });
   const sheetName = pickKcfxSheetName(workbookIndex, slot);
   if (!sheetName) throw new Error('missing sheet');
-  const workbook = xlsx.readFile(filePath, {
+  const workbook = reader.read({
     cellDates: true,
     dense: false,
     cellHTML: false,
@@ -2729,7 +2730,10 @@ function parseKcfxWorkbookFile(filePath, slot) {
     cellStyles: false,
     sheets: [sheetName]
   });
-  return parseKcfxWorkbookRows(workbook, slot);
+  return {
+    ...parseKcfxWorkbookRows(workbook, slot),
+    readMode: reader.usedFallback ? 'server-node-zlib-fallback' : 'server'
+  };
 }
 
 function scheduleKcfxFileParse(job) {
