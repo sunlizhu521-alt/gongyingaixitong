@@ -1259,7 +1259,20 @@ async function resolveKcfxStoredFilePath(record = {}) {
 }
 
 async function ensureKcfxRecordRows(db, id, record = {}) {
-  if (Array.isArray(record.rows) || record.rowsPath) return record;
+  if (Array.isArray(record.rows) || record.rowsPath) {
+    if (record.parseStatus === 'ready' && (record.parseError || record.parseFailedAt)) {
+      const cleanedRecord = {
+        ...record,
+        parseError: '',
+        parseFailedAt: ''
+      };
+      db.kcfxLibrary.records[id] = cleanedRecord;
+      db.kcfxLibrary.savedAt = new Date().toISOString();
+      await db.save();
+      return cleanedRecord;
+    }
+    return record;
+  }
   const originalFilePath = await resolveKcfxStoredFilePath({ ...record, id });
   if (!originalFilePath) return record;
   try {
@@ -1281,7 +1294,12 @@ async function ensureKcfxRecordRows(db, id, record = {}) {
       parseStatus: 'ready',
       parseSource: 'server-on-demand',
       parseCompletedAt: new Date().toISOString(),
-      parseDiagnostics: buildKcfxParseDiagnostics(parsed),
+      parseError: '',
+      parseFailedAt: '',
+      parseDiagnostics: {
+        ...buildKcfxParseDiagnostics(parsed),
+        readMode: parsed.readMode || 'server'
+      },
       rows: parsed.rows
     }, id);
     db.kcfxLibrary.records[id] = parsedRecord;
