@@ -1292,7 +1292,7 @@ async function ensureKcfxRecordRows(db, id, record = {}) {
     return {
       ...record,
       parseStatus: record.parseStatus || 'failed',
-      parseError: record.parseError || error?.message || 'parse failed'
+      parseError: error?.message || record.parseError || 'parse failed'
     };
   }
 }
@@ -2715,12 +2715,19 @@ async function removeKcfxStoredFile(record) {
 }
 
 function parseKcfxWorkbookFile(filePath, slot) {
+  const workbookIndex = xlsx.readFile(filePath, {
+    bookSheets: true,
+    bookProps: false
+  });
+  const sheetName = pickKcfxSheetName(workbookIndex, slot);
+  if (!sheetName) throw new Error('missing sheet');
   const workbook = xlsx.readFile(filePath, {
     cellDates: true,
     dense: false,
     cellHTML: false,
     cellNF: false,
-    cellStyles: false
+    cellStyles: false,
+    sheets: [sheetName]
   });
   return parseKcfxWorkbookRows(workbook, slot);
 }
