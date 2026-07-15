@@ -27,6 +27,8 @@ export default function KcfxLibraryPage({
       rowCount: record.rows?.length || record.rowCount || 0,
       sheetName: record.sheetName || record.selectedSheetName || '-',
       updatedAt: record.appliedAt || record.savedAt || '',
+      parseStatus: record.parseStatus || '',
+      parseError: record.parseError || '',
       source: recordSourceText(record)
     };
   }), [records, slots]);
@@ -77,6 +79,9 @@ export default function KcfxLibraryPage({
               <div><dt>Sheet</dt><dd>{row.sheetName}</dd></div>
               <div><dt>行数</dt><dd>{formatNumber(row.rowCount)}</dd></div>
             </dl>
+            {row.parseStatus === 'failed' && (
+              <p className="kcfx-library-parse-error">解析失败：{row.parseError || '未返回失败原因'}</p>
+            )}
             {canUpload && (
               <label className="kcfx-upload-button">
                 {uploadingSlot === row.id ? '上传中...' : '上传替换'}
@@ -102,6 +107,7 @@ export default function KcfxLibraryPage({
             { key: 'fileName', label: '文件名' },
             { key: 'sheetName', label: 'Sheet' },
             { key: 'rowCount', label: '行数', render: (row) => formatNumber(row.rowCount) },
+            { key: 'parseStatus', label: '解析状态', render: (row) => row.parseStatus === 'failed' ? `失败：${row.parseError || '未返回失败原因'}` : (row.rowCount > 0 ? '已解析' : '-') },
             { key: 'updatedAt', label: '更新时间', render: (row) => row.updatedAt ? new Date(row.updatedAt).toLocaleString('zh-CN', { hour12: false }) : '-' }
           ]}
         />

@@ -22,6 +22,7 @@ import registerKcfxRoutes from './routes/kcfx.js';
 import registerQualityRoutes from './routes/quality.js';
 import registerSystemRoutes from './routes/system.js';
 import registerReminderRoutes from './routes/reminders.js';
+import { constrainWorksheetRange } from './kcfx-workbook.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -2479,6 +2480,7 @@ function parseKcfxWorkbookRows(workbook, slot) {
   const sheetName = pickKcfxSheetName(workbook, slot);
   const sheet = workbook.Sheets[sheetName];
   if (!sheet) throw new Error('missing sheet');
+  const sheetRange = constrainWorksheetRange(sheet);
   const matrix = xlsx.utils.sheet_to_json(sheet, {
     header: 1,
     defval: '',
@@ -2492,6 +2494,8 @@ function parseKcfxWorkbookRows(workbook, slot) {
   const selected = chooseKcfxHeaderCandidate(candidates);
   return {
     sheetName,
+    originalSheetRange: sheetRange.originalRef,
+    usedSheetRange: sheetRange.usedRef,
     headerRowNumber: selected.headerRowNumber,
     parseNote: selected.parseNote,
     attemptedHeaderRows: candidates.map((candidate) => ({
@@ -2518,6 +2522,8 @@ function buildKcfxParseDiagnostics(parsed) {
   const headers = parsed.headers || Object.keys(rows[0] || {});
   return {
     sheetName: parsed.sheetName || '',
+    originalSheetRange: parsed.originalSheetRange || '',
+    usedSheetRange: parsed.usedSheetRange || '',
     headerRowNumber: parsed.headerRowNumber || 1,
     parseNote: parsed.parseNote || '',
     attemptedHeaderRows: parsed.attemptedHeaderRows || [],
@@ -2711,7 +2717,7 @@ async function removeKcfxStoredFile(record) {
 function parseKcfxWorkbookFile(filePath, slot) {
   const workbook = xlsx.readFile(filePath, {
     cellDates: true,
-    dense: true,
+    dense: false,
     cellHTML: false,
     cellNF: false,
     cellStyles: false

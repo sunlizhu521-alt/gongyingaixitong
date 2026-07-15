@@ -2355,6 +2355,13 @@ th {
   margin: 6px 0 0;
 }
 
+.kcfx-library-card .kcfx-library-parse-error {
+  color: #b42318;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .kcfx-library-card dl {
   display: grid;
   gap: 8px;
