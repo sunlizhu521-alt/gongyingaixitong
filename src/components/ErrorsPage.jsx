@@ -22,6 +22,8 @@ const ERROR_DOWNLOAD_CONFIG = {
     sources: ['closed', 'detail'],
     name: '仓库与物料维度表缺失',
     columns: [
+      ['organization', '库存组织'],
+      ['warehouse', '仓库名称'],
       ['materialCode', '物料编码'],
       ['sku', 'SKU'],
       ['materialName', '物料名称'],
@@ -207,6 +209,8 @@ function CheckGroup({ source, title, description, result, onDownload }) {
       <ErrorTable
         title="有库存仓库物料事业部对照表没有信息"
         columns={[
+          ['organization', '库存组织'],
+          ['warehouse', '仓库名称'],
           ['materialCode', '物料编码'],
           ['sku', 'SKU'],
           ['materialName', '物料名称'],
@@ -214,7 +218,7 @@ function CheckGroup({ source, title, description, result, onDownload }) {
         ]}
         rows={result.divisionMissing}
         diagnostic={[
-          '来源：事实表按有库存物料编码汇总数量。',
+          '来源：事实表按库存组织 + 仓库名称 + 物料编码汇总有库存数量。',
           '比对：仓库物料事业部对照表的物料编码或三元组合匹配键。',
           '缺失提示：有库存记录在仓库物料事业部对照表没有信息。',
           '需要维护：维度表文件库的仓库物料事业部对照表。'
@@ -426,7 +430,7 @@ function buildClosedInventoryChecks(records, maps) {
   const stockMaterials = summarizeClosedStockMaterials(fact.rows || []);
   const stockWarehouses = summarizeClosedStockWarehouses(fact.rows || []);
   const productMissing = stockMaterials.filter((item) => !maps.productMap.has(item.materialCode));
-  const divisionMissing = stockMaterials.filter((item) => !maps.divisionMaterialCodes.has(item.materialCode));
+  const divisionMissing = summarizeClosedDivisionMissing(fact.rows || [], maps.divisionMaterialCodes, maps.productMap);
   const warehouseSet = maps.warehouseNames.size ? maps.warehouseNames : maps.divisionWarehouses;
   const warehouseMissing = stockWarehouses.filter((item) => !warehouseSet.has(item.warehouse));
   const settlementMissing = stockMaterials.filter((item) => {
@@ -437,7 +441,7 @@ function buildClosedInventoryChecks(records, maps) {
   return {
     stockMaterials,
     productMissing: productMissing.map((item) => enrichMissingRow(item, maps.productMap)),
-    divisionMissing: divisionMissing.map((item) => enrichMissingRow(item, maps.productMap)),
+    divisionMissing,
     warehouseMissing,
     settlementMissing: settlementMissing.map((item) => enrichMissingRow(item, maps.productMap))
   };
@@ -598,29 +602,58 @@ function summarizeByWarehouse(rows, warehouseGetter, qtyGetter) {
 }
 
 function summarizeDetailDivisionMissing(rows, departmentKeys, productMap) {
+  return summarizeDivisionMissing(rows, productMap, {
+    qtyGetter: getDetailStockQty,
+    materialGetter: getDetailMaterialCode,
+    materialNameGetter: getDetailMaterialName,
+    organizationGetter: getDetailOrganization,
+    warehouseGetter: getDetailWarehouse,
+    isMissing: (row) => !departmentKeys.has(makeDetailDepartmentKey(row))
+  });
+}
+
+function summarizeClosedDivisionMissing(rows, divisionMaterialCodes, productMap) {
+  return summarizeDivisionMissing(rows, productMap, {
+    qtyGetter: getClosedStockQty,
+    materialGetter: getClosedMaterialCode,
+    materialNameGetter: getClosedMaterialName,
+    organizationGetter: getClosedOrganization,
+    warehouseGetter: getClosedWarehouse,
+    isMissing: (row, materialCode) => !divisionMaterialCodes.has(materialCode)
+  });
+}
+
+function summarizeDivisionMissing(rows, productMap, config) {
   const map = new Map();
   for (const row of rows) {
-    const qty = getDetailStockQty(row);
+    const qty = config.qtyGetter(row);
     if (qty <= 0) continue;
-    const materialCode = getDetailMaterialCode(row);
+    const materialCode = config.materialGetter(row);
     if (!materialCode) continue;
-    const departmentKey = makeDetailDepartmentKey(row);
-    if (departmentKeys.has(departmentKey)) continue;
-    if (!map.has(materialCode)) {
-      map.set(materialCode, {
+    if (!config.isMissing(row, materialCode)) continue;
+    const organization = config.organizationGetter(row);
+    const warehouse = config.warehouseGetter(row);
+    const mapKey = `${normalizeKey(organization)}|${normalizeKey(warehouse)}|${materialCode}`;
+    if (!map.has(mapKey)) {
+      map.set(mapKey, {
+        organization,
+        warehouse,
         materialCode,
         sku: normalizeText(firstValue(row, ['SKU'])),
-        materialName: getDetailMaterialName(row),
+        materialName: config.materialNameGetter(row),
         qty: 0
       });
     }
-    const item = map.get(materialCode);
+    const item = map.get(mapKey);
     item.qty += qty;
-    if (!item.materialName) item.materialName = getDetailMaterialName(row);
+    if (!item.materialName) item.materialName = config.materialNameGetter(row);
   }
   return [...map.values()]
     .map((item) => enrichMissingRow(item, productMap))
-    .sort((a, b) => b.qty - a.qty || a.materialCode.localeCompare(b.materialCode, 'zh-CN'));
+    .sort((a, b) => b.qty - a.qty
+      || a.organization.localeCompare(b.organization, 'zh-CN')
+      || a.warehouse.localeCompare(b.warehouse, 'zh-CN')
+      || a.materialCode.localeCompare(b.materialCode, 'zh-CN'));
 }
 
 function summarizeSalesCustomerMaterialMissing(rows, customerMaterialKeys, productMap) {
@@ -789,6 +822,8 @@ function mapStoreNames(rows) {
 function enrichMissingRow(item, productMap) {
   const product = productMap.get(item.materialCode) || {};
   return {
+    organization: item.organization || '',
+    warehouse: item.warehouse || '',
     materialCode: item.materialCode,
     sku: item.sku || product.sku || '',
     materialName: item.materialName || product.materialName || '',
@@ -820,6 +855,13 @@ function getClosedWarehouse(row) {
   return normalizeText(firstValue(row, ['仓库', '仓库名称', '金蝶名称']));
 }
 
+function getClosedOrganization(row) {
+  return normalizeText(firstText([
+    firstValue(row, ['库存组织', '使用组织', '组织', '主体名称']),
+    nthValue(row, 1)
+  ]));
+}
+
 function getClosedStockQty(row) {
   return firstNumber([
     firstValue(row, ['数量', '库存数量', '结存数量', '(结存)数量（库存）', 'K-现货+在途库存']),
@@ -843,7 +885,7 @@ function getDetailWarehouse(row) {
 
 function getDetailOrganization(row) {
   return normalizeText(firstText([
-    firstValue(row, ['使用组织', '库存组织', '组织']),
+    firstValue(row, ['使用组织', '库存组织', '组织', '主体名称']),
     nthValue(row, 4)
   ]));
 }
