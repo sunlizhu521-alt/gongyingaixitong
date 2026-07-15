@@ -2851,6 +2851,7 @@ const gongyingContext = {
   getKcfxReceiptSummaryResponse,
   getKcfxTrendSummaryResponse,
   recoverKcfxRecordFromRowsFile,
+  resolveKcfxStoredFilePath,
   ensureKcfxRecordRows,
   externalizeKcfxRecordRows,
   attachKcfxRecordRows,

@@ -110,6 +110,7 @@ export default function registerKcfxRoutes(app, db) {
     getKcfxReceiptSummaryResponse,
     getKcfxTrendSummaryResponse,
     recoverKcfxRecordFromRowsFile,
+    resolveKcfxStoredFilePath,
     ensureKcfxRecordRows,
     externalizeKcfxRecordRows,
     attachKcfxRecordRows,
@@ -303,6 +304,18 @@ app.get('/api/kcfx-library/sales-rows', async (req, res) => {
       error: error?.message || String(error)
     });
   }
+});
+
+app.get('/api/kcfx-library/records/:id/original', async (req, res) => {
+  const db = await initDb(dataDir);
+  const requestUser = requireSystemOwner(db, req, res);
+  if (!requestUser) return;
+  const id = String(req.params.id || '').trim();
+  const record = db.kcfxLibrary.records[id];
+  if (!record) return res.status(404).json({ error: 'record not found' });
+  const filePath = await resolveKcfxStoredFilePath({ ...record, id });
+  if (!filePath) return res.status(404).json({ error: 'original file not found' });
+  res.download(filePath, record.fileName || `${id}.xlsx`);
 });
 
 app.get('/api/kcfx-library/records/:id', async (req, res) => {
