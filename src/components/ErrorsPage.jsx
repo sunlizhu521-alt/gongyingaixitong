@@ -52,6 +52,7 @@ const ERROR_DOWNLOAD_CONFIG = {
     sources: ['sales'],
     name: '客户与物料对照缺失表',
     columns: [
+      ['salesDepartment', '销售部门名称'],
       ['customer', '客户/店铺'],
       ['materialCode', '物料编码'],
       ['sku', 'SKU'],
@@ -297,6 +298,7 @@ function SalesCheckGroup({ result, onDownload }) {
       <ErrorTable
         title="销售数据客户与物料对照表没有信息"
         columns={[
+          ['salesDepartment', '销售部门名称'],
           ['customer', '客户/店铺'],
           ['materialCode', '物料编码'],
           ['sku', 'SKU'],
@@ -305,7 +307,7 @@ function SalesCheckGroup({ result, onDownload }) {
         ]}
         rows={result.customerMaterialMissing}
         diagnostic={[
-          '来源：销售数据文件客户名称 + 物料编码组合。',
+          '来源：销售数据文件销售部门名称、客户名称 + 物料编码组合。',
           '比对：客户与物料对照表维护的客户物料匹配关系。',
           '缺失提示：销售数据文件存在客户和物料组合，但客户与物料对照表没有信息。',
           '需要维护：维度表文件库的客户与物料对照表。'
@@ -667,6 +669,7 @@ function summarizeSalesCustomerMaterialMissing(rows, customerMaterialKeys, produ
     const mapKey = `${normalizeStoreName(customer)}|${materialCode}`;
     if (!map.has(mapKey)) {
       map.set(mapKey, {
+        salesDepartment: getSalesDepartmentName(row),
         customer,
         materialCode,
         sku: normalizeText(firstValue(row, ['SKU'])),
@@ -676,6 +679,7 @@ function summarizeSalesCustomerMaterialMissing(rows, customerMaterialKeys, produ
     }
     const item = map.get(mapKey);
     item.qty += getSalesQty(row);
+    if (!item.salesDepartment) item.salesDepartment = getSalesDepartmentName(row);
     if (!item.materialName) item.materialName = getSalesMaterialName(row);
   }
   return [...map.values()]
@@ -835,6 +839,7 @@ function enrichMissingRow(item, productMap) {
 function enrichSalesCustomerRow(item, productMap) {
   const product = productMap.get(item.materialCode) || {};
   return {
+    salesDepartment: item.salesDepartment || '',
     customer: item.customer,
     materialCode: item.materialCode,
     sku: item.sku || product.sku || '',
@@ -917,6 +922,14 @@ function getSalesMaterialName(row) {
     firstValue(row, ['物料名称', '货品名称', '商品名称', '产品名称', '金蝶名称', '品名']),
     firstValueByHeaderIncludes(row, ['物料', '名称']),
     firstValueByHeaderIncludes(row, ['商品', '名称'])
+  ]));
+}
+
+function getSalesDepartmentName(row) {
+  return normalizeText(firstText([
+    firstValue(row, ['销售部门名称', '销售部门', '部门名称', '部门']),
+    firstValueByHeaderIncludes(row, ['销售', '部门']),
+    nthValue(row, 6)
   ]));
 }
 
