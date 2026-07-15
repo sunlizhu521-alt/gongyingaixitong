@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import MultiFilter from './MultiFilter.jsx';
 import MonthCalendarFilter from './MonthCalendarFilter.jsx';
-import { BarPanel, KcfxPageShell, PanelGrid } from './KcfxCommon.jsx';
+import { BarPanel, KcfxPageShell, PanelGrid, SimpleTable } from './KcfxCommon.jsx';
+import { downloadKcfxRowsAsXlsx } from './kcfxExport.js';
 import { KCFX_COLORS, formatNumber, formatQuantity, getCachedSalesRows, groupSum, recordSourceText, sum } from './kcfxUtils.js';
 import { useKcfxRecordMap, useKcfxSalesRows } from './kcfxRecordLoader.js';
 
@@ -18,10 +19,22 @@ const TREND_FILTERS = [
 const EMPTY_SELECTIONS = Object.fromEntries(TREND_FILTERS.map((filter) => [filter.id, []]));
 const SALES_TREND_FILTER_STORAGE_KEY = 'gongyingai:filters:sales-trend:v1';
 const SALES_TREND_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
+const SALES_TREND_PAGE_SIZE = 20;
+const SALES_TREND_TABLE_COLUMNS = [
+  { key: 'salesMonth', label: '月份' },
+  { key: 'salesOrg', label: '事业部' },
+  { key: 'productLine', label: '销售产品线' },
+  { key: 'productSeries', label: '销售系列' },
+  { key: 'materialCode', label: '物料编码' },
+  { key: 'sku', label: 'SKU', render: (row) => row.model || row.sku || '' },
+  { key: 'materialName', label: '名称' },
+  { key: 'qty', label: '数量', render: (row) => formatNumber(row.qty, 2), exportValue: (row) => Number(row.qty) || 0 }
+];
 
 export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, error = '', lastLoadedAt = '', onRefresh }) {
   const [openFilter, setOpenFilter] = useState('');
   const [selections, setSelections] = useState(() => readTrendSelections());
+  const [detailPage, setDetailPage] = useState(1);
   const salesRowsResult = useKcfxSalesRows(kcfxData);
   const shouldUseFallbackRecords = salesRowsResult.loaded && !salesRowsResult.loading && salesRowsResult.rows.length === 0;
   const fallbackRecordsResult = useKcfxRecordMap(kcfxData, shouldUseFallbackRecords ? SALES_TREND_RECORD_IDS : []);
@@ -71,6 +84,15 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
   const filteredRows = useMemo(() => (
     trendRows.filter((row) => rowMatchesSelections(row, normalizedSelections))
   ), [normalizedSelections, trendRows]);
+  const detailPageCount = Math.max(1, Math.ceil(filteredRows.length / SALES_TREND_PAGE_SIZE));
+  const detailRows = useMemo(() => {
+    const start = (detailPage - 1) * SALES_TREND_PAGE_SIZE;
+    return filteredRows.slice(start, start + SALES_TREND_PAGE_SIZE);
+  }, [detailPage, filteredRows]);
+
+  useEffect(() => {
+    setDetailPage((current) => Math.min(Math.max(current, 1), detailPageCount));
+  }, [detailPageCount]);
 
   const months = useMemo(() => (
     [...new Set(filteredRows.map((row) => row.salesMonthNumber).filter(Boolean))]
@@ -94,6 +116,10 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
   const refresh = async () => {
     await Promise.all([reload({ force: true }), onRefresh?.()]);
   };
+
+  const downloadTrendRows = useCallback(() => {
+    downloadKcfxRowsAsXlsx('销售趋势变化明细', filteredRows, SALES_TREND_TABLE_COLUMNS, '销售趋势变化明细');
+  }, [filteredRows]);
 
   function setFilterValue(id, value) {
     setSelections((current) => {
@@ -152,6 +178,29 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
 
       <PanelGrid>
         <BarPanel title="全部销售部门" rows={groupSum(filteredRows, 'salesOrg', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
+      </PanelGrid>
+
+      <section className="kcfx-panel sales-trend-detail-panel">
+        <div className="table-title-row">
+          <div>
+            <h3>销售趋势明细</h3>
+            <p className="kcfx-table-note">共 {formatNumber(filteredRows.length)} 行，每页 {SALES_TREND_PAGE_SIZE} 行</p>
+          </div>
+          <button type="button" className="ghost compact-button" onClick={downloadTrendRows} disabled={pageLoading || !filteredRows.length}>
+            导出
+          </button>
+        </div>
+        <SimpleTable rows={detailRows} maxRows={SALES_TREND_PAGE_SIZE} columns={SALES_TREND_TABLE_COLUMNS} />
+        <div className="kcfx-table-pager">
+          <button type="button" className="ghost compact-button" onClick={() => setDetailPage(1)} disabled={detailPage <= 1}>首页</button>
+          <button type="button" className="ghost compact-button" onClick={() => setDetailPage((page) => Math.max(1, page - 1))} disabled={detailPage <= 1}>上一页</button>
+          <span>第 {detailPage} / {detailPageCount} 页</span>
+          <button type="button" className="ghost compact-button" onClick={() => setDetailPage((page) => Math.min(detailPageCount, page + 1))} disabled={detailPage >= detailPageCount}>下一页</button>
+          <button type="button" className="ghost compact-button" onClick={() => setDetailPage(detailPageCount)} disabled={detailPage >= detailPageCount}>末页</button>
+        </div>
+      </section>
+
+      <PanelGrid>
         <BarPanel title="店铺简称（日常汇报沟通简称）" rows={groupSum(filteredRows, 'storeShortName', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
         <BarPanel title="销售产品线" rows={groupSum(filteredRows, 'productLine', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
         <BarPanel title="销售系列" rows={groupSum(filteredRows, 'productSeries', 'qty', 10)} total={totalQty} valueFormatter={(value) => formatNumber(value, 2)} />
