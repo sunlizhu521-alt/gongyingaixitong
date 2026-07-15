@@ -49,6 +49,8 @@ jobs:
             if [ -d data ]; then
               BACKUP_FILE="$BACKUP_DIR/data-$(date +%Y%m%d-%H%M%S).tar.gz"
               tar -czf "$BACKUP_FILE" data
+              test -s "$BACKUP_FILE"
+              tar -tzf "$BACKUP_FILE" > /dev/null
               ls -lh "$BACKUP_FILE"
             fi
 
