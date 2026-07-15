@@ -2153,6 +2153,7 @@ function summarizeKcfxTrendMonth(month, record, maps) {
   const qtyAccessor = makeKcfxTrendQtyAccessor(sourceRows[0]);
   const priceAccessor = makeKcfxTrendPriceAccessor(sourceRows[0]);
   const groupedItems = new Map();
+  const departmentMissingItems = new Map();
   const summary = {
     ...month,
     record: stripKcfxTrendRecord(record),
@@ -2165,6 +2166,7 @@ function summarizeKcfxTrendMonth(month, record, maps) {
     directPricedRows: 0,
     fallbackPricedRows: 0,
     items: [],
+    departmentMissingRows: [],
     unclassifiedRows: [],
     unclassifiedTruncated: false
   };
@@ -2186,6 +2188,20 @@ function summarizeKcfxTrendMonth(month, record, maps) {
     const productSeries = maps.productSeriesByMaterial.get(materialB) || '';
     const warehouseType = maps.warehouseTypeByName.get(normalizeKcfxText(warehouse)) || '';
     const warehouseLocation = maps.warehouseLocationByName.get(normalizeKcfxText(warehouse)) || '';
+    if (!department) {
+      const missingKey = [materialA, warehouse, materialB].join('\u001f');
+      const missingItem = departmentMissingItems.get(missingKey) || {
+        month: month.label,
+        organization: materialA,
+        warehouse,
+        materialCode: materialB,
+        materialName,
+        qty: 0,
+        reason: '有库存仓库物料事业部对照表没有信息'
+      };
+      missingItem.qty += qty;
+      departmentMissingItems.set(missingKey, missingItem);
+    }
     const item = {
       qty,
       value,
@@ -2224,6 +2240,7 @@ function summarizeKcfxTrendMonth(month, record, maps) {
         summary.unclassifiedRows.push({
           month: month.label,
           reason: missingReasons.join('、'),
+          organization: materialA,
           materialA,
           materialCode: materialB,
           materialName,
@@ -2240,6 +2257,7 @@ function summarizeKcfxTrendMonth(month, record, maps) {
   }
 
   summary.items = [...groupedItems.values()];
+  summary.departmentMissingRows = [...departmentMissingItems.values()];
   return summary;
 }
 

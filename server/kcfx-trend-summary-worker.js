@@ -160,6 +160,7 @@ function summarizeMonth(month, record, maps) {
   const qtyAccessor = makeQtyAccessor(sourceRows[0]);
   const priceAccessor = makePriceAccessor(sourceRows[0]);
   const groupedItems = new Map();
+  const departmentMissingItems = new Map();
   const summary = {
     ...month,
     record: stripRows(record),
@@ -172,6 +173,7 @@ function summarizeMonth(month, record, maps) {
     directPricedRows: 0,
     fallbackPricedRows: 0,
     items: [],
+    departmentMissingRows: [],
     unclassifiedRows: [],
     unclassifiedTruncated: false
   };
@@ -193,14 +195,28 @@ function summarizeMonth(month, record, maps) {
     const productSeries = maps.productSeriesByMaterial.get(materialB) || '';
     const warehouseType = maps.warehouseTypeByName.get(warehouse) || '';
     const warehouseLocation = maps.warehouseLocationByName.get(warehouse) || '';
+    if (!department) {
+      const missingKey = [materialA, warehouse, materialB].join('\u001f');
+      const missingItem = departmentMissingItems.get(missingKey) || {
+        month: month.label,
+        organization: materialA,
+        warehouse,
+        materialCode: materialB,
+        materialName,
+        qty: 0,
+        reason: '有库存仓库物料事业部对照表没有信息'
+      };
+      missingItem.qty += qty;
+      departmentMissingItems.set(missingKey, missingItem);
+    }
     const item = {
       qty,
       value,
-      warehouseType: warehouseType || 'Unclassified warehouse type',
-      department: department || 'Unmatched department',
-      productLine: productLine || 'Unclassified product line',
-      productSeries: productSeries || 'Unclassified sales series',
-      warehouseLocation: warehouseLocation || 'Unclassified warehouse location'
+      warehouseType: warehouseType || '未分类仓库类型',
+      department: department || '未匹配事业部',
+      productLine: productLine || '未分类产品线',
+      productSeries: productSeries || '未分类销售系列',
+      warehouseLocation: warehouseLocation || '未分类仓库位置'
     };
     const groupKey = [item.warehouseType, item.department, item.productLine, item.productSeries, item.warehouseLocation].join('\u001f');
     const grouped = groupedItems.get(groupKey) || { ...item, qty: 0, value: 0 };
@@ -216,15 +232,16 @@ function summarizeMonth(month, record, maps) {
     else if (fallbackSettlementPrice) summary.fallbackPricedRows += 1;
 
     const missingReasons = [
-      department ? '' : 'Missing department',
-      productLine ? '' : 'Missing product line',
-      warehouseLocation ? '' : 'Missing warehouse location'
+      department ? '' : '未匹配事业部',
+      productLine ? '' : '未匹配销售产品线',
+      warehouseLocation ? '' : '未匹配仓库位置'
     ].filter(Boolean);
     if (missingReasons.length) {
       if (summary.unclassifiedRows.length < UNCLASSIFIED_LIMIT) {
         summary.unclassifiedRows.push({
           month: month.label,
           reason: missingReasons.join('、'),
+          organization: materialA,
           materialA,
           materialCode: materialB,
           materialName,
@@ -241,6 +258,7 @@ function summarizeMonth(month, record, maps) {
   }
 
   summary.items = [...groupedItems.values()];
+  summary.departmentMissingRows = [...departmentMissingItems.values()];
   return summary;
 }
 

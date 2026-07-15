@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { API } from '../constants.js';
 import { useKcfxRecordMap } from './kcfxRecordLoader.js';
 
 const EMPTY_TABLES = {
   closed: emptyErrorResult(),
   detail: emptyErrorResult(),
-  sales: emptySalesErrorResult()
+  sales: emptySalesErrorResult(),
+  trend: emptyTrendErrorResult()
 };
 
 const ERROR_DOWNLOAD_CONFIG = {
@@ -68,6 +70,19 @@ const ERROR_DOWNLOAD_CONFIG = {
       ['normalized', '规范化客户名称'],
       ['qty', '数量']
     ]
+  },
+  trendDivisionMissing: {
+    sources: ['trend'],
+    name: '库存趋势事业部对照缺失表',
+    columns: [
+      ['month', '月份'],
+      ['organization', '库存组织'],
+      ['warehouse', '仓库名称'],
+      ['materialCode', '物料编码'],
+      ['materialName', '物料名称'],
+      ['qty', '数量'],
+      ['reason', '缺失原因']
+    ]
   }
 };
 
@@ -80,10 +95,37 @@ export default function ErrorsPage({
   onRefresh
 }) {
   const [downloadMessage, setDownloadMessage] = useState('');
+  const [trendSummary, setTrendSummary] = useState(null);
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [trendError, setTrendError] = useState('');
   const { records: loadedRecords, loading: recordsLoading, error: recordsError, reload } = useKcfxRecordMap(kcfxData, ERROR_RECORD_IDS);
   const records = useMemo(() => ({ ...kcfxRecords, ...loadedRecords }), [kcfxRecords, loadedRecords]);
-  const pageLoading = loading || recordsLoading;
-  const pageError = recordsError || error;
+  const pageLoading = loading || recordsLoading || trendLoading;
+  const pageError = recordsError || trendError || error;
+
+  const loadTrendSummary = useCallback(async () => {
+    setTrendLoading(true);
+    setTrendError('');
+    try {
+      const response = await fetch(`${API}/api/kcfx-library/trend-summary`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setTrendSummary(await response.json());
+    } catch (loadError) {
+      setTrendError(loadError?.message || String(loadError));
+    } finally {
+      setTrendLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTrendSummary();
+  }, [loadTrendSummary, kcfxData?.savedAt]);
+
+  useEffect(() => {
+    if (!trendSummary?.refreshing) return undefined;
+    const timer = window.setTimeout(loadTrendSummary, 1500);
+    return () => window.clearTimeout(timer);
+  }, [loadTrendSummary, trendSummary?.refreshing]);
 
   const checks = useMemo(() => {
     if (!records || Object.keys(records).length === 0) return EMPTY_TABLES;
@@ -91,9 +133,10 @@ export default function ErrorsPage({
     return {
       closed: buildClosedInventoryChecks(records, maps),
       detail: buildInventoryMonthChecks(records, maps),
-      sales: buildSalesDataChecks(records, maps)
+      sales: buildSalesDataChecks(records, maps),
+      trend: buildTrendChecks(trendSummary)
     };
-  }, [records]);
+  }, [records, trendSummary]);
 
   const statusText = useMemo(() => {
     if (pageLoading) return '数据加载中...';
@@ -102,13 +145,14 @@ export default function ErrorsPage({
     const messages = [
       checks.closed.message || `关账库存事实表：有库存物料 ${formatNumber(checks.closed.stockMaterials.length)} 个，缺失 ${formatNumber(totalMissingCount(checks.closed))} 项`,
       checks.detail.message || `库存分析月份表：有库存物料 ${formatNumber(checks.detail.stockMaterials.length)} 个，缺失 ${formatNumber(totalMissingCount(checks.detail))} 项`,
-      checks.sales.message || `销售数据文件：销售物料 ${formatNumber(checks.sales.stockMaterials.length)} 个，缺失 ${formatNumber(totalMissingCount(checks.sales))} 项`
+      checks.sales.message || `销售数据文件：销售物料 ${formatNumber(checks.sales.stockMaterials.length)} 个，缺失 ${formatNumber(totalMissingCount(checks.sales))} 项`,
+      `库存趋势事实表：事业部对照缺失 ${formatNumber(checks.trend.trendDivisionMissing.length)} 项`
     ];
     const loadedText = lastLoadedAt ? `；读取时间：${lastLoadedAt}` : '';
     return `检查完成：${messages.join('；')}${loadedText}`;
   }, [checks, pageError, records, lastLoadedAt, pageLoading]);
   const refresh = async () => {
-    await Promise.all([reload(), onRefresh?.()]);
+    await Promise.all([reload(), onRefresh?.(), loadTrendSummary()]);
   };
 
   async function downloadSingle(source, tableName) {
@@ -126,7 +170,7 @@ export default function ErrorsPage({
   async function downloadAll() {
     const XLSX = await import('xlsx');
     const stamp = downloadTimestamp();
-    for (const source of ['closed', 'detail', 'sales']) {
+    for (const source of ['closed', 'detail', 'sales', 'trend']) {
       for (const [tableName, config] of Object.entries(ERROR_DOWNLOAD_CONFIG)) {
         if (!config.sources.includes(source)) continue;
         downloadRowsAsWorkbook(XLSX, `${errorSourceLabel(source)}-${config.name}`, stamp, checks[source][tableName] || [], config.columns);
@@ -168,6 +212,7 @@ export default function ErrorsPage({
         onDownload={downloadSingle}
       />
       <SalesCheckGroup result={checks.sales} onDownload={downloadSingle} />
+      <TrendCheckGroup result={checks.trend} onDownload={downloadSingle} />
     </section>
   );
 }
@@ -328,6 +373,32 @@ function SalesCheckGroup({ result, onDownload }) {
   );
 }
 
+function TrendCheckGroup({ result, onDownload }) {
+  return (
+    <section className="error-source-panel">
+      <section className="error-source-title">
+        <h2>根据库存趋势事实表</h2>
+        <p>按月份检查库存组织、仓库名称和物料编码是否能匹配有库存仓库物料事业部对照表。</p>
+      </section>
+      <section className="metric-grid error-metrics">
+        <MetricCard label="事业部对照缺失" value={result.trendDivisionMissing.length} />
+      </section>
+      <ErrorTable
+        title="有库存仓库物料事业部对照表没有信息"
+        columns={ERROR_DOWNLOAD_CONFIG.trendDivisionMissing.columns.map(([key, label]) => [key, label, key === 'qty' ? 'num' : ''])}
+        rows={result.trendDivisionMissing}
+        diagnostic={[
+          '来源：库存趋势事实表中有库存数量的记录。',
+          '比对：库存组织 + 仓库名称 + 物料编码匹配有库存仓库物料事业部对照表。',
+          '缺失提示：无法匹配的记录会在库存趋势中显示为“未匹配事业部”。',
+          '需要维护：维度表文件库中的有库存仓库物料事业部对照表。'
+        ]}
+        onDownload={() => onDownload('trend', 'trendDivisionMissing')}
+      />
+    </section>
+  );
+}
+
 function MetricCard({ label, value }) {
   return (
     <div className="metric-card">
@@ -391,6 +462,51 @@ function emptySalesErrorResult(message = '') {
     customerMaterialMissing: [],
     storeMissing: []
   };
+}
+
+function emptyTrendErrorResult() {
+  return { trendDivisionMissing: [] };
+}
+
+function buildTrendChecks(summary) {
+  const grouped = new Map();
+  for (const monthSummary of summary?.monthSummaries || []) {
+    const missingRows = monthSummary?.departmentMissingRows
+      || (monthSummary?.unclassifiedRows || []).filter((row) => !normalizeText(row.department));
+    for (const row of missingRows) {
+      const month = normalizeText(row.month || monthSummary.label);
+      const organization = normalizeText(row.organization || row.materialA);
+      const warehouse = normalizeText(row.warehouse);
+      const materialCode = normalizeMaterialCode(row.materialCode);
+      const materialName = normalizeText(row.materialName);
+      const key = [month, organization, warehouse, materialCode].map(normalizeKey).join('|');
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          month,
+          organization,
+          warehouse,
+          materialCode,
+          materialName,
+          qty: 0,
+          reason: '有库存仓库物料事业部对照表没有信息'
+        });
+      }
+      const item = grouped.get(key);
+      item.qty += Number(row.qty) || 0;
+      if (!item.materialName) item.materialName = materialName;
+    }
+  }
+  return {
+    trendDivisionMissing: [...grouped.values()].sort((a, b) => monthNumber(a.month) - monthNumber(b.month)
+      || b.qty - a.qty
+      || a.organization.localeCompare(b.organization, 'zh-CN')
+      || a.warehouse.localeCompare(b.warehouse, 'zh-CN')
+      || a.materialCode.localeCompare(b.materialCode, 'zh-CN'))
+  };
+}
+
+function monthNumber(value) {
+  return Number.parseInt(String(value || ''), 10) || 0;
 }
 
 function buildDimensionMaps(records) {
@@ -1022,7 +1138,8 @@ function totalMissingCount(result) {
     + result.warehouseMissing.length
     + result.settlementMissing.length
     + (result.customerMaterialMissing?.length || 0)
-    + (result.storeMissing?.length || 0);
+    + (result.storeMissing?.length || 0)
+    + (result.trendDivisionMissing?.length || 0);
 }
 
 function formatNumber(value) {
@@ -1053,7 +1170,8 @@ function errorSourceLabel(source) {
   return {
     closed: '关账库存事实表',
     detail: '库存分析月份表',
-    sales: '销售数据文件'
+    sales: '销售数据文件',
+    trend: '库存趋势事实表'
   }[source] || '报错信息';
 }
 
