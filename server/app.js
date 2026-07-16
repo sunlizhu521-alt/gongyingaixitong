@@ -27,8 +27,20 @@ import { INVENTORY_TREND_MONTHS, KCFX_TREND_SCHEMA_VERSION } from '../shared/kcf
 import {
   filterInventoryMonthSummaryRows,
   findInventoryMonthHeaderRowIndex,
-  inventoryMonthAgeBuckets
+  inventoryMonthAgeBuckets,
+  inventoryMonthAgeQuantity
 } from '../shared/kcfxInventoryMonth.js';
+import {
+  INVENTORY_AGE_SLOT_IDS,
+  isInventoryAgeSlotId,
+  latestInventoryAgeSlotId
+} from '../shared/kcfxAgeMonths.js';
+import {
+  buildAgeAnalysisCache,
+  exportAgeAnalysisRows,
+  KCFX_AGE_ANALYSIS_VERSION,
+  queryAgeAnalysis
+} from './kcfx-age-analysis.js';
 import { isStoreMappingHeaderSet, isStoreMappingRecordValid, pickStoreMappingSheetName, STORE_MAPPING_SHEET_HINT } from '../shared/kcfxStoreMapping.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,6 +53,7 @@ const legacyKcfxFileDir = path.join(dataDir, 'kcfx-files');
 const kcfxRecordDir = path.join(dataDir, 'kcfx-records');
 const kcfxTrendSummaryPath = path.join(dataDir, 'kcfx-trend-summary.json');
 const kcfxReceiptSummaryPath = path.join(dataDir, 'kcfx-receipt-summary.json');
+const kcfxAgeAnalysisPath = path.join(dataDir, 'kcfx-age-analysis.json');
 const kcfxTrendWorkerPath = path.join(__dirname, 'kcfx-trend-summary-worker.js');
 const kcfxDir = path.join(rootDir, 'public', 'kcfx');
 const serverStartedAt = new Date();
@@ -148,6 +161,7 @@ const USER_STATUS_APPROVED = 'approved';
 const USER_STATUS_PENDING = 'pending';
 const SALES_INVENTORY_PERMISSIONS = [
   'salesInventory.receiptSummary',
+  'salesInventory.ageAnalysis',
   'salesInventory.receiptFeedback',
   'salesInventory.inventoryTrend',
   'salesInventory.salesAnalysis',
@@ -158,6 +172,7 @@ const SALES_INVENTORY_PERMISSIONS = [
 ];
 const MAINTENANCE_LIBRARY_PERMISSIONS = [
   'maintenanceLibrary.factLibrary',
+  'maintenanceLibrary.ageLibrary',
   'maintenanceLibrary.salesLibrary',
   'maintenanceLibrary.fileLibrary',
   'maintenanceLibrary.supplierManagement'
@@ -214,6 +229,7 @@ const KC_LIBRARY_SLOT_IDS = new Set([
   'fact-12',
   'fact-13',
   'fact-14',
+  ...INVENTORY_AGE_SLOT_IDS,
   'sales-data'
 ]);
 const KC_PRIORITY_PRELOAD_SLOT_IDS = new Set([
@@ -251,7 +267,9 @@ function expandPermissionKey(permission) {
   if (permission === 'supplierPayment.invoiceInventory' || permission === 'invoiceInventory') return ['systemFileLibrary', 'systemFileLibrary.invoiceInventory'];
   if (permission === 'supplierPayment.supplierManagement' || permission === 'supplierManagement') return ['maintenanceLibrary', 'maintenanceLibrary.supplierManagement'];
   if (permission === 'supplierPayment.reminders') return ['systemManagement', 'systemManagement.reminders'];
-  if (permission === 'salesInventory') return ['salesInventory', ...SALES_INVENTORY_PERMISSIONS];
+  if (permission === 'salesInventory') {
+    return ['salesInventory', ...SALES_INVENTORY_PERMISSIONS.filter((item) => item !== 'salesInventory.ageAnalysis')];
+  }
   if (permission === 'maintenanceLibrary') return ['maintenanceLibrary', ...MAINTENANCE_LIBRARY_PERMISSIONS];
   if (permission === 'salesInventory.factLibrary') return ['maintenanceLibrary', 'maintenanceLibrary.factLibrary'];
   if (permission === 'salesInventory.salesLibrary') return ['maintenanceLibrary', 'maintenanceLibrary.salesLibrary'];
@@ -1445,7 +1463,6 @@ let kcfxTrendSummaryCache = null;
 let kcfxTrendSummaryPromise = null;
 
 const KCFX_RECEIPT_RECORD_IDS = new Set([
-  'fact-2',
   'dim-product',
   'dim-warehouse',
   'dim-warehouse-material',
@@ -1470,6 +1487,8 @@ const KCFX_RECEIPT_OTHER_UNSALEABLE_RETURN_CATEGORIES = new Set(['健康办公',
 let kcfxReceiptSummaryCache = null;
 let kcfxReceiptSummaryPromise = null;
 const KCFX_RECEIPT_SUMMARY_CACHE_VERSION = 4;
+let kcfxAgeAnalysisCache = null;
+let kcfxAgeAnalysisPromise = null;
 const KCFX_RECEIPT_SUMMARY_ROW_FIELDS = [
   'materialCode',
   'sku',
@@ -1516,6 +1535,14 @@ async function buildPreloadedKcfxLibrary(db = null, options = {}) {
   const entries = new Map(Object.entries(database.kcfxLibrary?.records || {}));
   if (targetIds) {
     for (const id of targetIds) {
+      if (id === 'fact-2') {
+        const activeId = resolveActiveInventoryMonthId(database.kcfxLibrary?.records || {});
+        const activeRecord = activeId ? database.kcfxLibrary?.records?.[activeId] : null;
+        if (activeRecord) {
+          entries.set(id, activeRecord);
+          continue;
+        }
+      }
       if (!entries.has(id)) {
         const recoveredRecord = await recoverKcfxRecordFromRowsFile(id);
         if (recoveredRecord) entries.set(id, recoveredRecord);
@@ -1527,11 +1554,17 @@ async function buildPreloadedKcfxLibrary(db = null, options = {}) {
     if (!KC_LIBRARY_SLOT_IDS.has(id)) continue;
     if (targetIds && !targetIds.has(id)) continue;
     try {
-      const record = await ensureKcfxRecordRows(database, id, sourceRecord);
+      const sourceId = id === 'fact-2' ? resolveActiveInventoryMonthId(database.kcfxLibrary?.records || {}) : id;
+      const resolvedSourceRecord = sourceId === id
+        ? sourceRecord
+        : database.kcfxLibrary?.records?.[sourceId] || await recoverKcfxRecordFromRowsFile(sourceId);
+      if (!resolvedSourceRecord) continue;
+      const record = await ensureKcfxRecordRows(database, sourceId, resolvedSourceRecord);
       const fullRecord = await attachKcfxRecordRows(record);
       records[id] = {
         ...fullRecord,
         id,
+        ...(sourceId !== id ? { sourceRecordId: sourceId } : {}),
         libraryPath: `/api/kcfx-library/records/${encodeURIComponent(id)}`,
         libraryManifestPath: '/api/kcfx-library',
         sharedSavedAt: fullRecord.serverSavedAt || fullRecord.savedAt || manifest.savedAt || ''
@@ -1602,11 +1635,29 @@ function scheduleKcfxPreloadRefresh(db = null) {
   });
 }
 
+function isInventoryMonthSlotId(id) {
+  return id === 'fact-2' || isInventoryAgeSlotId(id);
+}
+
+function resolveActiveInventoryMonthId(records = {}) {
+  return latestInventoryAgeSlotId(records, 'fact-2');
+}
+
+let kcfxLibraryMutationQueue = Promise.resolve();
+
+function withKcfxLibraryMutation(task) {
+  const run = kcfxLibraryMutationQueue.then(task, task);
+  kcfxLibraryMutationQueue = run.catch(() => {});
+  return run;
+}
+
 async function getKcfxTrendRecord(db, id) {
-  const source = db.kcfxLibrary?.records?.[id] || await recoverKcfxRecordFromRowsFile(id);
+  const sourceId = id === 'fact-2' ? resolveActiveInventoryMonthId(db.kcfxLibrary?.records || {}) : id;
+  const source = db.kcfxLibrary?.records?.[sourceId] || await recoverKcfxRecordFromRowsFile(sourceId);
   if (!source) return null;
-  const record = await ensureKcfxRecordRows(db, id, source);
-  return attachKcfxRecordRows(record);
+  const record = await ensureKcfxRecordRows(db, sourceId, source);
+  const fullRecord = await attachKcfxRecordRows(record);
+  return id === sourceId ? fullRecord : { ...fullRecord, id, sourceRecordId: sourceId };
 }
 
 function stripKcfxTrendRecord(record = null) {
@@ -1755,10 +1806,12 @@ async function getKcfxTrendSummaryResponse() {
 }
 
 async function getKcfxReceiptRecord(db, id) {
-  const source = db.kcfxLibrary?.records?.[id] || await recoverKcfxRecordFromRowsFile(id);
+  const sourceId = id === 'fact-2' ? resolveActiveInventoryMonthId(db.kcfxLibrary?.records || {}) : id;
+  const source = db.kcfxLibrary?.records?.[sourceId] || await recoverKcfxRecordFromRowsFile(sourceId);
   if (!source) return null;
-  const record = await ensureKcfxRecordRows(db, id, source);
-  return attachKcfxRecordRows(record);
+  const record = await ensureKcfxRecordRows(db, sourceId, source);
+  const fullRecord = await attachKcfxRecordRows(record);
+  return id === sourceId ? fullRecord : { ...fullRecord, id, sourceRecordId: sourceId };
 }
 
 function stripKcfxReceiptRecord(record = null) {
@@ -1819,6 +1872,11 @@ async function buildKcfxReceiptSummary(db = null) {
   for (const id of KCFX_RECEIPT_RECORD_IDS) {
     records[id] = await getKcfxReceiptRecord(database, id);
   }
+  const activeInventoryMonthId = resolveActiveInventoryMonthId(database.kcfxLibrary?.records || {});
+  const activeInventoryMonthRecord = activeInventoryMonthId
+    ? await getKcfxReceiptRecord(database, activeInventoryMonthId)
+    : null;
+  records['fact-2'] = activeInventoryMonthRecord;
   const ageBuckets = inventoryMonthAgeBuckets(records['fact-2']);
   const maps = buildKcfxReceiptDimensionMaps(records);
   const diagnostics = { matched: 0, unmatched: 0, sample: '' };
@@ -1835,6 +1893,7 @@ async function buildKcfxReceiptSummary(db = null) {
     project: 'kcfx',
     savedAt: database.kcfxLibrary?.savedAt || '',
     generatedAt: new Date().toISOString(),
+    activeInventoryMonthId,
     records: Object.fromEntries(Object.entries(records).map(([id, record]) => [id, stripKcfxReceiptRecord(record)])),
     rowFields: KCFX_RECEIPT_SUMMARY_ROW_FIELDS,
     ageBuckets,
@@ -1887,6 +1946,108 @@ async function getKcfxReceiptSummaryResponse() {
     source: 'server-receipt-summary',
     message: '库存分析汇总正在服务器生成中，请稍后刷新'
   };
+}
+
+async function readKcfxAgeAnalysisCacheFromDisk() {
+  const payload = JSON.parse(await readFile(kcfxAgeAnalysisPath, 'utf8'));
+  if (payload?.ok && payload.version === KCFX_AGE_ANALYSIS_VERSION && Array.isArray(payload.rows)) {
+    kcfxAgeAnalysisCache = payload;
+    return payload;
+  }
+  return null;
+}
+
+async function readKcfxAgeAnalysisCache() {
+  if (kcfxAgeAnalysisCache?.ok) return kcfxAgeAnalysisCache;
+  try {
+    return await readKcfxAgeAnalysisCacheFromDisk();
+  } catch {
+    return null;
+  }
+}
+
+async function writeKcfxAgeAnalysisCache(payload) {
+  await mkdir(path.dirname(kcfxAgeAnalysisPath), { recursive: true });
+  const tempPath = `${kcfxAgeAnalysisPath}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(tempPath, JSON.stringify(payload), 'utf8');
+  await rename(tempPath, kcfxAgeAnalysisPath);
+  kcfxAgeAnalysisCache = payload;
+  return payload;
+}
+
+function isKcfxAgeAnalysisFresh(cache, db) {
+  return Boolean(
+    cache?.ok
+    && cache.version === KCFX_AGE_ANALYSIS_VERSION
+    && Array.isArray(cache.rows)
+    && (!db?.kcfxLibrary?.savedAt || cache.savedAt === db.kcfxLibrary.savedAt)
+  );
+}
+
+async function buildKcfxAgeAnalysis(db = null) {
+  const database = db || await initDb(dataDir);
+  const records = {};
+  for (const id of [
+    ...INVENTORY_AGE_SLOT_IDS,
+    'fact-2',
+    'dim-product',
+    'dim-warehouse',
+    'dim-warehouse-material'
+  ]) {
+    records[id] = await getKcfxReceiptRecord(database, id);
+  }
+  return buildAgeAnalysisCache(records, database.kcfxLibrary?.savedAt || '');
+}
+
+async function refreshKcfxAgeAnalysisCache(db = null) {
+  if (kcfxAgeAnalysisPromise) return kcfxAgeAnalysisPromise;
+  kcfxAgeAnalysisPromise = buildKcfxAgeAnalysis(db)
+    .then((payload) => writeKcfxAgeAnalysisCache(payload))
+    .finally(() => {
+      kcfxAgeAnalysisPromise = null;
+    });
+  return kcfxAgeAnalysisPromise;
+}
+
+function scheduleKcfxAgeAnalysisRefresh(db = null) {
+  refreshKcfxAgeAnalysisCache(db).catch((error) => {
+    console.error('kcfx age analysis refresh failed', error);
+  });
+}
+
+async function getKcfxAgeAnalysisCacheResponse({ waitMs = 12000 } = {}) {
+  const db = await initDb(dataDir);
+  const cache = await readKcfxAgeAnalysisCache();
+  if (isKcfxAgeAnalysisFresh(cache, db)) return cache;
+  if (!kcfxAgeAnalysisPromise) scheduleKcfxAgeAnalysisRefresh(db);
+  if (kcfxAgeAnalysisPromise) {
+    const payload = await Promise.race([
+      kcfxAgeAnalysisPromise,
+      new Promise((resolve) => setTimeout(() => resolve(null), waitMs))
+    ]);
+    if (payload?.ok) return payload;
+  }
+  if (cache?.ok) return { ...cache, refreshing: true };
+  return null;
+}
+
+async function queryKcfxAgeAnalysis(request = {}) {
+  const cache = await getKcfxAgeAnalysisCacheResponse();
+  if (!cache) {
+    return {
+      ok: false,
+      status: 'loading',
+      source: 'server-age-analysis',
+      message: '库存分析汇总正在生成中，请稍后刷新'
+    };
+  }
+  return queryAgeAnalysis(cache, request);
+}
+
+async function getKcfxAgeAnalysisExportRows(request = {}) {
+  const cache = await getKcfxAgeAnalysisCacheResponse({ waitMs: 30000 });
+  if (!cache) throw new Error('库存分析汇总尚未生成完成');
+  return exportAgeAnalysisRows(cache, request);
 }
 
 function buildKcfxReceiptDimensionMaps(records) {
@@ -2113,6 +2274,8 @@ function getKcfxReceiptAgeQuantities(row, ageBuckets) {
 }
 
 function getKcfxReceiptAgeQuantity(row, label) {
+  const dynamicValue = inventoryMonthAgeQuantity(row, label);
+  if (dynamicValue) return dynamicValue;
   const candidates = KCFX_RECEIPT_AGE_DEFINITIONS.get(label) || [];
   return kcfxReceiptFirstOptionalNumber([
     ...candidates.map((name) => kcfxReceiptFirstValue(row, [name])),
@@ -2500,7 +2663,7 @@ function kcfxHeaderKeywordsForSlot(slot = {}) {
   if (slot.id === 'fact-inventory') {
     return [...common, '结存数量', '真实成本', '真实成本单价', '货品'];
   }
-  if (slot.id === 'fact-2') {
+  if (isInventoryMonthSlotId(slot.id)) {
     return [...common, '数量(库存)', '0天到30天', '151天到180天', '181天以上', '结余库存数量', '库龄'];
   }
   if (/^fact-[3-8]$/.test(slot.id || '')) {
@@ -2593,10 +2756,10 @@ function parseKcfxWorkbookRows(workbook, slot) {
   const candidates = kcfxHeaderRowCandidates(slot, matrix.length)
     .map((rowIndex) => parseKcfxRowsFromHeaderIndex(matrix, rowIndex, slot))
     .filter(Boolean);
-  const detectedHeaderIndex = slot.id === 'fact-2' ? findInventoryMonthHeaderRowIndex(matrix) : -1;
+  const detectedHeaderIndex = isInventoryMonthSlotId(slot.id) ? findInventoryMonthHeaderRowIndex(matrix) : -1;
   const selected = candidates.find((candidate) => candidate.headerRowIndex === detectedHeaderIndex)
     || chooseKcfxHeaderCandidate(candidates);
-  const filtered = slot.id === 'fact-2'
+  const filtered = isInventoryMonthSlotId(slot.id)
     ? filterInventoryMonthSummaryRows(selected.rows)
     : { rows: selected.rows, removed: 0 };
   return {
@@ -2666,7 +2829,7 @@ function parseKcfxSlotPayload(slotId, payload) {
     title: String(slot.title || slotId),
     expectedName: String(slot.expectedName || ''),
     sheetHint: String(slot.sheetHint || defaultKcfxSheetHint(slotId)),
-    skipRows: Number.isInteger(Number(slot.skipRows)) ? Number(slot.skipRows) : (slotId === 'fact-2' ? 2 : undefined)
+    skipRows: Number.isInteger(Number(slot.skipRows)) ? Number(slot.skipRows) : (isInventoryMonthSlotId(slotId) ? 2 : undefined)
   };
 }
 
@@ -2850,66 +3013,89 @@ function parseKcfxWorkbookFile(filePath, slot) {
   };
 }
 
+let kcfxFileParseQueue = Promise.resolve();
+let kcfxFileParsePending = 0;
+
+async function scheduleKcfxDerivedRefreshFromLatestDb() {
+  const database = await initDb(dataDir);
+  scheduleKcfxPreloadRefresh(database);
+  scheduleKcfxReceiptSummaryRefresh(database);
+  scheduleKcfxTrendSummaryRefresh();
+  scheduleKcfxAgeAnalysisRefresh(database);
+}
+
 function scheduleKcfxFileParse(job) {
-  setTimeout(() => {
-    parseKcfxStoredFile(job).catch((error) => {
+  kcfxFileParsePending += 1;
+  kcfxFileParseQueue = kcfxFileParseQueue
+    .then(() => parseKcfxStoredFile(job))
+    .catch((error) => {
       console.error('kcfx background parse failed', error);
+    })
+    .finally(() => {
+      kcfxFileParsePending = Math.max(0, kcfxFileParsePending - 1);
+      if (kcfxFileParsePending === 0) {
+        scheduleKcfxDerivedRefreshFromLatestDb().catch((error) => {
+          console.error('kcfx derived refresh failed', error);
+        });
+      }
     });
-  }, 0);
+  return kcfxFileParseQueue;
 }
 
 async function parseKcfxStoredFile({ id, slot, file, storedFile, previousRecord, requestUserName }) {
   const parseStartedAt = new Date().toISOString();
-  let db = await initDb(dataDir);
-  const currentRecord = db.kcfxLibrary.records[id];
-  if (!currentRecord || currentRecord.serverFilePath !== storedFile.relativePath) return;
-  db.kcfxLibrary.records[id] = {
-    ...currentRecord,
-    parseStatus: 'parsing',
-    parseStartedAt,
-    parseError: ''
-  };
-  db.kcfxLibrary.savedAt = parseStartedAt;
-  await db.save();
+  const shouldParse = await withKcfxLibraryMutation(async () => {
+    const database = await initDb(dataDir);
+    const currentRecord = database.kcfxLibrary.records[id];
+    if (!currentRecord || currentRecord.serverFilePath !== storedFile.relativePath) return false;
+    database.kcfxLibrary.records[id] = {
+      ...currentRecord,
+      parseStatus: 'parsing',
+      parseStartedAt,
+      parseError: ''
+    };
+    database.kcfxLibrary.savedAt = parseStartedAt;
+    await database.save();
+    return true;
+  });
+  if (!shouldParse) return;
 
   try {
     const parsed = parseKcfxWorkbookFile(storedFile.fullPath, slot);
     if (!parsed.rows.length) throw new Error('file parsed no valid rows');
     const record = await externalizeKcfxRecordRows(buildKcfxFileRecord(file, storedFile, slot, parsed), id);
-    db = await initDb(dataDir);
-    const latestRecord = db.kcfxLibrary.records[id];
-    if (!latestRecord || latestRecord.serverFilePath !== storedFile.relativePath) return;
-    db.kcfxLibrary.records[id] = {
-      ...record,
-      serverSavedAt: latestRecord.serverSavedAt || record.savedAt,
-      serverSavedBy: requestUserName,
-      parseQueuedAt: latestRecord.parseQueuedAt || record.savedAt,
-      parseStartedAt
-    };
-    db.kcfxLibrary.savedAt = new Date().toISOString();
-    await removeKcfxStoredFile(previousRecord);
-    pushLog(db, 'kcfx file library parsed', requestUserName, `${requestUserName} uploaded and parsed ${record.title || id}`);
-    await db.save();
-    scheduleKcfxPreloadRefresh(db);
-    scheduleKcfxReceiptSummaryRefresh(db);
-    scheduleKcfxTrendSummaryRefresh();
+    await withKcfxLibraryMutation(async () => {
+      const database = await initDb(dataDir);
+      const latestRecord = database.kcfxLibrary.records[id];
+      if (!latestRecord || latestRecord.serverFilePath !== storedFile.relativePath) return;
+      database.kcfxLibrary.records[id] = {
+        ...record,
+        serverSavedAt: latestRecord.serverSavedAt || record.savedAt,
+        serverSavedBy: requestUserName,
+        parseQueuedAt: latestRecord.parseQueuedAt || record.savedAt,
+        parseStartedAt
+      };
+      database.kcfxLibrary.savedAt = new Date().toISOString();
+      await removeKcfxStoredFile(previousRecord);
+      pushLog(database, 'kcfx file library parsed', requestUserName, `${requestUserName} uploaded and parsed ${record.title || id}`);
+      await database.save();
+    });
   } catch (error) {
-    db = await initDb(dataDir);
-    const latestRecord = db.kcfxLibrary.records[id];
-    if (!latestRecord || latestRecord.serverFilePath !== storedFile.relativePath) return;
-    db.kcfxLibrary.records[id] = {
-      ...latestRecord,
-      ...preserveKcfxRowsMetadata(previousRecord),
-      parseStatus: 'failed',
-      parseFailedAt: new Date().toISOString(),
-      parseError: error?.message || 'parse failed'
-    };
-    db.kcfxLibrary.savedAt = new Date().toISOString();
-    pushLog(db, 'kcfx file library parse failed', requestUserName, `${requestUserName} uploaded ${latestRecord.title || id}, background parse failed`);
-    await db.save();
-    scheduleKcfxPreloadRefresh(db);
-    scheduleKcfxReceiptSummaryRefresh(db);
-    scheduleKcfxTrendSummaryRefresh();
+    await withKcfxLibraryMutation(async () => {
+      const database = await initDb(dataDir);
+      const latestRecord = database.kcfxLibrary.records[id];
+      if (!latestRecord || latestRecord.serverFilePath !== storedFile.relativePath) return;
+      database.kcfxLibrary.records[id] = {
+        ...latestRecord,
+        ...preserveKcfxRowsMetadata(previousRecord),
+        parseStatus: 'failed',
+        parseFailedAt: new Date().toISOString(),
+        parseError: error?.message || 'parse failed'
+      };
+      database.kcfxLibrary.savedAt = new Date().toISOString();
+      pushLog(database, 'kcfx file library parse failed', requestUserName, `${requestUserName} uploaded ${latestRecord.title || id}, background parse failed`);
+      await database.save();
+    });
   }
 }
 
@@ -2968,6 +3154,8 @@ const gongyingContext = {
   buildPreloadedKcfxLibrary,
   getKcfxReceiptSummaryResponse,
   getKcfxTrendSummaryResponse,
+  queryKcfxAgeAnalysis,
+  getKcfxAgeAnalysisExportRows,
   recoverKcfxRecordFromRowsFile,
   resolveKcfxStoredFilePath,
   ensureKcfxRecordRows,
@@ -2985,7 +3173,10 @@ const gongyingContext = {
   buildQueuedKcfxFileRecord,
   scheduleKcfxFileParse,
   scheduleKcfxReceiptSummaryRefresh,
-  scheduleKcfxTrendSummaryRefresh
+  scheduleKcfxTrendSummaryRefresh,
+  scheduleKcfxAgeAnalysisRefresh,
+  resolveActiveInventoryMonthId,
+  withKcfxLibraryMutation
 };
 Object.defineProperties(gongyingContext, {
   kcfxPreloadCache: { get: () => kcfxPreloadCache, set: (value) => { kcfxPreloadCache = value; } },
@@ -3016,6 +3207,7 @@ app.listen(port, async () => {
   scheduleKcfxPreloadRefresh(db);
   scheduleKcfxReceiptSummaryRefresh(db);
   scheduleKcfxTrendSummaryRefresh();
+  scheduleKcfxAgeAnalysisRefresh(db);
   startWeeklyPaymentEmailScheduler();
   console.log(`API running at http://localhost:${port}`);
 });

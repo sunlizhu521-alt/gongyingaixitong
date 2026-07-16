@@ -4,7 +4,6 @@ import { INVENTORY_TREND_MONTHS } from '../../shared/kcfxTrendMonths.js';
 
 const FACT_SLOTS = [
   { id: 'fact-inventory', label: '最近关账库存', description: '关账库存总表' },
-  { id: 'fact-2', label: '库存分析月份表', description: '库存数量、金额、库龄等分析数据' },
   ...INVENTORY_TREND_MONTHS.map((month, index) => ({
     id: month.id,
     label: `库存事实表 ${index + 3}`,

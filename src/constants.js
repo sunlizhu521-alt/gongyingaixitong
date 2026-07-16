@@ -63,6 +63,7 @@ const KCFX_INDEXED_DB_STORE = 'files';
 
 const SALES_INVENTORY_PAGES = [
   { tab: 'salesInventoryReceiptSummary', key: 'receiptSummary', label: '关账库存分析', sourceFile: 'receipt-summary.html' },
+  { tab: 'salesInventoryAgeAnalysis', key: 'ageAnalysis', label: '库存分析' },
   { tab: 'salesInventoryReceiptFeedback', key: 'receiptFeedback', label: '关账库存反馈信息汇总' },
   { tab: 'salesInventoryInventoryTrend', key: 'inventoryTrend', label: '库存趋势分析', sourceFile: 'inventory-trend.html' },
   { tab: 'salesInventorySalesAnalysis', key: 'salesAnalysis', label: '月度销售数据', sourceFile: 'sales-analysis.html' },
@@ -74,6 +75,7 @@ const SALES_INVENTORY_PAGES = [
 
 const MAINTENANCE_LIBRARY_PAGES = [
   { tab: 'maintenanceFactLibrary', key: 'factLibrary', label: '库存数据文件', sourceFile: 'fact-library.html' },
+  { tab: 'maintenanceAgeLibrary', key: 'ageLibrary', label: '库龄数据文件' },
   { tab: 'maintenanceSalesLibrary', key: 'salesLibrary', label: '销售数据文件', sourceFile: 'sales-library.html' },
   { tab: 'maintenanceFileLibrary', key: 'fileLibrary', label: '维度表文件库', sourceFile: 'file-library.html' }
 ];
@@ -82,6 +84,7 @@ const EMBEDDED_KCFX_PAGES = [];
 const PRIORITY_KCFX_PRELOAD_TABS = new Set(['salesInventorySalesAnalysis']);
 const KCFX_REACT_DATA_TABS = new Set([
   'salesInventoryReceiptSummary',
+  'salesInventoryAgeAnalysis',
   'salesInventoryInventoryTrend',
   'salesInventorySalesAnalysis',
   'salesInventoryComparison',
@@ -154,8 +157,13 @@ const tabPermissionMap = Object.fromEntries(
 );
 
 const legacyPermissionMap = {
-  ...Object.fromEntries(SALES_INVENTORY_PAGES.map((page) => [`salesInventory.${page.key}`, ['salesInventory']])),
+  ...Object.fromEntries(
+    SALES_INVENTORY_PAGES
+      .filter((page) => page.key !== 'ageAnalysis')
+      .map((page) => [`salesInventory.${page.key}`, ['salesInventory']])
+  ),
   'maintenanceLibrary.factLibrary': ['maintenanceLibrary', 'salesInventory', 'salesInventory.factLibrary'],
+  'maintenanceLibrary.ageLibrary': ['maintenanceLibrary'],
   'maintenanceLibrary.salesLibrary': ['maintenanceLibrary', 'salesInventory', 'salesInventory.salesLibrary'],
   'maintenanceLibrary.fileLibrary': ['maintenanceLibrary', 'salesInventory', 'salesInventory.fileLibrary'],
   'maintenanceLibrary.supplierManagement': ['maintenanceLibrary', 'supplierManagement', 'supplierPayment.supplierManagement'],

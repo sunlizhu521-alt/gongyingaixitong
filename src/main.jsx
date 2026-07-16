@@ -53,9 +53,11 @@ import ErrorsPage from './components/ErrorsPage.jsx';
 import SalesTrendPage from './components/SalesTrendPage.jsx';
 import ReceiptSummaryPage from './components/ReceiptSummaryPage.jsx';
 import InventoryTrendPage from './components/InventoryTrendPage.jsx';
+import AgeAnalysisPage from './components/AgeAnalysisPage.jsx';
 import SalesAnalysisPage from './components/SalesAnalysisPage.jsx';
 import ComparisonPage from './components/ComparisonPage.jsx';
 import FactLibraryPage from './components/FactLibraryPage.jsx';
+import AgeLibraryPage from './components/AgeLibraryPage.jsx';
 import SalesLibraryPage from './components/SalesLibraryPage.jsx';
 import FileLibraryPage from './components/FileLibraryPage.jsx';
 import KcfxFeedbackPage from './components/KcfxFeedbackPage.jsx';
@@ -65,12 +67,12 @@ import './styles.css';
 
 const SALES_KCFX_TABS = new Set(['salesInventorySalesAnalysis', 'salesInventorySalesTrend']);
 function priorityKcfxRecordIdsForTab(tab) {
-  if (tab === 'salesInventoryReceiptSummary') return [];
+  if (tab === 'salesInventoryReceiptSummary' || tab === 'salesInventoryAgeAnalysis') return [];
   if (SALES_KCFX_TABS.has(tab)) return [];
   return KCFX_PRIORITY_PRELOAD_RECORD_IDS.filter((id) => id !== 'sales-data');
 }
 function deferredKcfxRecordIdsForTab(tab, priorityIds = []) {
-  if (tab === 'salesInventoryReceiptSummary') return [];
+  if (tab === 'salesInventoryReceiptSummary' || tab === 'salesInventoryAgeAnalysis') return [];
   const prioritySet = new Set(priorityIds);
   return KCFX_DASHBOARD_PRELOAD_RECORD_IDS.filter((id) => {
     if (prioritySet.has(id)) return false;
@@ -1873,6 +1875,16 @@ function App() {
           </div>
         )}
 
+        {mountedReactKcfxTabs.has('salesInventoryAgeAnalysis') && canAccessTab('salesInventoryAgeAnalysis') && (
+          <div className={activeTab === 'salesInventoryAgeAnalysis' ? '' : 'kept-page-hidden'}>
+            <AgeAnalysisPage
+              user={user}
+              kcfxData={kcfxData}
+              onRefresh={loadKcfxMetadata}
+            />
+          </div>
+        )}
+
         {mountedReactKcfxTabs.has('salesInventoryInventoryTrend') && canAccessTab('salesInventoryInventoryTrend') && (
           <div className={activeTab === 'salesInventoryInventoryTrend' ? '' : 'kept-page-hidden'}>
             <InventoryTrendPage
@@ -1923,6 +1935,18 @@ function App() {
 
         {activeTab === 'maintenanceFactLibrary' && canAccessTab('maintenanceFactLibrary') && (
           <FactLibraryPage
+            kcfxData={kcfxData}
+            library={kcfxLibrary}
+            user={user}
+            loading={kcfxLoading}
+            error={kcfxLibraryMessage}
+            lastLoadedAt={kcfxLibraryLoadedAt}
+            onRefresh={loadKcfxLibrary}
+          />
+        )}
+
+        {activeTab === 'maintenanceAgeLibrary' && canAccessTab('maintenanceAgeLibrary') && (
+          <AgeLibraryPage
             kcfxData={kcfxData}
             library={kcfxLibrary}
             user={user}

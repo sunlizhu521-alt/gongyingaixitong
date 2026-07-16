@@ -1,17 +1,6 @@
-import { inventoryMonthAgeBuckets } from './kcfxInventoryMonth.js';
+import { inventoryMonthAgeBuckets, inventoryMonthAgeQuantity } from './kcfxInventoryMonth.js';
 
 export const UNMATCHED_INVENTORY_AGE_BUCKET = '无库龄信息';
-
-const AGE_HEADER_CANDIDATES = {
-  '0-30天': ['(0天到30天)数量(库存)', '0-30天数量', '0-30天库存数量', '0-30天'],
-  '31-60天': ['(31天到60天)数量(库存)', '31-60天数量', '31-60天库存数量', '31-60天'],
-  '61-90天': ['(61天到90天)数量(库存)', '61-90天数量', '61-90天库存数量', '61-90天'],
-  '91-120天': ['(91天到120天)数量(库存)', '91-120天数量', '91-120天库存数量', '91-120天'],
-  '121-150天': ['(121天到150天)数量(库存)', '121-150天数量', '121-150天库存数量', '121-150天'],
-  '151-180天': ['(151天到180天)数量(库存)', '151-180天数量', '151-180天库存数量', '151-180天'],
-  '181天以上': ['(181天以上)数量(库存)', '181天以上数量', '181天以上库存数量', '181天以上'],
-  '150天以上': ['>150天', '＞150天', '>150天数量', '＞150天数量', '150天以上数量', '150天以上库存数量', '150天以上']
-};
 
 function normalizeText(value) {
   if (value === null || value === undefined) return '';
@@ -65,7 +54,7 @@ export function inventoryMonthTrendIdentity(row) {
 export function inventoryMonthAgeQuantities(row, ageBuckets) {
   return Object.fromEntries(ageBuckets.map((ageGroup) => [
     ageGroup,
-    Math.max(0, toNumber(firstHeaderValue(row, AGE_HEADER_CANDIDATES[ageGroup] || [ageGroup])))
+    Math.max(0, inventoryMonthAgeQuantity(row, ageGroup))
   ]));
 }
 

@@ -3,12 +3,13 @@ import path from 'node:path';
 import { initDb } from './db.js';
 import { INVENTORY_TREND_MONTHS, KCFX_TREND_SCHEMA_VERSION } from '../shared/kcfxTrendMonths.js';
 import { allocateInventoryTrendAge, buildInventoryTrendAgeLookup, inventoryMonthTrendIdentity, UNMATCHED_INVENTORY_AGE_BUCKET } from '../shared/kcfxTrendAge.js';
+import { latestInventoryAgeSlotId } from '../shared/kcfxAgeMonths.js';
 
 const [dataDirArg, outputPathArg] = process.argv.slice(2);
 const dataDir = path.resolve(dataDirArg || 'data');
 const outputPath = path.resolve(outputPathArg || path.join(dataDir, 'kcfx-trend-summary.json'));
 
-const REQUIRED_DIMENSION_IDS = ['fact-2', 'dim-product', 'dim-warehouse', 'dim-warehouse-material'];
+const REQUIRED_DIMENSION_IDS = ['dim-product', 'dim-warehouse', 'dim-warehouse-material'];
 const UNCLASSIFIED_LIMIT = 1000;
 
 function safeId(id) {
@@ -295,11 +296,13 @@ function summarizeMonth(month, record, maps) {
 async function main() {
   const db = await initDb(dataDir);
   const trendMonths = INVENTORY_TREND_MONTHS.filter((month) => db.kcfxLibrary.records[month.id]);
-  const requiredIds = [...trendMonths.map((month) => month.id), ...REQUIRED_DIMENSION_IDS];
+  const activeInventoryAgeId = latestInventoryAgeSlotId(db.kcfxLibrary.records || {});
+  const requiredIds = [...trendMonths.map((month) => month.id), ...REQUIRED_DIMENSION_IDS, activeInventoryAgeId].filter(Boolean);
   const records = {};
   for (const id of requiredIds) {
     records[id] = await loadRecord(db, id);
   }
+  records['fact-2'] = activeInventoryAgeId ? records[activeInventoryAgeId] : null;
   const maps = buildDimensionMaps(records);
   const monthSummaries = trendMonths.map((month) => summarizeMonth(month, records[month.id], maps));
   const payload = {
@@ -310,6 +313,7 @@ async function main() {
     savedAt: db.kcfxLibrary.savedAt || '',
     generatedAt: new Date().toISOString(),
     ageBuckets: maps.ageLookup.ageBuckets,
+    activeInventoryAgeId,
     monthSummaries,
     records: Object.fromEntries(Object.entries(records).map(([id, record]) => [id, stripRows(record)]))
   };

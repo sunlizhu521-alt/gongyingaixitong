@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import xlsx from 'xlsx';
 import { getCachedSalesRows } from '../../src/components/kcfxUtils.js';
 
 const crypto = { randomUUID };
@@ -109,6 +110,8 @@ export default function registerKcfxRoutes(app, db) {
     buildPreloadedKcfxLibrary,
     getKcfxReceiptSummaryResponse,
     getKcfxTrendSummaryResponse,
+    queryKcfxAgeAnalysis,
+    getKcfxAgeAnalysisExportRows,
     recoverKcfxRecordFromRowsFile,
     resolveKcfxStoredFilePath,
     ensureKcfxRecordRows,
@@ -126,7 +129,10 @@ export default function registerKcfxRoutes(app, db) {
     buildQueuedKcfxFileRecord,
     scheduleKcfxFileParse,
     scheduleKcfxReceiptSummaryRefresh,
-    scheduleKcfxTrendSummaryRefresh
+    scheduleKcfxTrendSummaryRefresh,
+    scheduleKcfxAgeAnalysisRefresh,
+    resolveActiveInventoryMonthId,
+    withKcfxLibraryMutation
   } = app.locals.gongying;
 
 app.get('/api/kcfx-feedback/:type', async (req, res) => {
@@ -296,6 +302,61 @@ app.get('/api/kcfx-library/trend-summary', async (req, res) => {
   }
 });
 
+app.post('/api/kcfx-library/age-analysis/query', async (req, res) => {
+  try {
+    const database = await initDb(dataDir);
+    const requestUser = requirePermission(database, req, res, 'salesInventory.ageAnalysis');
+    if (!requestUser) return;
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await queryKcfxAgeAnalysis(req.body || {}));
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      status: 'failed',
+      source: 'server-age-analysis',
+      error: error?.message || String(error)
+    });
+  }
+});
+
+app.post('/api/kcfx-library/age-analysis/export', async (req, res) => {
+  try {
+    const database = await initDb(dataDir);
+    const requestUser = requirePermission(database, req, res, 'salesInventory.ageAnalysis');
+    if (!requestUser) return;
+    const rows = await getKcfxAgeAnalysisExportRows(req.body || {});
+    const data = rows.map((row) => ({
+      月份: row.monthLabel || row.month,
+      库存组织: row.organization,
+      事业部: row.department,
+      销售产品线: row.productLine,
+      销售系列: row.productSeries,
+      物料编码: row.materialCode,
+      SKU: row.sku,
+      物料名称: row.materialName,
+      仓库: row.warehouse,
+      仓库类型: row.warehouseType,
+      仓库位置: row.warehouseLocation,
+      可售状态: row.saleStatus,
+      商品分类: row.productCategory,
+      库龄: row.ageGroup,
+      库存数量: Number(row.qty) || 0,
+      结算价: Number(row.settlementPrice) || 0,
+      库存金额: Number(row.amount) || 0
+    }));
+    const worksheet = xlsx.utils.json_to_sheet(data.length ? data : [{ 月份: '' }]);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, '库存分析明细');
+    const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx', compression: true });
+    const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`库存分析明细_${stamp}.xlsx`)}`);
+    res.send(buffer);
+  } catch (error) {
+    res.status(500).json({ error: error?.message || String(error) });
+  }
+});
+
 app.get('/api/kcfx-library/sales-rows', async (req, res) => {
   try {
     const db = await initDb(dataDir);
@@ -330,7 +391,10 @@ app.get('/api/kcfx-library/records/:id/original', async (req, res) => {
 
 app.get('/api/kcfx-library/records/:id', async (req, res) => {
   const db = await initDb(dataDir);
-  const id = String(req.params.id || '').trim();
+  const requestedId = String(req.params.id || '').trim();
+  const id = requestedId === 'fact-2'
+    ? resolveActiveInventoryMonthId(db.kcfxLibrary.records || {}) || requestedId
+    : requestedId;
   let record = db.kcfxLibrary.records[id] || await recoverKcfxRecordFromRowsFile(id);
   if (!record) return res.status(404).json({ error: 'record not found' });
   record = await ensureKcfxRecordRows(db, id, record);
@@ -340,7 +404,11 @@ app.get('/api/kcfx-library/records/:id', async (req, res) => {
     db.kcfxLibrary.savedAt = new Date().toISOString();
     await db.save();
   }
-  res.json({ ok: true, record: await attachKcfxRecordRows(record) });
+  const fullRecord = await attachKcfxRecordRows(record);
+  res.json({
+    ok: true,
+    record: requestedId === id ? fullRecord : { ...fullRecord, id: requestedId, sourceRecordId: id }
+  });
 });
 
 app.post('/api/kcfx-library/records/:id/upload', upload.single('file'), async (req, res) => {
@@ -362,7 +430,6 @@ app.post('/api/kcfx-library/records/:id/upload', upload.single('file'), async (r
     return res.status(400).json({ error: 'unsupported file type' });
   }
 
-  const previousRecord = db.kcfxLibrary.records[id];
   let storedFile = null;
   try {
     const slot = parseKcfxSlotPayload(id, req.body.slot);
@@ -370,26 +437,41 @@ app.post('/api/kcfx-library/records/:id/upload', upload.single('file'), async (r
     const clientRecord = parseKcfxClientRecordPayload(req.body.record);
     if (clientRecord) {
       const record = await externalizeKcfxRecordRows(buildKcfxClientParsedFileRecord(req.file, storedFile, slot, clientRecord), id);
-      db.kcfxLibrary.records[id] = {
-        ...record,
-        serverSavedAt: new Date().toISOString(),
-        serverSavedBy: requestUser.name
-      };
-      db.kcfxLibrary.savedAt = new Date().toISOString();
-      await removeKcfxStoredFile(previousRecord);
-      pushLog(db, 'kcfx file library uploaded', requestUser.name, `${requestUser.name} uploaded browser-parsed ${record.title || id}`);
-      await db.save();
-      scheduleKcfxPreloadRefresh(db);
-      scheduleKcfxReceiptSummaryRefresh(db);
-      scheduleKcfxTrendSummaryRefresh();
-      return res.json({ ok: true, parsedOnClient: true, library: publicKcfxLibrary(db), record: db.kcfxLibrary.records[id] });
+      const payload = await withKcfxLibraryMutation(async () => {
+        const database = await initDb(dataDir);
+        const previousRecord = database.kcfxLibrary.records[id];
+        database.kcfxLibrary.records[id] = {
+          ...record,
+          serverSavedAt: new Date().toISOString(),
+          serverSavedBy: requestUser.name
+        };
+        database.kcfxLibrary.savedAt = new Date().toISOString();
+        await removeKcfxStoredFile(previousRecord);
+        pushLog(database, 'kcfx file library uploaded', requestUser.name, `${requestUser.name} uploaded browser-parsed ${record.title || id}`);
+        await database.save();
+        scheduleKcfxPreloadRefresh(database);
+        scheduleKcfxReceiptSummaryRefresh(database);
+        scheduleKcfxTrendSummaryRefresh();
+        scheduleKcfxAgeAnalysisRefresh(database);
+        return { library: publicKcfxLibrary(database), record: database.kcfxLibrary.records[id] };
+      });
+      return res.json({ ok: true, parsedOnClient: true, ...payload });
     }
-    const queuedRecord = buildQueuedKcfxFileRecord(req.file, storedFile, slot, previousRecord, requestUser.name);
-    db.kcfxLibrary.records[id] = queuedRecord;
-    db.kcfxLibrary.savedAt = new Date().toISOString();
-    pushLog(db, 'kcfx file library uploaded', requestUser.name, `${requestUser.name} uploaded ${queuedRecord.title || id}, background parse queued`);
-    await db.save();
-    res.status(202).json({ ok: true, queued: true, library: publicKcfxLibrary(db), record: db.kcfxLibrary.records[id] });
+    const queued = await withKcfxLibraryMutation(async () => {
+      const database = await initDb(dataDir);
+      const previousRecord = database.kcfxLibrary.records[id];
+      const queuedRecord = buildQueuedKcfxFileRecord(req.file, storedFile, slot, previousRecord, requestUser.name);
+      database.kcfxLibrary.records[id] = queuedRecord;
+      database.kcfxLibrary.savedAt = new Date().toISOString();
+      pushLog(database, 'kcfx file library uploaded', requestUser.name, `${requestUser.name} uploaded ${queuedRecord.title || id}, background parse queued`);
+      await database.save();
+      return {
+        previousRecord,
+        record: queuedRecord,
+        library: publicKcfxLibrary(database)
+      };
+    });
+    res.status(202).json({ ok: true, queued: true, library: queued.library, record: queued.record });
     scheduleKcfxFileParse({
       id,
       slot,
@@ -398,7 +480,7 @@ app.post('/api/kcfx-library/records/:id/upload', upload.single('file'), async (r
         size: req.file.size
       },
       storedFile,
-      previousRecord,
+      previousRecord: queued.previousRecord,
       requestUserName: requestUser.name
     });
     return;
@@ -420,19 +502,24 @@ app.put('/api/kcfx-library/records/:id', async (req, res) => {
   if (!requestUser) return;
   const id = String(req.params.id || '').trim();
   if (!id) return res.status(400).json({ error: 'missing id' });
-  const record = await externalizeKcfxRecordRows(sanitizeKcfxLibraryRecord(id, req.body.record || req.body), id);
-  db.kcfxLibrary.records[id] = {
-    ...record,
-    serverSavedAt: new Date().toISOString(),
-    serverSavedBy: requestUser.name
-  };
-  db.kcfxLibrary.savedAt = new Date().toISOString();
-  pushLog(db, '文件库更新', requestUser.name, `${requestUser.name} 更新销售及库存看板文件库：${record.title || id}`);
-  await db.save();
-  scheduleKcfxPreloadRefresh(db);
-  scheduleKcfxReceiptSummaryRefresh(db);
-  scheduleKcfxTrendSummaryRefresh();
-  res.json({ ok: true, library: publicKcfxLibrary(db), record: db.kcfxLibrary.records[id] });
+  const payload = await withKcfxLibraryMutation(async () => {
+    const database = await initDb(dataDir);
+    const record = await externalizeKcfxRecordRows(sanitizeKcfxLibraryRecord(id, req.body.record || req.body), id);
+    database.kcfxLibrary.records[id] = {
+      ...record,
+      serverSavedAt: new Date().toISOString(),
+      serverSavedBy: requestUser.name
+    };
+    database.kcfxLibrary.savedAt = new Date().toISOString();
+    pushLog(database, '文件库更新', requestUser.name, `${requestUser.name} 更新销售及库存看板文件库：${record.title || id}`);
+    await database.save();
+    scheduleKcfxPreloadRefresh(database);
+    scheduleKcfxReceiptSummaryRefresh(database);
+    scheduleKcfxTrendSummaryRefresh();
+    scheduleKcfxAgeAnalysisRefresh(database);
+    return { library: publicKcfxLibrary(database), record: database.kcfxLibrary.records[id] };
+  });
+  res.json({ ok: true, ...payload });
 });
 
 app.delete('/api/kcfx-library/records/:id', async (req, res) => {
@@ -441,15 +528,19 @@ app.delete('/api/kcfx-library/records/:id', async (req, res) => {
   if (!requestUser) return;
   const id = String(req.params.id || '').trim();
   if (!id) return res.status(400).json({ error: 'missing id' });
-  await removeKcfxStoredFile(db.kcfxLibrary.records[id]);
-  await removeKcfxRecordRows(db.kcfxLibrary.records[id] || { id });
-  delete db.kcfxLibrary.records[id];
-  db.kcfxLibrary.savedAt = new Date().toISOString();
-  pushLog(db, '文件库删除', requestUser.name, `${requestUser.name} 删除销售及库存看板文件库：${id}`);
-  await db.save();
-  scheduleKcfxPreloadRefresh(db);
-  scheduleKcfxReceiptSummaryRefresh(db);
-  scheduleKcfxTrendSummaryRefresh();
+  await withKcfxLibraryMutation(async () => {
+    const database = await initDb(dataDir);
+    await removeKcfxStoredFile(database.kcfxLibrary.records[id]);
+    await removeKcfxRecordRows(database.kcfxLibrary.records[id] || { id });
+    delete database.kcfxLibrary.records[id];
+    database.kcfxLibrary.savedAt = new Date().toISOString();
+    pushLog(database, '文件库删除', requestUser.name, `${requestUser.name} 删除销售及库存看板文件库：${id}`);
+    await database.save();
+    scheduleKcfxPreloadRefresh(database);
+    scheduleKcfxReceiptSummaryRefresh(database);
+    scheduleKcfxTrendSummaryRefresh();
+    scheduleKcfxAgeAnalysisRefresh(database);
+  });
   res.status(204).end();
 });
 }
