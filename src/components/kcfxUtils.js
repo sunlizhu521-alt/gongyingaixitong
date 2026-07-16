@@ -3,13 +3,14 @@ import { INVENTORY_TREND_MONTHS } from '../../shared/kcfxTrendMonths.js';
 export { INVENTORY_TREND_MONTHS };
 export const KCFX_COLORS = ['#007aff', '#34c759', '#ff9f0a', '#af52de', '#ff375f', '#5ac8fa', '#5856d6', '#30d158', '#bf5af2', '#ff6b35'];
 
-const AGE_BUCKETS = ['0-30天', '31-60天', '61-90天', '91-120天', '121-150天', '150天以上'];
 const AGE_BUCKET_DEFINITIONS = [
-  { label: '0-30天', candidates: ['0-30天数量', '0-30天库存数量', '0-30天结余库存数量', '0-30天库龄数量', '0-30天'] },
-  { label: '31-60天', candidates: ['31-60天数量', '31-60天库存数量', '31-60天结余库存数量', '31-60天库龄数量', '31-60天'] },
-  { label: '61-90天', candidates: ['61-90天数量', '61-90天库存数量', '61-90天结余库存数量', '61-90天库龄数量', '61-90天'] },
-  { label: '91-120天', candidates: ['91-120天数量', '91-120天库存数量', '91-120天结余库存数量', '91-120天库龄数量', '91-120天'] },
-  { label: '121-150天', candidates: ['121-150天数量', '121-150天库存数量', '121-150天结余库存数量', '121-150数量', '121-150天', '121-150'] },
+  { label: '0-30天', candidates: ['(0天到30天)数量(库存)', '0-30天数量', '0-30天库存数量', '0-30天结余库存数量', '0-30天库龄数量', '0-30天'] },
+  { label: '31-60天', candidates: ['(31天到60天)数量(库存)', '31-60天数量', '31-60天库存数量', '31-60天结余库存数量', '31-60天库龄数量', '31-60天'] },
+  { label: '61-90天', candidates: ['(61天到90天)数量(库存)', '61-90天数量', '61-90天库存数量', '61-90天结余库存数量', '61-90天库龄数量', '61-90天'] },
+  { label: '91-120天', candidates: ['(91天到120天)数量(库存)', '91-120天数量', '91-120天库存数量', '91-120天结余库存数量', '91-120天库龄数量', '91-120天'] },
+  { label: '121-150天', candidates: ['(121天到150天)数量(库存)', '121-150天数量', '121-150天库存数量', '121-150天结余库存数量', '121-150数量', '121-150天', '121-150'] },
+  { label: '151-180天', candidates: ['(151天到180天)数量(库存)', '151-180天数量', '151-180天库存数量', '151-180天'] },
+  { label: '181天以上', candidates: ['(181天以上)数量(库存)', '181天以上数量', '181天以上库存数量', '181天以上'] },
   { label: '150天以上', candidates: ['>150天', '＞150天', '>150天数量', '＞150天数量', '大于150天数量', '150天以上数量', '150天及以上数量', '150以上数量', '150天以上', '150天及以上', '150以上'] }
 ];
 
@@ -255,6 +256,7 @@ function enrichInventoryRow(row, maps) {
   ]);
   const organization = firstText([firstValue(row, ['使用组织', '库存组织', '组织']), firstValueByHeaderIncludes(row, ['组织']), nthValue(row, 4)]);
   const qty = firstNumber([
+    firstValue(row, ['数量(库存)', '数量（库存）']),
     firstValue(row, ['关账结存库存', '0430结余库存数量', '合计库存数量', '合计数量', '合计', '结余库存数量']),
     firstValueByHeaderIncludes(row, ['结存', '库存'], ['金额']),
     firstValueByHeaderIncludes(row, ['结余', '库存', '数量']),
@@ -364,22 +366,28 @@ function buildFallbackPriceMap(inventoryMonthRecord, productMap) {
     if (product.settlementPrice) map.set(materialCode, product.settlementPrice);
   }
   const rows = rowsOf(inventoryMonthRecord);
-  const priceAccessor = makeTrendPriceAccessor(rows[0]);
+  const priceAccessor = makeTrendPriceAccessor(rows[0], 0);
   for (const row of rows) {
-    const materialCode = normalizeMaterialCode(nthValue(row, 1));
+    const materialCode = normalizeMaterialCode(firstText([
+      firstValue(row, ['物料编码', '货品编码', '商品编码']),
+      firstValueByHeaderIncludes(row, ['物料', '编码']),
+      nthValue(row, 1)
+    ]));
     const price = toNumber(priceAccessor(row));
     if (materialCode && price) map.set(materialCode, price);
   }
   return map;
 }
 
-function makeTrendPriceAccessor(sampleRow) {
+function makeTrendPriceAccessor(sampleRow, fallbackOneBasedIndex = 16) {
   const keys = Object.keys(sampleRow || {});
   const normalized = keys.map((key) => ({ key, text: normalizeHeaderName(key) }));
   const preferred = normalized.find(({ text }) => text.includes('结算价') && text.includes('含税'))
     || normalized.find(({ text }) => text.includes('结算价'))
     || normalized.find(({ text }) => text.includes('含税') && text.includes('价'));
-  return preferred ? (row) => row?.[preferred.key] : (row) => nthValue(row, 16);
+  return preferred
+    ? (row) => row?.[preferred.key]
+    : (row) => (fallbackOneBasedIndex > 0 ? nthValue(row, fallbackOneBasedIndex) : 0);
 }
 
 function makeTrendQtyAccessor(sampleRow) {
@@ -595,7 +603,8 @@ function getAgeGroup(row) {
   if (bucket) return bucket.label;
   const age = firstOptionalNumber([firstValue(row, ['库龄', '库龄天数', '账龄']), firstValueByHeaderIncludes(row, ['库龄'])]);
   if (age === null) return '0-30天';
-  if (age > 150) return '150天以上';
+  if (age > 180) return '181天以上';
+  if (age > 150) return '151-180天';
   if (age > 120) return '121-150天';
   if (age > 90) return '91-120天';
   if (age > 60) return '61-90天';

@@ -24,6 +24,11 @@ import registerSystemRoutes from './routes/system.js';
 import registerReminderRoutes from './routes/reminders.js';
 import { constrainWorksheetRange, createCompatibleXlsxReader } from './kcfx-workbook.js';
 import { INVENTORY_TREND_MONTHS, KCFX_TREND_SCHEMA_VERSION } from '../shared/kcfxTrendMonths.js';
+import {
+  filterInventoryMonthSummaryRows,
+  findInventoryMonthHeaderRowIndex,
+  inventoryMonthAgeBuckets
+} from '../shared/kcfxInventoryMonth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -1416,15 +1421,16 @@ const KCFX_RECEIPT_RECORD_IDS = new Set([
   'dim-warehouse-material',
   'fact-inventory'
 ]);
-const KCFX_RECEIPT_AGE_BUCKETS = ['0-30天', '31-60天', '61-90天', '91-120天', '121-150天', '150天以上'];
-const KCFX_RECEIPT_AGE_DEFINITIONS = [
-  { label: '0-30天', candidates: ['0-30天数量', '0-30天库存数量', '0-30天结余库存数量', '0-30天库龄数量', '0-30天'] },
-  { label: '31-60天', candidates: ['31-60天数量', '31-60天库存数量', '31-60天结余库存数量', '31-60天库龄数量', '31-60天'] },
-  { label: '61-90天', candidates: ['61-90天数量', '61-90天库存数量', '61-90天结余库存数量', '61-90天库龄数量', '61-90天'] },
-  { label: '91-120天', candidates: ['91-120天数量', '91-120天库存数量', '91-120天结余库存数量', '91-120天库龄数量', '91-120天'] },
-  { label: '121-150天', candidates: ['121-150天数量', '121-150天库存数量', '121-150天结余库存数量', '121-150天库龄数量', '121-150数量', '121-150天', '121-150'] },
-  { label: '150天以上', candidates: ['>150天', '＞150天', '>150天数量', '＞150天数量', '>150天库存数量', '＞150天库存数量', '>150天结余库存数量', '＞150天结余库存数量', '大于150天', '大于150天数量', '150天以上数量', '150天以上库存数量', '150天以上结余库存数量', '150天以上库龄数量', '150天及以上数量', '150天及以上库存数量', '150以上数量', '150天以上', '150天及以上', '150以上'] }
-];
+const KCFX_RECEIPT_AGE_DEFINITIONS = new Map([
+  ['0-30天', ['(0天到30天)数量(库存)', '0-30天数量', '0-30天库存数量', '0-30天结余库存数量', '0-30天库龄数量', '0-30天']],
+  ['31-60天', ['(31天到60天)数量(库存)', '31-60天数量', '31-60天库存数量', '31-60天结余库存数量', '31-60天库龄数量', '31-60天']],
+  ['61-90天', ['(61天到90天)数量(库存)', '61-90天数量', '61-90天库存数量', '61-90天结余库存数量', '61-90天库龄数量', '61-90天']],
+  ['91-120天', ['(91天到120天)数量(库存)', '91-120天数量', '91-120天库存数量', '91-120天结余库存数量', '91-120天库龄数量', '91-120天']],
+  ['121-150天', ['(121天到150天)数量(库存)', '121-150天数量', '121-150天库存数量', '121-150天结余库存数量', '121-150天库龄数量', '121-150数量', '121-150天', '121-150']],
+  ['151-180天', ['(151天到180天)数量(库存)', '151-180天数量', '151-180天库存数量', '151-180天']],
+  ['181天以上', ['(181天以上)数量(库存)', '181天以上数量', '181天以上库存数量', '181天以上']],
+  ['150天以上', ['>150天', '＞150天', '>150天数量', '＞150天数量', '>150天库存数量', '＞150天库存数量', '>150天结余库存数量', '＞150天结余库存数量', '大于150天', '大于150天数量', '150天以上数量', '150天以上库存数量', '150天以上结余库存数量', '150天以上库龄数量', '150天及以上数量', '150天及以上库存数量', '150以上数量', '150天以上', '150天及以上', '150以上']]
+]);
 const KCFX_RECEIPT_SALEABLE_NEW_WAREHOUSE_TYPES = new Set(['销售出库仓', '销售供应商仓', '生产成品仓']);
 const KCFX_RECEIPT_RAW_MATERIAL_WAREHOUSE_TYPES = new Set(['生产材料仓', '生成材料仓']);
 const KCFX_RECEIPT_OTHER_UNSALEABLE_WAREHOUSE_TYPES = new Set(['系统集成仓', '销售海上在途仓', '销售售后配件仓', '样品/展厅仓', '样品展厅仓']);
@@ -1433,7 +1439,7 @@ const KCFX_RECEIPT_UNINSPECTED_RETURN_CATEGORIES = new Set(['全新品', '其他
 const KCFX_RECEIPT_OTHER_UNSALEABLE_RETURN_CATEGORIES = new Set(['健康办公', '其他/配件']);
 let kcfxReceiptSummaryCache = null;
 let kcfxReceiptSummaryPromise = null;
-const KCFX_RECEIPT_SUMMARY_CACHE_VERSION = 3;
+const KCFX_RECEIPT_SUMMARY_CACHE_VERSION = 4;
 const KCFX_RECEIPT_SUMMARY_ROW_FIELDS = [
   'materialCode',
   'sku',
@@ -1764,13 +1770,13 @@ function isKcfxReceiptSummaryFresh(cache, db) {
   return cache.savedAt === db.kcfxLibrary.savedAt;
 }
 
-function compactKcfxReceiptSummaryRows(rows) {
+function compactKcfxReceiptSummaryRows(rows, ageBuckets) {
   return rows.map((row) => KCFX_RECEIPT_SUMMARY_ROW_FIELDS.map((field) => {
     if (field === 'ageQuantities') {
-      return KCFX_RECEIPT_AGE_BUCKETS.map((bucket) => Number(row.ageQuantities?.[bucket]) || 0);
+      return ageBuckets.map((bucket) => Number(row.ageQuantities?.[bucket]) || 0);
     }
     if (field === 'ageSettlementAmounts') {
-      return KCFX_RECEIPT_AGE_BUCKETS.map((bucket) => Number(row.ageSettlementAmounts?.[bucket]) || 0);
+      return ageBuckets.map((bucket) => Number(row.ageSettlementAmounts?.[bucket]) || 0);
     }
     return row[field] ?? '';
   }));
@@ -1783,9 +1789,12 @@ async function buildKcfxReceiptSummary(db = null) {
   for (const id of KCFX_RECEIPT_RECORD_IDS) {
     records[id] = await getKcfxReceiptRecord(database, id);
   }
+  const ageBuckets = inventoryMonthAgeBuckets(records['fact-2']);
   const maps = buildKcfxReceiptDimensionMaps(records);
   const diagnostics = { matched: 0, unmatched: 0, sample: '' };
-  const rows = (records['fact-2']?.rows || []).map((row) => buildKcfxReceiptSummaryRow(row, maps, diagnostics));
+  const rows = (records['fact-2']?.rows || [])
+    .map((row) => buildKcfxReceiptSummaryRow(row, maps, diagnostics, ageBuckets))
+    .filter((row) => row.materialCode);
   const closedInventory = summarizeKcfxClosedInventory(records['fact-inventory']);
   return {
     ok: true,
@@ -1798,8 +1807,8 @@ async function buildKcfxReceiptSummary(db = null) {
     generatedAt: new Date().toISOString(),
     records: Object.fromEntries(Object.entries(records).map(([id, record]) => [id, stripKcfxReceiptRecord(record)])),
     rowFields: KCFX_RECEIPT_SUMMARY_ROW_FIELDS,
-    ageBuckets: KCFX_RECEIPT_AGE_BUCKETS,
-    rowsCompact: compactKcfxReceiptSummaryRows(rows),
+    ageBuckets,
+    rowsCompact: compactKcfxReceiptSummaryRows(rows, ageBuckets),
     rowCount: rows.length,
     diagnostics,
     closedInventory
@@ -1858,7 +1867,7 @@ function buildKcfxReceiptDimensionMaps(records) {
   };
 }
 
-function buildKcfxReceiptSummaryRow(row, { productMap, warehouseMap, warehouseMaterialMaps }, diagnostics) {
+function buildKcfxReceiptSummaryRow(row, { productMap, warehouseMap, warehouseMaterialMaps }, diagnostics, ageBuckets) {
   const materialCode = getKcfxReceiptDetailMaterialCode(row);
   const warehouse = getKcfxReceiptDetailWarehouse(row);
   const organization = getKcfxReceiptDetailOrganization(row);
@@ -1867,7 +1876,7 @@ function buildKcfxReceiptSummaryRow(row, { productMap, warehouseMap, warehouseMa
   const inventoryDays = getKcfxReceiptDetailInventoryDays(row);
   const product = productMap.get(materialCode) || {};
   const settlementPrice = Number(product.settlementPrice) || 0;
-  const ageQuantities = getKcfxReceiptAgeQuantities(row);
+  const ageQuantities = getKcfxReceiptAgeQuantities(row, ageBuckets);
   const ageSettlementAmounts = Object.fromEntries(
     Object.entries(ageQuantities).map(([label, qty]) => [label, qty * settlementPrice])
   );
@@ -2007,32 +2016,41 @@ function escapeKcfxReceiptStatusText(value) {
 }
 
 function getKcfxReceiptDetailMaterialCode(row) {
-  return normalizeKcfxMaterialCode(kcfxNthValue(row, 1) || kcfxReceiptFirstValue(row, ['物料编码', '货品编码', '商品编码', 'SKU']));
+  return normalizeKcfxMaterialCode(kcfxReceiptFirstText([
+    kcfxReceiptFirstValue(row, ['物料编码', '货品编码', '商品编码', 'SKU']),
+    kcfxReceiptFirstValueByHeaderIncludes(row, ['物料', '编码']),
+    kcfxNthValue(row, 1)
+  ]));
 }
 
 function getKcfxReceiptDetailWarehouse(row) {
   return normalizeKcfxText(kcfxReceiptFirstText([
-    kcfxNthValue(row, 3),
     kcfxReceiptFirstValue(row, ['仓库', '仓库名称', '金蝶仓库', '库存仓库']),
-    kcfxReceiptFirstValueByHeaderIncludes(row, ['仓库'])
+    kcfxReceiptFirstValueByHeaderIncludes(row, ['仓库']),
+    kcfxNthValue(row, 3)
   ]));
 }
 
 function getKcfxReceiptDetailOrganization(row) {
   return normalizeKcfxText(kcfxReceiptFirstText([
-    kcfxNthValue(row, 4),
-    kcfxReceiptFirstValue(row, ['使用组织', '库存组织', '组织']),
-    kcfxReceiptFirstValueByHeaderIncludes(row, ['组织'])
+    kcfxReceiptFirstValue(row, ['使用组织', '库存组织', '组织', '主体名称']),
+    kcfxReceiptFirstValueByHeaderIncludes(row, ['组织']),
+    kcfxNthValue(row, 4)
   ]));
 }
 
 function getKcfxReceiptDetailMaterialName(row) {
-  return normalizeKcfxText(kcfxReceiptFirstValue(row, ['物料名称', '货品名称', '商品名称', '金蝶名称']));
+  return normalizeKcfxText(kcfxReceiptFirstText([
+    kcfxReceiptFirstValue(row, ['物料名称', '货品名称', '商品名称', '金蝶名称']),
+    kcfxNthValue(row, 2)
+  ]));
 }
 
 function getKcfxReceiptDetailEndingQty(row) {
   return kcfxReceiptFirstNumber([
+    kcfxReceiptFirstValue(row, ['数量(库存)', '数量（库存）']),
     kcfxReceiptFirstValue(row, ['合计库存数量', '合计数量', '合计']),
+    kcfxReceiptFirstValueByHeaderIncludes(row, ['数量', '库存'], ['天到', '天以上']),
     kcfxReceiptFirstValueByHeaderIncludes(row, ['合计', '库存', '数量']),
     kcfxReceiptFirstValueByHeaderIncludes(row, ['合计', '数量']),
     kcfxReceiptFirstValue(row, ['0430结余库存数量', '4月30日结余库存数量', '结余库存数量']),
@@ -2052,22 +2070,23 @@ function getKcfxReceiptDetailInventoryDays(row) {
 
 function getKcfxReceiptDetailDepartment(row) {
   return normalizeKcfxText(kcfxReceiptFirstText([
-    kcfxNthValue(row, 21),
-    kcfxReceiptFirstValue(row, ['事业部'])
+    kcfxReceiptFirstValue(row, ['事业部']),
+    kcfxNthValue(row, 21)
   ]));
 }
 
-function getKcfxReceiptAgeQuantities(row) {
-  return Object.fromEntries(KCFX_RECEIPT_AGE_DEFINITIONS.map((definition) => [
-    definition.label,
-    getKcfxReceiptAgeQuantity(row, definition)
+function getKcfxReceiptAgeQuantities(row, ageBuckets) {
+  return Object.fromEntries(ageBuckets.map((label) => [
+    label,
+    getKcfxReceiptAgeQuantity(row, label)
   ]));
 }
 
-function getKcfxReceiptAgeQuantity(row, definition) {
+function getKcfxReceiptAgeQuantity(row, label) {
+  const candidates = KCFX_RECEIPT_AGE_DEFINITIONS.get(label) || [];
   return kcfxReceiptFirstOptionalNumber([
-    ...definition.candidates.map((name) => kcfxReceiptFirstValue(row, [name])),
-    kcfxReceiptFirstValueByHeaderIncludes(row, [definition.label, '数量'])
+    ...candidates.map((name) => kcfxReceiptFirstValue(row, [name])),
+    kcfxReceiptFirstValueByHeaderIncludes(row, [label, '数量'])
   ]) || 0;
 }
 
@@ -2297,7 +2316,7 @@ function buildKcfxTrendDimensionMaps(records) {
   }
 
   const inventoryMonthRows = records['fact-2']?.rows || [];
-  const monthPriceAccessor = makeKcfxTrendPriceAccessor(inventoryMonthRows[0]);
+  const monthPriceAccessor = makeKcfxTrendPriceAccessor(inventoryMonthRows[0], 0);
   for (const row of inventoryMonthRows) {
     const materialCode = normalizeKcfxMaterialCode(kcfxNthValue(row, 1));
     const price = kcfxTrendToNumber(monthPriceAccessor(row));
@@ -2319,13 +2338,15 @@ function normalizeKcfxMaterialCode(value) {
   return normalizeKcfxText(value).replace(/\s+/g, '');
 }
 
-function makeKcfxTrendPriceAccessor(sampleRow) {
+function makeKcfxTrendPriceAccessor(sampleRow, fallbackOneBasedIndex = 16) {
   const keys = Object.keys(sampleRow || {});
   const normalized = keys.map((key) => ({ key, text: normalizeKcfxTrendHeaderText(key) }));
   const preferred = normalized.find(({ text }) => text.includes('结算价') && text.includes('含税'))
     || normalized.find(({ text }) => text.includes('结算价'))
     || normalized.find(({ text }) => text.includes('含税') && text.includes('价'));
-  return preferred ? (row) => row?.[preferred.key] : (row) => kcfxNthValue(row, 16);
+  return preferred
+    ? (row) => row?.[preferred.key]
+    : (row) => (fallbackOneBasedIndex > 0 ? kcfxNthValue(row, fallbackOneBasedIndex) : 0);
 }
 
 function makeKcfxTrendQtyAccessor(sampleRow) {
@@ -2447,7 +2468,7 @@ function kcfxHeaderKeywordsForSlot(slot = {}) {
     return [...common, '结存数量', '真实成本', '真实成本单价', '货品'];
   }
   if (slot.id === 'fact-2') {
-    return [...common, '0430', '结余库存数量', '结算价', '库龄', '销售产品线', '销售系列'];
+    return [...common, '数量(库存)', '0天到30天', '151天到180天', '181天以上', '结余库存数量', '库龄'];
   }
   if (/^fact-[3-8]$/.test(slot.id || '')) {
     return [...common, '结算价', '含税', '库存数量', '期末', '收发'];
@@ -2473,7 +2494,7 @@ function scoreKcfxHeaderCandidate(headers, rows, headerIndex, slot = {}) {
 function kcfxHeaderRowCandidates(slot = {}, matrixLength = 0) {
   const configured = Number.isInteger(slot.skipRows) ? slot.skipRows : 0;
   const maxIndex = Math.max(0, Math.min(matrixLength - 1, 9));
-  const candidates = [configured, 0, 3];
+  const candidates = [configured, 0, 2, 3];
   for (let index = 0; index <= maxIndex; index += 1) candidates.push(index);
   return [...new Set(candidates)]
     .filter((index) => Number.isInteger(index) && index >= 0 && index < Math.max(matrixLength, 1));
@@ -2535,13 +2556,19 @@ function parseKcfxWorkbookRows(workbook, slot) {
   const candidates = kcfxHeaderRowCandidates(slot, matrix.length)
     .map((rowIndex) => parseKcfxRowsFromHeaderIndex(matrix, rowIndex, slot))
     .filter(Boolean);
-  const selected = chooseKcfxHeaderCandidate(candidates);
+  const detectedHeaderIndex = slot.id === 'fact-2' ? findInventoryMonthHeaderRowIndex(matrix) : -1;
+  const selected = candidates.find((candidate) => candidate.headerRowIndex === detectedHeaderIndex)
+    || chooseKcfxHeaderCandidate(candidates);
+  const filtered = slot.id === 'fact-2'
+    ? filterInventoryMonthSummaryRows(selected.rows)
+    : { rows: selected.rows, removed: 0 };
   return {
     sheetName,
     originalSheetRange: sheetRange.originalRef,
     usedSheetRange: sheetRange.usedRef,
     headerRowNumber: selected.headerRowNumber,
-    parseNote: selected.parseNote,
+    parseNote: filtered.removed ? `${selected.parseNote}，已排除末行汇总` : selected.parseNote,
+    summaryRowsRemoved: filtered.removed,
     attemptedHeaderRows: candidates.map((candidate) => ({
       headerRowNumber: candidate.headerRowNumber,
       rowCount: candidate.rows.length,
@@ -2549,7 +2576,7 @@ function parseKcfxWorkbookRows(workbook, slot) {
       headerFirst6: candidate.headers.slice(0, 6)
     })),
     headers: selected.headers,
-    rows: selected.rows
+    rows: filtered.rows
   };
 }
 
@@ -2570,6 +2597,7 @@ function buildKcfxParseDiagnostics(parsed) {
     usedSheetRange: parsed.usedSheetRange || '',
     headerRowNumber: parsed.headerRowNumber || 1,
     parseNote: parsed.parseNote || '',
+    summaryRowsRemoved: Number(parsed.summaryRowsRemoved || 0),
     attemptedHeaderRows: parsed.attemptedHeaderRows || [],
     headerFirst12: headers.slice(0, 12),
     gHeader: headers[6] || '',
@@ -2600,7 +2628,7 @@ function parseKcfxSlotPayload(slotId, payload) {
     title: String(slot.title || slotId),
     expectedName: String(slot.expectedName || ''),
     sheetHint: String(slot.sheetHint || defaultKcfxSheetHint(slotId)),
-    skipRows: Number.isInteger(Number(slot.skipRows)) ? Number(slot.skipRows) : undefined
+    skipRows: Number.isInteger(Number(slot.skipRows)) ? Number(slot.skipRows) : (slotId === 'fact-2' ? 2 : undefined)
   };
 }
 

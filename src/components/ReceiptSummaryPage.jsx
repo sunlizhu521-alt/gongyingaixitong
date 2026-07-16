@@ -5,8 +5,12 @@ import { FilterToolbar, useDashboardFilters } from './KcfxFilters.jsx';
 import { readFeedbackDrafts, writeFeedbackDrafts } from './feedbackDraftStorage.js';
 import { downloadKcfxRowsAsXlsx } from './kcfxExport.js';
 import { formatNumber, groupSum, moneyWan, recordSourceText, sum, uniqueCount } from './kcfxUtils.js';
+import { CURRENT_INVENTORY_AGE_BUCKETS, LEGACY_INVENTORY_AGE_BUCKETS } from '../../shared/kcfxInventoryMonth.js';
 
-const AGE_BUCKET_ORDER = ['0-30天', '31-60天', '61-90天', '91-120天', '121-150天', '150天以上'];
+const AGE_BUCKET_ORDER = [
+  ...CURRENT_INVENTORY_AGE_BUCKETS,
+  ...LEGACY_INVENTORY_AGE_BUCKETS.filter((bucket) => !CURRENT_INVENTORY_AGE_BUCKETS.includes(bucket))
+];
 const RECEIPT_FILTERS = [
   { id: 'receiptWarehouseType', field: 'warehouseType', allLabel: '全部仓库类型', sortByName: true, sortValueField: 'amount' },
   { id: 'receiptDepartment', field: 'department', allLabel: '全部事业部', sortValueField: 'amount' },

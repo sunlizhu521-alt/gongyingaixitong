@@ -1021,6 +1021,7 @@ function getDetailMaterialName(row) {
 
 function getDetailStockQty(row) {
   return firstNumber([
+    firstValue(row, ['数量(库存)', '数量（库存）']),
     firstValue(row, ['合计库存数量', '合计数量', '合计', '关账结存库存']),
     firstValueByHeaderIncludes(row, ['合计', '库存', '数量']),
     firstValueByHeaderIncludes(row, ['合计', '数量']),
