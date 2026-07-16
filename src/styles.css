@@ -1516,7 +1516,7 @@ th {
 
 .warehouse-type-trend-table th,
 .warehouse-type-trend-table td {
-  min-width: 140px;
+  min-width: 118px;
   padding: 9px 10px;
   border-right: 1px solid #dce5ef;
   border-bottom: 1px solid #dce5ef;
@@ -1528,10 +1528,61 @@ th {
   position: sticky;
   left: 0;
   z-index: 2;
-  min-width: 180px;
+  min-width: 240px;
   background: #f8fafc;
   color: #334155;
   font-weight: 800;
+}
+
+.warehouse-type-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.warehouse-type-sparkline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.warehouse-type-sparkline svg {
+  width: 104px;
+  height: 30px;
+  overflow: visible;
+}
+
+.warehouse-type-sparkline polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.warehouse-type-sparkline circle {
+  fill: #fff;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.warehouse-type-sparkline circle:last-child {
+  fill: currentColor;
+}
+
+.warehouse-type-sparkline.is-up {
+  color: #b45309;
+}
+
+.warehouse-type-sparkline.is-down {
+  color: #0f766e;
+}
+
+.warehouse-type-sparkline.is-flat {
+  color: #64748b;
 }
 
 .warehouse-type-trend-table thead th {

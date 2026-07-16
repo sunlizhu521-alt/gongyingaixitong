@@ -25,6 +25,7 @@ export function buildWarehouseTypeTrendMatrix(rows = [], mode = 'amount', availa
     return {
       warehouseType,
       values,
+      trendDirection: compareTrend(values[0]?.value, values.at(-1)?.value),
       latestValue: values.at(-1)?.value || 0,
       maxValue: Math.max(...values.map((item) => item.value), 0)
     };
@@ -41,4 +42,12 @@ function monthOverMonth(currentValue, previousValue) {
   const previous = Number(previousValue);
   if (!Number.isFinite(current) || !Number.isFinite(previous) || previous === 0) return null;
   return ((current - previous) / Math.abs(previous)) * 100;
+}
+
+function compareTrend(firstValue, latestValue) {
+  const first = Number(firstValue) || 0;
+  const latest = Number(latestValue) || 0;
+  const tolerance = Math.max(Math.abs(first), Math.abs(latest), 1) * 1e-9;
+  if (Math.abs(latest - first) <= tolerance) return 'flat';
+  return latest > first ? 'up' : 'down';
 }

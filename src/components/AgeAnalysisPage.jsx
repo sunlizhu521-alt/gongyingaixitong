@@ -392,7 +392,7 @@ function formatAgeTrendSegmentValue(mode, value) {
 
 function WarehouseTypeTrendMatrix({ rows, months, mode, setMode }) {
   const { matrix, months: matrixMonths } = buildWarehouseTypeTrendMatrix(rows, mode, months);
-  const tableMinWidth = Math.max(920, matrixMonths.length * 140 + 190);
+  const tableMinWidth = Math.max(920, matrixMonths.length * 118 + 242);
   return (
     <section className="kcfx-panel warehouse-type-trend-panel">
       <div className="table-title-row">
@@ -414,7 +414,10 @@ function WarehouseTypeTrendMatrix({ rows, months, mode, setMode }) {
             <tbody>
               {matrix.map((item) => (
                 <tr key={item.warehouseType}>
-                  <th>{item.warehouseType}</th>
+                  <th>
+                    <div className="warehouse-type-label">{item.warehouseType}</div>
+                    <WarehouseTypeSparkline item={item} mode={mode} />
+                  </th>
                   {item.values.map(({ month, value, mom }) => {
                     const intensity = item.maxValue ? value / item.maxValue : 0;
                     return (
@@ -436,6 +439,42 @@ function WarehouseTypeTrendMatrix({ rows, months, mode, setMode }) {
         </div>
       ) : <div className="empty">暂无数据</div>}
     </section>
+  );
+}
+
+function WarehouseTypeSparkline({ item, mode }) {
+  const width = 104;
+  const height = 30;
+  const padding = 3;
+  const values = item.values.map(({ value }) => Number(value) || 0);
+  const minValue = Math.min(...values, 0);
+  const maxValue = Math.max(...values, 0);
+  const range = maxValue - minValue;
+  const points = values.map((value, index) => {
+    const x = values.length > 1
+      ? padding + (index / (values.length - 1)) * (width - padding * 2)
+      : width / 2;
+    const y = range
+      ? padding + ((maxValue - value) / range) * (height - padding * 2)
+      : height / 2;
+    return { x, y };
+  });
+  const direction = item.trendDirection || 'flat';
+  const directionText = direction === 'up' ? '↑ 上升' : direction === 'down' ? '↓ 下降' : '→ 持平';
+  const detail = item.values.map(({ month, value }) => (
+    `${month} ${formatWarehouseTypeTrendValue(mode, value)}`
+  )).join('，');
+
+  return (
+    <div className={`warehouse-type-sparkline is-${direction}`} title={`${item.warehouseType}：${detail}`}>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${item.warehouseType}${directionText}`}>
+        <polyline points={points.map(({ x, y }) => `${x},${y}`).join(' ')} />
+        {points.map(({ x, y }, index) => (
+          <circle key={item.values[index]?.month || index} cx={x} cy={y} r={index === points.length - 1 ? 2.8 : 2} />
+        ))}
+      </svg>
+      <span>{directionText}</span>
+    </div>
   );
 }
 
