@@ -1,5 +1,6 @@
 import { INVENTORY_TREND_MONTHS } from '../../shared/kcfxTrendMonths.js';
 import { STORE_MAPPING_CUSTOMER_HEADERS, STORE_MAPPING_SHORT_NAME_HEADERS } from '../../shared/kcfxStoreMapping.js';
+import { selectInventoryTrendPrice } from '../../shared/kcfxTrendPrice.js';
 
 export { INVENTORY_TREND_MONTHS };
 export const KCFX_COLORS = ['#007aff', '#34c759', '#ff9f0a', '#af52de', '#ff375f', '#5ac8fa', '#5856d6', '#30d158', '#bf5af2', '#ff6b35'];
@@ -341,7 +342,10 @@ function summarizeTrendMonth(month, record, inventoryMonthRecord, maps) {
     const warehouse = normalizeText(nthValue(row, 4));
     const qty = toNumber(qtyAccessor(row));
     if (!qty) continue;
-    const price = toNumber(priceAccessor(row)) || fallbackPriceMap.get(materialCode) || 0;
+    const price = selectInventoryTrendPrice(
+      fallbackPriceMap.get(materialCode) || 0,
+      toNumber(priceAccessor(row))
+    );
     const value = qty * price;
     const product = maps.productMap.get(materialCode) || {};
     const warehouseInfo = maps.warehouseMap.get(warehouse) || {};
@@ -388,7 +392,7 @@ function buildFallbackPriceMap(inventoryMonthRecord, productMap) {
       nthValue(row, 1)
     ]));
     const price = toNumber(priceAccessor(row));
-    if (materialCode && price) map.set(materialCode, price);
+    if (materialCode && price && !map.has(materialCode)) map.set(materialCode, price);
   }
   return map;
 }

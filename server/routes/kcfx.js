@@ -346,11 +346,11 @@ app.post('/api/kcfx-library/age-analysis/export', async (req, res) => {
     }));
     const worksheet = xlsx.utils.json_to_sheet(data.length ? data : [{ 月份: '' }]);
     const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, '库存分析明细');
+    xlsx.utils.book_append_sheet(workbook, worksheet, '库龄维度分析明细');
     const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx', compression: true });
     const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`库存分析明细_${stamp}.xlsx`)}`);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`库龄维度分析明细_${stamp}.xlsx`)}`);
     res.send(buffer);
   } catch (error) {
     res.status(500).json({ error: error?.message || String(error) });

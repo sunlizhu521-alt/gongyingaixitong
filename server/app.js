@@ -24,6 +24,7 @@ import registerSystemRoutes from './routes/system.js';
 import registerReminderRoutes from './routes/reminders.js';
 import { constrainWorksheetRange, createCompatibleXlsxReader } from './kcfx-workbook.js';
 import { INVENTORY_TREND_MONTHS, KCFX_TREND_SCHEMA_VERSION } from '../shared/kcfxTrendMonths.js';
+import { selectInventoryTrendPrice } from '../shared/kcfxTrendPrice.js';
 import {
   filterInventoryMonthSummaryRows,
   findInventoryMonthHeaderRowIndex,
@@ -1944,7 +1945,7 @@ async function getKcfxReceiptSummaryResponse() {
     ok: false,
     status: 'loading',
     source: 'server-receipt-summary',
-    message: '库存分析汇总正在服务器生成中，请稍后刷新'
+    message: '关账库存分析汇总正在服务器生成中，请稍后刷新'
   };
 }
 
@@ -2038,7 +2039,7 @@ async function queryKcfxAgeAnalysis(request = {}) {
       ok: false,
       status: 'loading',
       source: 'server-age-analysis',
-      message: '库存分析汇总正在生成中，请稍后刷新'
+      message: '库龄维度分析汇总正在生成中，请稍后刷新'
     };
   }
   return queryAgeAnalysis(cache, request);
@@ -2046,7 +2047,7 @@ async function queryKcfxAgeAnalysis(request = {}) {
 
 async function getKcfxAgeAnalysisExportRows(request = {}) {
   const cache = await getKcfxAgeAnalysisCacheResponse({ waitMs: 30000 });
-  if (!cache) throw new Error('库存分析汇总尚未生成完成');
+  if (!cache) throw new Error('库龄维度分析汇总尚未生成完成');
   return exportAgeAnalysisRows(cache, request);
 }
 
@@ -2391,8 +2392,8 @@ function summarizeKcfxTrendMonth(month, record, maps) {
     const qty = kcfxTrendToNumber(qtyAccessor(row));
     if (!qty) continue;
     const directSettlementPrice = kcfxTrendToNumber(priceAccessor(row));
-    const fallbackSettlementPrice = maps.settlementPriceByMaterial.get(materialB) || 0;
-    const settlementPrice = directSettlementPrice || fallbackSettlementPrice;
+    const dimensionSettlementPrice = maps.settlementPriceByMaterial.get(materialB) || 0;
+    const settlementPrice = selectInventoryTrendPrice(dimensionSettlementPrice, directSettlementPrice);
     const value = qty * settlementPrice;
 
     const department = maps.departmentByKey.get(makeKcfxTrendDepartmentKey(materialA, warehouse, materialB)) || '';
@@ -2440,8 +2441,8 @@ function summarizeKcfxTrendMonth(month, record, maps) {
     summary.totalQty += qty;
     summary.totalValue += value;
     if (settlementPrice) summary.pricedRows += 1;
-    if (directSettlementPrice) summary.directPricedRows += 1;
-    else if (fallbackSettlementPrice) summary.fallbackPricedRows += 1;
+    if (dimensionSettlementPrice) summary.fallbackPricedRows += 1;
+    else if (directSettlementPrice) summary.directPricedRows += 1;
 
     const missingReasons = [
       department ? '' : '未区分事业部',
@@ -2513,7 +2514,9 @@ function buildKcfxTrendDimensionMaps(records) {
   for (const row of inventoryMonthRows) {
     const materialCode = normalizeKcfxMaterialCode(kcfxNthValue(row, 1));
     const price = kcfxTrendToNumber(monthPriceAccessor(row));
-    if (materialCode && price) settlementPriceByMaterial.set(materialCode, price);
+    if (materialCode && price && !settlementPriceByMaterial.has(materialCode)) {
+      settlementPriceByMaterial.set(materialCode, price);
+    }
   }
 
   return { departmentByKey, warehouseTypeByName, warehouseLocationByName, productLineByMaterial, productSeriesByMaterial, skuByMaterial, settlementPriceByMaterial };

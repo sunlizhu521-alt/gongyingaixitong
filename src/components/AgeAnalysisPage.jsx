@@ -8,6 +8,7 @@ import {
   formatNumber,
   moneyWan
 } from './kcfxUtils.js';
+import { buildAgeTrendMatrix } from '../../shared/kcfxAgeTrend.js';
 
 const FILTERS = [
   { id: 'month', field: 'month', type: 'month', allLabel: '全部月份', monthAllLabel: '全部月份' },
@@ -22,6 +23,20 @@ const FILTERS = [
 ];
 
 const EMPTY_SELECTIONS = Object.fromEntries(FILTERS.map((filter) => [filter.id, []]));
+const AGE_TREND_COLORS = [
+  '#007aff',
+  '#30b85a',
+  '#ff9f0a',
+  '#9b51e0',
+  '#ff375f',
+  '#2aa7d6',
+  '#5856d6',
+  '#0f9d76',
+  '#d94fd5',
+  '#ff6b35',
+  '#b38b00',
+  '#0f766e'
+];
 
 const TABLE_COLUMNS = [
   { key: 'monthLabel', label: '月份' },
@@ -80,7 +95,7 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const result = await response.json();
-        if (!result?.ok) throw new Error(result?.message || result?.error || '库存分析数据尚未生成');
+        if (!result?.ok) throw new Error(result?.message || result?.error || '库龄维度分析数据尚未生成');
         if (!cancelled) {
           if (!initialized) {
             const latestMonth = monthFromRecordId(result.activeRecordId);
@@ -144,7 +159,7 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `库存分析明细_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      anchor.download = `库龄维度分析明细_${new Date().toISOString().slice(0, 10)}.xlsx`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (exportError) {
@@ -161,7 +176,7 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
     : error || `筛选后 ${formatNumber(metrics.rowCount || 0)} 行，库存数量 ${formatNumber(metrics.qty || 0, 2)}，库存货值 ${moneyWan(metrics.amount || 0)}`;
 
   return (
-    <KcfxPageShell title="库存分析" status={status} loading={loading} onRefresh={refresh}>
+    <KcfxPageShell title="库龄维度分析" status={status} loading={loading} onRefresh={refresh}>
       <FilterToolbar
         filters={FILTERS}
         optionsById={optionsById}
@@ -212,7 +227,7 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
       <section className="kcfx-panel">
         <div className="table-title-row">
           <div>
-            <h3>库存分析明细</h3>
+            <h3>库龄维度分析明细</h3>
             <p className="kcfx-table-note">共 {formatNumber(pagination.totalRows)} 行，每页20行</p>
           </div>
           <button type="button" className="ghost compact-button" onClick={exportRows} disabled={exporting || loading}>
@@ -269,14 +284,8 @@ function TrendPanel({ title, rows, valueKey, formatter }) {
 }
 
 function AgeStackedTrend({ rows, mode, setMode }) {
-  const ageGroups = [...new Set(rows.map((row) => row.ageGroup))];
-  const months = [...new Set(rows.map((row) => row.month))].sort();
-  const colors = Object.fromEntries(ageGroups.map((group, index) => [group, KCFX_COLORS[index % KCFX_COLORS.length]]));
-  const matrix = months.map((month) => {
-    const monthRows = rows.filter((row) => row.month === month);
-    const total = monthRows.reduce((sum, row) => sum + (Number(row[mode]) || 0), 0);
-    return { month, monthRows, total };
-  });
+  const { ageGroups, matrix } = buildAgeTrendMatrix(rows, mode);
+  const colors = Object.fromEntries(ageGroups.map((group, index) => [group, AGE_TREND_COLORS[index % AGE_TREND_COLORS.length]]));
   return (
     <section className="kcfx-panel age-stacked-panel">
       <div className="table-title-row">
@@ -294,24 +303,68 @@ function AgeStackedTrend({ rows, mode, setMode }) {
           <div className="age-stacked-row" key={item.month}>
             <span>{item.month.replace('-', '年')}月</span>
             <div className="age-stacked-track">
-              {item.monthRows.map((row) => {
-                const value = Number(row[mode]) || 0;
+              {item.values.map(({ ageGroup, value }) => {
+                const percentage = item.total ? (value / item.total) * 100 : 0;
                 return (
                   <div
-                    key={row.ageGroup}
-                    title={`${row.ageGroup} ${mode === 'amount' ? moneyWan(value) : formatNumber(value, 2)}`}
+                    className="age-stacked-segment"
+                    key={ageGroup}
+                    title={`${ageGroup} ${formatAgeTrendValue(mode, value)}`}
                     style={{
-                      width: `${item.total ? (value / item.total) * 100 : 0}%`,
-                      background: colors[row.ageGroup]
+                      width: `${percentage}%`,
+                      background: colors[ageGroup]
                     }}
-                  />
+                  >
+                    {percentage >= 9 && value > 0 && <span>{formatAgeTrendSegmentValue(mode, value)}</span>}
+                  </div>
                 );
               })}
             </div>
-            <strong>{mode === 'amount' ? moneyWan(item.total) : formatNumber(item.total, 2)}</strong>
+            <strong>{formatAgeTrendValue(mode, item.total)}</strong>
           </div>
         )) : <div className="empty">暂无数据</div>}
       </div>
+      {matrix.length > 0 && (
+        <div className="age-value-table-wrap">
+          <table className="age-value-table">
+            <thead>
+              <tr>
+                <th>月份</th>
+                {ageGroups.map((ageGroup) => (
+                  <th key={ageGroup}>
+                    <span className="age-value-heading">
+                      <i style={{ background: colors[ageGroup] }} />
+                      {ageGroup}
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {matrix.map((item) => (
+                <tr key={item.month}>
+                  <th>{item.month.replace('-', '年')}月</th>
+                  {item.values.map(({ ageGroup, value }) => (
+                    <td className={value ? '' : 'is-zero'} key={ageGroup}>
+                      {value ? formatAgeTrendValue(mode, value) : '0'}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
+}
+
+function formatAgeTrendValue(mode, value) {
+  return mode === 'amount' ? moneyWan(value) : formatNumber(value, 2);
+}
+
+function formatAgeTrendSegmentValue(mode, value) {
+  if (mode === 'amount') return `${formatNumber(value / 10000, 1)}万`;
+  if (Math.abs(value) >= 10000) return `${formatNumber(value / 10000, 1)}万`;
+  return formatNumber(value, 0);
 }

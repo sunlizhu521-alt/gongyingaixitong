@@ -63,7 +63,7 @@ const KCFX_INDEXED_DB_STORE = 'files';
 
 const SALES_INVENTORY_PAGES = [
   { tab: 'salesInventoryReceiptSummary', key: 'receiptSummary', label: '关账库存分析', sourceFile: 'receipt-summary.html' },
-  { tab: 'salesInventoryAgeAnalysis', key: 'ageAnalysis', label: '库存分析' },
+  { tab: 'salesInventoryAgeAnalysis', key: 'ageAnalysis', label: '库龄维度分析' },
   { tab: 'salesInventoryReceiptFeedback', key: 'receiptFeedback', label: '关账库存反馈信息汇总' },
   { tab: 'salesInventoryInventoryTrend', key: 'inventoryTrend', label: '库存趋势分析', sourceFile: 'inventory-trend.html' },
   { tab: 'salesInventorySalesAnalysis', key: 'salesAnalysis', label: '月度销售数据', sourceFile: 'sales-analysis.html' },

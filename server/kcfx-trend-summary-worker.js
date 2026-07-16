@@ -4,6 +4,7 @@ import { initDb } from './db.js';
 import { INVENTORY_TREND_MONTHS, KCFX_TREND_SCHEMA_VERSION } from '../shared/kcfxTrendMonths.js';
 import { allocateInventoryTrendAge, buildInventoryTrendAgeLookup, inventoryMonthTrendIdentity, UNMATCHED_INVENTORY_AGE_BUCKET } from '../shared/kcfxTrendAge.js';
 import { latestInventoryAgeSlotId } from '../shared/kcfxAgeMonths.js';
+import { selectInventoryTrendPrice } from '../shared/kcfxTrendPrice.js';
 
 const [dataDirArg, outputPathArg] = process.argv.slice(2);
 const dataDir = path.resolve(dataDirArg || 'data');
@@ -155,7 +156,9 @@ function buildDimensionMaps(records) {
   for (const row of inventoryMonthRows) {
     const materialCode = normalizeMaterialCode(inventoryMonthTrendIdentity(row).materialCode);
     const price = toNumber(monthPriceAccessor(row));
-    if (materialCode && price) settlementPriceByMaterial.set(materialCode, price);
+    if (materialCode && price && !settlementPriceByMaterial.has(materialCode)) {
+      settlementPriceByMaterial.set(materialCode, price);
+    }
   }
 
   return {
@@ -203,8 +206,8 @@ function summarizeMonth(month, record, maps) {
     const qty = toNumber(qtyAccessor(row));
     if (!qty) continue;
     const directSettlementPrice = toNumber(priceAccessor(row));
-    const fallbackSettlementPrice = maps.settlementPriceByMaterial.get(materialB) || 0;
-    const settlementPrice = directSettlementPrice || fallbackSettlementPrice;
+    const dimensionSettlementPrice = maps.settlementPriceByMaterial.get(materialB) || 0;
+    const settlementPrice = selectInventoryTrendPrice(dimensionSettlementPrice, directSettlementPrice);
     const value = qty * settlementPrice;
 
     const department = maps.departmentByKey.get(makeDepartmentKey(materialA, warehouse, materialB)) || '';
@@ -259,8 +262,8 @@ function summarizeMonth(month, record, maps) {
     summary.totalQty += qty;
     summary.totalValue += value;
     if (settlementPrice) summary.pricedRows += 1;
-    if (directSettlementPrice) summary.directPricedRows += 1;
-    else if (fallbackSettlementPrice) summary.fallbackPricedRows += 1;
+    if (dimensionSettlementPrice) summary.fallbackPricedRows += 1;
+    else if (directSettlementPrice) summary.directPricedRows += 1;
 
     const missingReasons = [
       department ? '' : '未匹配事业部',
