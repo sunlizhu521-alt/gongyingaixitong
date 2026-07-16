@@ -164,21 +164,25 @@ function rowMatches(row, filters, excludedField = '') {
 }
 
 function filterRows(rows, filters = {}, search = '') {
-  const query = normalizeText(search).toLowerCase();
   return rows.filter((row) => {
     if (!rowMatches(row, filters)) return false;
-    if (!query) return true;
-    return [
-      row.materialCode,
-      row.sku,
-      row.materialName,
-      row.warehouse,
-      row.organization,
-      row.department,
-      row.productLine,
-      row.productSeries
-    ].some((value) => normalizeText(value).toLowerCase().includes(query));
+    return rowMatchesSearch(row, search);
   });
+}
+
+function rowMatchesSearch(row, search = '') {
+  const query = normalizeText(search).toLowerCase();
+  if (!query) return true;
+  return [
+    row.materialCode,
+    row.sku,
+    row.materialName,
+    row.warehouse,
+    row.organization,
+    row.department,
+    row.productLine,
+    row.productSeries
+  ].some((value) => normalizeText(value).toLowerCase().includes(query));
 }
 
 function linkedOptions(rows, filters = {}) {
@@ -231,6 +235,27 @@ function ageSeries(rows) {
     totals.set(key, current);
   }
   return [...totals.values()].sort((a, b) => a.month.localeCompare(b.month) || a.ageGroup.localeCompare(b.ageGroup, 'zh-CN'));
+}
+
+function warehouseTypeSeries(rows) {
+  const totals = new Map();
+  for (const row of rows) {
+    const key = `${row.month}\u001f${row.warehouseType}`;
+    const current = totals.get(key) || {
+      month: row.month,
+      monthLabel: row.monthLabel,
+      warehouseType: row.warehouseType,
+      qty: 0,
+      amount: 0
+    };
+    current.qty += Number(row.qty) || 0;
+    current.amount += Number(row.amount) || 0;
+    totals.set(key, current);
+  }
+  return [...totals.values()].sort((a, b) => (
+    a.month.localeCompare(b.month)
+    || a.warehouseType.localeCompare(b.warehouseType, 'zh-CN')
+  ));
 }
 
 function ratio(current, previous) {
@@ -347,12 +372,11 @@ export function queryAgeAnalysis(cache, request = {}) {
   const trendRows = (cache?.rows || []).filter((row) => {
     const nonMonthFilters = { ...filters, month: [] };
     if (!rowMatches(row, nonMonthFilters)) return false;
-    const query = normalizeText(search).toLowerCase();
-    if (!query) return true;
-    return [
-      row.materialCode, row.sku, row.materialName, row.warehouse,
-      row.organization, row.department, row.productLine, row.productSeries
-    ].some((value) => normalizeText(value).toLowerCase().includes(query));
+    return rowMatchesSearch(row, search);
+  });
+  const warehouseTypeTrendRows = (cache?.rows || []).filter((row) => {
+    const comparisonFilters = { ...filters, month: [], warehouseType: [] };
+    return rowMatches(row, comparisonFilters) && rowMatchesSearch(row, search);
   });
   const trend = monthSeries(trendRows);
   const selectedMonths = selectedValues(filters, 'month');
@@ -380,6 +404,7 @@ export function queryAgeAnalysis(cache, request = {}) {
     },
     trend,
     ageTrend: ageSeries(trendRows),
+    warehouseTypeTrend: warehouseTypeSeries(warehouseTypeTrendRows),
     distributions: {
       ageQty: summarize(filteredRows, 'ageGroup', 'qty', 30),
       ageAmount: summarize(filteredRows, 'ageGroup', 'amount', 30),

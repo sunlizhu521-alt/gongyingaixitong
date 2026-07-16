@@ -9,6 +9,7 @@ import {
   moneyWan
 } from './kcfxUtils.js';
 import { buildAgeTrendMatrix } from '../../shared/kcfxAgeTrend.js';
+import { buildWarehouseTypeTrendMatrix } from '../../shared/kcfxWarehouseTypeTrend.js';
 
 const FILTERS = [
   { id: 'month', field: 'month', type: 'month', allLabel: '全部月份', monthAllLabel: '全部月份' },
@@ -79,6 +80,7 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [ageMode, setAgeMode] = useState('amount');
+  const [warehouseTypeMode, setWarehouseTypeMode] = useState('amount');
   const filtersKey = useMemo(() => JSON.stringify(selections), [selections]);
 
   useEffect(() => {
@@ -215,6 +217,13 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
       </div>
 
       <AgeStackedTrend rows={payload?.ageTrend || []} mode={ageMode} setMode={setAgeMode} />
+
+      <WarehouseTypeTrendMatrix
+        rows={payload?.warehouseTypeTrend || []}
+        months={(payload?.monthSummaries || []).map((item) => item.month)}
+        mode={warehouseTypeMode}
+        setMode={setWarehouseTypeMode}
+      />
 
       <PanelGrid className="age-analysis-distribution-grid">
         <BarPanel title="库龄库存数量" rows={payload?.distributions?.ageQty || []} valueFormatter={(value) => formatNumber(value, 2)} />
@@ -379,4 +388,62 @@ function formatAgeTrendValue(mode, value) {
 function formatAgeTrendSegmentValue(mode, value) {
   if (mode === 'amount') return `${formatNumber(value / 10000, 1)}万`;
   return formatNumber(value, 0);
+}
+
+function WarehouseTypeTrendMatrix({ rows, months, mode, setMode }) {
+  const { matrix, months: matrixMonths } = buildWarehouseTypeTrendMatrix(rows, mode, months);
+  const tableMinWidth = Math.max(920, matrixMonths.length * 140 + 190);
+  return (
+    <section className="kcfx-panel warehouse-type-trend-panel">
+      <div className="table-title-row">
+        <h3>全部仓库类型跨月变化</h3>
+        <div className="age-mode-switch" role="group" aria-label="仓库类型趋势口径">
+          <button type="button" className={mode === 'amount' ? 'active' : ''} onClick={() => setMode('amount')}>金额</button>
+          <button type="button" className={mode === 'qty' ? 'active' : ''} onClick={() => setMode('qty')}>数量</button>
+        </div>
+      </div>
+      {matrix.length ? (
+        <div className="warehouse-type-trend-wrap">
+          <table className="warehouse-type-trend-table" style={{ minWidth: `${tableMinWidth}px` }}>
+            <thead>
+              <tr>
+                <th>仓库类型</th>
+                {matrixMonths.map((month) => <th key={month}>{month.replace('-', '年')}月</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {matrix.map((item) => (
+                <tr key={item.warehouseType}>
+                  <th>{item.warehouseType}</th>
+                  {item.values.map(({ month, value, mom }) => {
+                    const intensity = item.maxValue ? value / item.maxValue : 0;
+                    return (
+                      <td
+                        className={value ? '' : 'is-zero'}
+                        key={month}
+                        style={{ '--warehouse-heat-opacity': value ? 0.08 + intensity * 0.28 : 0 }}
+                        title={`${item.warehouseType} ${month} ${formatWarehouseTypeTrendValue(mode, value)}，环比 ${formatMonthOverMonth(mom)}`}
+                      >
+                        <span>{formatWarehouseTypeTrendValue(mode, value)}</span>
+                        <small className={monthOverMonthClass(mom)}>环比 {formatMonthOverMonth(mom)}</small>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <div className="empty">暂无数据</div>}
+    </section>
+  );
+}
+
+function formatWarehouseTypeTrendValue(mode, value) {
+  return mode === 'amount' ? moneyWan(value) : formatNumber(value, 0);
+}
+
+function monthOverMonthClass(value) {
+  if (!Number.isFinite(value) || Math.abs(value) < 0.005) return 'is-flat';
+  return value > 0 ? 'is-up' : 'is-down';
 }

@@ -1498,6 +1498,96 @@ th {
   box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18);
 }
 
+.warehouse-type-trend-panel {
+  margin-bottom: 16px;
+}
+
+.warehouse-type-trend-wrap {
+  overflow-x: auto;
+  border: 1px solid #d7e2ee;
+  border-radius: 6px;
+}
+
+.warehouse-type-trend-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.warehouse-type-trend-table th,
+.warehouse-type-trend-table td {
+  min-width: 140px;
+  padding: 9px 10px;
+  border-right: 1px solid #dce5ef;
+  border-bottom: 1px solid #dce5ef;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.warehouse-type-trend-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 180px;
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 800;
+}
+
+.warehouse-type-trend-table thead th {
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 800;
+}
+
+.warehouse-type-trend-table thead th:first-child {
+  z-index: 3;
+}
+
+.warehouse-type-trend-table td {
+  background: rgba(23, 105, 224, var(--warehouse-heat-opacity, 0));
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.warehouse-type-trend-table td span,
+.warehouse-type-trend-table td small {
+  display: block;
+}
+
+.warehouse-type-trend-table td span {
+  font-weight: 800;
+}
+
+.warehouse-type-trend-table td small {
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.warehouse-type-trend-table td small.is-up {
+  color: #b45309;
+}
+
+.warehouse-type-trend-table td small.is-down {
+  color: #0f766e;
+}
+
+.warehouse-type-trend-table td small.is-flat,
+.warehouse-type-trend-table td.is-zero {
+  color: #64748b;
+}
+
+.warehouse-type-trend-table tr:last-child th,
+.warehouse-type-trend-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.warehouse-type-trend-table th:last-child,
+.warehouse-type-trend-table td:last-child {
+  border-right: 0;
+}
+
 .age-stacked-track > div {
   min-width: 0;
 }
