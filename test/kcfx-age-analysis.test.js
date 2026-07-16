@@ -53,8 +53,16 @@ test('selects the latest successful inventory age record and falls back to fact-
     'inventory-age-2026-05': { rowCount: 20 },
     'inventory-age-2026-06': { rowCount: 0 },
     'inventory-age-2026-07': { rowCount: 30, parseStatus: 'failed' }
-  }), 'inventory-age-2026-05');
+  }), 'fact-2');
   assert.equal(latestInventoryAgeSlotId({ 'fact-2': { rowCount: 10 } }), 'fact-2');
+  assert.equal(latestInventoryAgeSlotId({
+    'fact-2': { rowCount: 10 },
+    'inventory-age-2026-06': { rowCount: 20 }
+  }), 'inventory-age-2026-06');
+  assert.equal(latestInventoryAgeSlotId({
+    'fact-2': { rowCount: 10 },
+    'inventory-age-2026-07': { rowCount: 20 }
+  }), 'inventory-age-2026-07');
 });
 
 test('detects each historical month final age bucket without splitting it', () => {
@@ -125,6 +133,22 @@ test('builds, filters, paginates and exports age analysis rows', () => {
   assert.equal(exportAgeAnalysisRows(cache, {
     filters: { month: ['2026-01'], department: ['事业部A'] }
   }).length, 2);
+});
+
+test('uses fact-2 as the June analysis source until the June slot is uploaded', () => {
+  const headers = [...BASE_HEADERS, '(0天到30天)数量(库存)', '(181天以上)数量(库存)'];
+  const cache = buildAgeAnalysisCache({
+    'fact-2': {
+      id: 'fact-2',
+      rows: [rowFrom(headers, ['组织A', '1001', '产品A', '仓库A', '可用', '', '', '', '个', 6, 4, 2])],
+      rowCount: 1
+    }
+  }, 'saved-at');
+  assert.equal(cache.activeRecordId, 'inventory-age-2026-06');
+  assert.equal(cache.monthSummaries.length, 1);
+  assert.equal(cache.monthSummaries[0].month, '2026-06');
+  assert.equal(cache.monthSummaries[0].sourceQty, 6);
+  assert.equal(cache.monthSummaries[0].expandedQty, 6);
 });
 
 test('server serializes background file parsing to protect library writes', async () => {

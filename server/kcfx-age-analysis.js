@@ -3,6 +3,8 @@ import {
   inventoryMonthAgeQuantity
 } from '../shared/kcfxInventoryMonth.js';
 import {
+  INVENTORY_AGE_FALLBACK_MONTH,
+  INVENTORY_AGE_FALLBACK_SLOT_ID,
   INVENTORY_AGE_MONTHS,
   inventoryAgeMonthById,
   latestInventoryAgeSlotId
@@ -243,7 +245,8 @@ export function buildAgeAnalysisCache(records = {}, savedAt = '') {
   const diagnostics = { missingPriceRows: 0, missingDepartmentRows: 0, missingAgeRows: 0 };
 
   for (const month of INVENTORY_AGE_MONTHS) {
-    const record = records[month.id];
+    const record = records[month.id]
+      || (month.month === INVENTORY_AGE_FALLBACK_MONTH ? records['fact-2'] : null);
     if (!record?.rows?.length) continue;
     const ageBuckets = inventoryMonthAgeBuckets(record);
     let sourceQty = 0;
@@ -315,6 +318,7 @@ export function buildAgeAnalysisCache(records = {}, savedAt = '') {
     });
   }
 
+  const activeRecordId = latestInventoryAgeSlotId(records);
   return {
     ok: true,
     status: 'ready',
@@ -322,7 +326,9 @@ export function buildAgeAnalysisCache(records = {}, savedAt = '') {
     version: KCFX_AGE_ANALYSIS_VERSION,
     savedAt,
     generatedAt: new Date().toISOString(),
-    activeRecordId: latestInventoryAgeSlotId(records),
+    activeRecordId: activeRecordId === 'fact-2'
+      ? INVENTORY_AGE_FALLBACK_SLOT_ID
+      : activeRecordId,
     rows,
     rowCount: rows.length,
     monthSummaries,
