@@ -49,6 +49,19 @@ export function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+export function monthOverMonthPercent(currentValue, previousValue) {
+  const current = Number(currentValue);
+  const previous = Number(previousValue);
+  if (!Number.isFinite(current) || !Number.isFinite(previous) || previous === 0) return null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
+export function formatMonthOverMonth(value) {
+  if (!Number.isFinite(value)) return '--';
+  const rounded = Math.abs(value) < 0.005 ? 0 : value;
+  return `${rounded > 0 ? '+' : ''}${rounded.toFixed(2)}%`;
+}
+
 export function nthValue(row, oneBasedIndex) {
   const index = oneBasedIndex - 1;
   if (Array.isArray(row?.__cells)) return row.__cells[index] ?? '';

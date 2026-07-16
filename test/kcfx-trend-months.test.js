@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { INVENTORY_TREND_MONTHS, KCFX_TREND_SCHEMA_VERSION } from '../shared/kcfxTrendMonths.js';
 import { allocateInventoryTrendAge, buildInventoryTrendAgeLookup, UNMATCHED_INVENTORY_AGE_BUCKET } from '../shared/kcfxTrendAge.js';
+import { formatMonthOverMonth, monthOverMonthPercent } from '../src/components/kcfxUtils.js';
 
 const CURRENT_HEADERS = [
   '库存组织', '物料编码', '物料名称', '仓库', '库存状态', '批号', '货主类型', '货主', '库存单位',
@@ -19,6 +20,14 @@ test('inventory trend month slots cover January through December', () => {
   assert.equal(INVENTORY_TREND_MONTHS.length, 12);
   assert.deepEqual(INVENTORY_TREND_MONTHS[5], { id: 'fact-8', label: '6月' });
   assert.deepEqual(INVENTORY_TREND_MONTHS[11], { id: 'fact-14', label: '12月' });
+});
+
+test('inventory trend month-over-month labels handle increases, decreases and missing bases', () => {
+  assert.equal(formatMonthOverMonth(monthOverMonthPercent(110, 100)), '+10.00%');
+  assert.equal(formatMonthOverMonth(monthOverMonthPercent(90, 100)), '-10.00%');
+  assert.equal(formatMonthOverMonth(monthOverMonthPercent(100, 100)), '0.00%');
+  assert.equal(formatMonthOverMonth(monthOverMonthPercent(100, 0)), '--');
+  assert.equal(formatMonthOverMonth(null), '--');
 });
 
 test('inventory trend age allocation preserves quantity and value totals', () => {

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API } from '../constants.js';
 import { BarPanel, KcfxPageShell, MetricCards, PanelGrid, SimpleTable, SourcePanel } from './KcfxCommon.jsx';
 import { FilterToolbar, useDashboardFilters } from './KcfxFilters.jsx';
-import { INVENTORY_TREND_MONTHS, KCFX_COLORS, formatNumber, groupSum, moneyWan, recordSourceText, sum } from './kcfxUtils.js';
+import { INVENTORY_TREND_MONTHS, KCFX_COLORS, formatMonthOverMonth, formatNumber, groupSum, moneyWan, monthOverMonthPercent, recordSourceText, sum } from './kcfxUtils.js';
 import { CURRENT_INVENTORY_AGE_BUCKETS, LEGACY_INVENTORY_AGE_BUCKETS } from '../../shared/kcfxInventoryMonth.js';
 import { UNMATCHED_INVENTORY_AGE_BUCKET } from '../../shared/kcfxTrendAge.js';
 
@@ -181,8 +181,16 @@ function MonthTrendChart({ rows, formatter }) {
           <div className="trend-bar-group">
             {rows.length ? rows.map((row, index) => {
               const value = Number(row.value) || 0;
+              const previousValue = index > 0 ? Number(rows[index - 1]?.value) || 0 : 0;
+              const monthOverMonth = index > 0 ? monthOverMonthPercent(value, previousValue) : null;
+              const monthOverMonthText = formatMonthOverMonth(monthOverMonth);
+              const monthOverMonthClass = monthOverMonth > 0
+                ? 'is-increase'
+                : monthOverMonth < 0
+                  ? 'is-decrease'
+                  : '';
               return (
-                <div className="trend-bar-wrap" title={`${row.label} ${formatter(value)}`} key={row.id || row.label}>
+                <div className="trend-bar-wrap" title={`${row.label} ${formatter(value)}，环比 ${monthOverMonthText}`} key={row.id || row.label}>
                   <div
                     className="trend-bar"
                     style={{
@@ -190,7 +198,10 @@ function MonthTrendChart({ rows, formatter }) {
                       background: KCFX_COLORS[index % KCFX_COLORS.length]
                     }}
                   >
-                    <span className="trend-bar-value">{formatter(value)}</span>
+                    <span className="trend-bar-value inventory-trend-bar-value">
+                      <span>{formatter(value)}</span>
+                      <span className={`inventory-trend-mom ${monthOverMonthClass}`}>环比 {monthOverMonthText}</span>
+                    </span>
                   </div>
                 </div>
               );
