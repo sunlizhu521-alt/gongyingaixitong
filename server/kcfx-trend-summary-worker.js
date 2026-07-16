@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { initDb } from './db.js';
 import { INVENTORY_TREND_MONTHS, KCFX_TREND_SCHEMA_VERSION } from '../shared/kcfxTrendMonths.js';
+import { allocateInventoryTrendAge, buildInventoryTrendAgeLookup, inventoryMonthTrendIdentity, UNMATCHED_INVENTORY_AGE_BUCKET } from '../shared/kcfxTrendAge.js';
 
 const [dataDirArg, outputPathArg] = process.argv.slice(2);
 const dataDir = path.resolve(dataDirArg || 'data');
@@ -151,12 +152,21 @@ function buildDimensionMaps(records) {
   const inventoryMonthRows = records['fact-2']?.rows || [];
   const monthPriceAccessor = makePriceAccessor(inventoryMonthRows[0], 0);
   for (const row of inventoryMonthRows) {
-    const materialCode = normalizeMaterialCode(nthValue(row, 1));
+    const materialCode = normalizeMaterialCode(inventoryMonthTrendIdentity(row).materialCode);
     const price = toNumber(monthPriceAccessor(row));
     if (materialCode && price) settlementPriceByMaterial.set(materialCode, price);
   }
 
-  return { departmentByKey, warehouseTypeByName, warehouseLocationByName, productLineByMaterial, productSeriesByMaterial, skuByMaterial, settlementPriceByMaterial };
+  return {
+    departmentByKey,
+    warehouseTypeByName,
+    warehouseLocationByName,
+    productLineByMaterial,
+    productSeriesByMaterial,
+    skuByMaterial,
+    settlementPriceByMaterial,
+    ageLookup: buildInventoryTrendAgeLookup(records['fact-2'])
+  };
 }
 
 function summarizeMonth(month, record, maps) {
@@ -177,6 +187,7 @@ function summarizeMonth(month, record, maps) {
     pricedRows: 0,
     directPricedRows: 0,
     fallbackPricedRows: 0,
+    unmatchedAgeRows: 0,
     items: [],
     departmentMissingRows: [],
     unclassifiedRows: [],
@@ -215,20 +226,33 @@ function summarizeMonth(month, record, maps) {
       missingItem.qty += qty;
       departmentMissingItems.set(missingKey, missingItem);
     }
-    const item = {
+    const ageAllocations = allocateInventoryTrendAge(maps.ageLookup, {
+      organization: materialA,
+      warehouse,
+      materialCode: materialB,
       qty,
-      value,
-      warehouseType: warehouseType || '未分类仓库类型',
-      department: department || '未匹配事业部',
-      productLine: productLine || '未分类产品线',
-      productSeries: productSeries || '未分类销售系列',
-      warehouseLocation: warehouseLocation || '未分类仓库位置'
-    };
-    const groupKey = [item.warehouseType, item.department, item.productLine, item.productSeries, item.warehouseLocation].join('\u001f');
-    const grouped = groupedItems.get(groupKey) || { ...item, qty: 0, value: 0 };
-    grouped.qty += qty;
-    grouped.value += value;
-    groupedItems.set(groupKey, grouped);
+      value
+    });
+    if (ageAllocations.length === 1 && ageAllocations[0].ageGroup === UNMATCHED_INVENTORY_AGE_BUCKET) {
+      summary.unmatchedAgeRows += 1;
+    }
+    for (const allocation of ageAllocations) {
+      const item = {
+        qty: allocation.qty,
+        value: allocation.value,
+        ageGroup: allocation.ageGroup,
+        warehouseType: warehouseType || '未分类仓库类型',
+        department: department || '未匹配事业部',
+        productLine: productLine || '未分类产品线',
+        productSeries: productSeries || '未分类销售系列',
+        warehouseLocation: warehouseLocation || '未分类仓库位置'
+      };
+      const groupKey = [item.ageGroup, item.warehouseType, item.department, item.productLine, item.productSeries, item.warehouseLocation].join('\u001f');
+      const grouped = groupedItems.get(groupKey) || { ...item, qty: 0, value: 0 };
+      grouped.qty += allocation.qty;
+      grouped.value += allocation.value;
+      groupedItems.set(groupKey, grouped);
+    }
 
     summary.usedRows += 1;
     summary.totalQty += qty;
@@ -285,6 +309,7 @@ async function main() {
     source: 'server-trend-summary',
     savedAt: db.kcfxLibrary.savedAt || '',
     generatedAt: new Date().toISOString(),
+    ageBuckets: maps.ageLookup.ageBuckets,
     monthSummaries,
     records: Object.fromEntries(Object.entries(records).map(([id, record]) => [id, stripRows(record)]))
   };

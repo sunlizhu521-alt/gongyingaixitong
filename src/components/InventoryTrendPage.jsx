@@ -3,10 +3,19 @@ import { API } from '../constants.js';
 import { BarPanel, KcfxPageShell, MetricCards, PanelGrid, SimpleTable, SourcePanel } from './KcfxCommon.jsx';
 import { FilterToolbar, useDashboardFilters } from './KcfxFilters.jsx';
 import { INVENTORY_TREND_MONTHS, KCFX_COLORS, formatNumber, groupSum, moneyWan, recordSourceText, sum } from './kcfxUtils.js';
+import { CURRENT_INVENTORY_AGE_BUCKETS, LEGACY_INVENTORY_AGE_BUCKETS } from '../../shared/kcfxInventoryMonth.js';
+import { UNMATCHED_INVENTORY_AGE_BUCKET } from '../../shared/kcfxTrendAge.js';
+
+const INVENTORY_TREND_AGE_ORDER = [
+  ...CURRENT_INVENTORY_AGE_BUCKETS,
+  ...LEGACY_INVENTORY_AGE_BUCKETS.filter((bucket) => !CURRENT_INVENTORY_AGE_BUCKETS.includes(bucket)),
+  UNMATCHED_INVENTORY_AGE_BUCKET
+];
 
 const INVENTORY_TREND_FILTERS = [
   { id: 'trendWarehouseType', field: 'warehouseType', allLabel: '全部仓库类型', sortByName: true, sortValueField: 'amount' },
   { id: 'trendDepartment', field: 'department', allLabel: '全部事业部', sortValueField: 'amount' },
+  { id: 'trendAgeGroup', field: 'ageGroup', allLabel: '全部库龄', preferredOrder: INVENTORY_TREND_AGE_ORDER, sortValueField: 'amount' },
   { id: 'trendProductLine', field: 'productLine', allLabel: '全部销售产品线', sortValueField: 'amount' },
   { id: 'trendProductSeries', field: 'productSeries', allLabel: '全部销售系列', sortValueField: 'amount' },
   { id: 'trendWarehouseLocation', field: 'warehouseLocation', allLabel: '全部仓库位置', sortValueField: 'amount' }
