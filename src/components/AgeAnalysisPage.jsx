@@ -286,6 +286,8 @@ function TrendPanel({ title, rows, valueKey, formatter }) {
 function AgeStackedTrend({ rows, mode, setMode }) {
   const { ageGroups, matrix } = buildAgeTrendMatrix(rows, mode);
   const colors = Object.fromEntries(ageGroups.map((group, index) => [group, AGE_TREND_COLORS[index % AGE_TREND_COLORS.length]]));
+  const maxVisibleSegments = Math.max(...matrix.map((item) => item.values.filter(({ value }) => value > 0).length), 1);
+  const chartMinWidth = Math.max(920, maxVisibleSegments * 104 + 220);
   return (
     <section className="kcfx-panel age-stacked-panel">
       <div className="table-title-row">
@@ -298,31 +300,41 @@ function AgeStackedTrend({ rows, mode, setMode }) {
       <div className="age-legend">
         {ageGroups.map((group) => <span key={group}><i style={{ background: colors[group] }} />{group}</span>)}
       </div>
-      <div className="age-stacked-rows">
-        {matrix.length ? matrix.map((item) => (
-          <div className="age-stacked-row" key={item.month}>
-            <span>{item.month.replace('-', '年')}月</span>
-            <div className="age-stacked-track">
-              {item.values.map(({ ageGroup, value }) => {
-                const percentage = item.total ? (value / item.total) * 100 : 0;
-                return (
-                  <div
-                    className="age-stacked-segment"
-                    key={ageGroup}
-                    title={`${ageGroup} ${formatAgeTrendValue(mode, value)}`}
-                    style={{
-                      width: `${percentage}%`,
-                      background: colors[ageGroup]
-                    }}
-                  >
-                    {percentage >= 9 && value > 0 && <span>{formatAgeTrendSegmentValue(mode, value)}</span>}
-                  </div>
-                );
-              })}
-            </div>
-            <strong>{formatAgeTrendValue(mode, item.total)}</strong>
+      <div className="age-stacked-chart-scroll">
+        <div className="age-stacked-chart" style={{ minWidth: `${chartMinWidth}px` }}>
+          <div className="age-stacked-rows">
+            {matrix.length ? matrix.map((item) => (
+              <div className="age-stacked-row" key={item.month}>
+                <span>{item.month.replace('-', '年')}月</span>
+                <div className="age-stacked-track">
+                  {item.values.map(({ ageGroup, value, mom }) => (
+                    <div
+                      className={`age-stacked-segment${value ? '' : ' is-zero'}`}
+                      key={ageGroup}
+                      title={`${ageGroup} ${formatAgeTrendValue(mode, value)}，环比 ${formatMonthOverMonth(mom)}`}
+                      style={{
+                        flexGrow: Math.max(value, 0),
+                        flexBasis: value > 0 ? '104px' : '0px',
+                        background: colors[ageGroup]
+                      }}
+                    >
+                      {value > 0 && (
+                        <span>
+                          <b>{formatAgeTrendSegmentValue(mode, value)}</b>
+                          <small>环比 {formatMonthOverMonth(mom)}</small>
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <strong>
+                  <span>{formatAgeTrendValue(mode, item.total)}</span>
+                  <small>环比 {formatMonthOverMonth(item.totalMom)}</small>
+                </strong>
+              </div>
+            )) : <div className="empty">暂无数据</div>}
           </div>
-        )) : <div className="empty">暂无数据</div>}
+        </div>
       </div>
       {matrix.length > 0 && (
         <div className="age-value-table-wrap">
@@ -344,9 +356,10 @@ function AgeStackedTrend({ rows, mode, setMode }) {
               {matrix.map((item) => (
                 <tr key={item.month}>
                   <th>{item.month.replace('-', '年')}月</th>
-                  {item.values.map(({ ageGroup, value }) => (
+                  {item.values.map(({ ageGroup, value, mom }) => (
                     <td className={value ? '' : 'is-zero'} key={ageGroup}>
-                      {value ? formatAgeTrendValue(mode, value) : '0'}
+                      <span>{formatAgeTrendValue(mode, value)}</span>
+                      <small>环比 {formatMonthOverMonth(mom)}</small>
                     </td>
                   ))}
                 </tr>
@@ -360,11 +373,10 @@ function AgeStackedTrend({ rows, mode, setMode }) {
 }
 
 function formatAgeTrendValue(mode, value) {
-  return mode === 'amount' ? moneyWan(value) : formatNumber(value, 2);
+  return mode === 'amount' ? moneyWan(value) : formatNumber(value, 0);
 }
 
 function formatAgeTrendSegmentValue(mode, value) {
   if (mode === 'amount') return `${formatNumber(value / 10000, 1)}万`;
-  if (Math.abs(value) >= 10000) return `${formatNumber(value / 10000, 1)}万`;
   return formatNumber(value, 0);
 }

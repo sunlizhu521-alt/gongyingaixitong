@@ -1329,9 +1329,18 @@ th {
   gap: 10px;
 }
 
+.age-stacked-chart-scroll {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.age-stacked-chart {
+  width: 100%;
+}
+
 .age-stacked-row {
   display: grid;
-  grid-template-columns: 92px minmax(180px, 1fr) 120px;
+  grid-template-columns: 92px minmax(650px, 1fr) 146px;
   align-items: center;
   gap: 10px;
   color: #475569;
@@ -1343,13 +1352,21 @@ th {
 }
 
 .age-stacked-row > strong {
-  text-align: right;
+  display: grid;
+  gap: 2px;
+  text-align: center;
   white-space: nowrap;
+}
+
+.age-stacked-row > strong small {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .age-stacked-track {
   display: flex;
-  height: 30px;
+  height: 46px;
   overflow: hidden;
   border-radius: 4px;
   background: #e7edf5;
@@ -1358,7 +1375,7 @@ th {
 
 .age-stacked-segment {
   display: flex;
-  min-width: 0;
+  min-width: 104px;
   align-items: center;
   justify-content: center;
   overflow: hidden;
@@ -1369,13 +1386,30 @@ th {
   text-shadow: 0 1px 2px rgba(15, 23, 42, 0.72);
 }
 
+.age-stacked-segment.is-zero {
+  min-width: 0;
+  border-right: 0;
+}
+
 .age-stacked-segment:last-child {
   border-right: 0;
 }
 
 .age-stacked-segment span {
+  display: grid;
+  gap: 2px;
   padding: 0 3px;
+  text-align: center;
   white-space: nowrap;
+}
+
+.age-stacked-segment b {
+  font-size: 11px;
+}
+
+.age-stacked-segment small {
+  font-size: 9px;
+  font-weight: 700;
 }
 
 .age-value-table-wrap {
@@ -1397,7 +1431,7 @@ th {
   padding: 8px 10px;
   border-right: 1px solid #e2e8f0;
   border-bottom: 1px solid #e2e8f0;
-  text-align: right;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -1406,7 +1440,7 @@ th {
   left: 0;
   z-index: 2;
   background: #f8fafc;
-  text-align: left;
+  text-align: center;
 }
 
 .age-value-table thead th {
@@ -1434,6 +1468,18 @@ th {
   font-variant-numeric: tabular-nums;
 }
 
+.age-value-table td span,
+.age-value-table td small {
+  display: block;
+}
+
+.age-value-table td small {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .age-value-table td.is-zero {
   color: #94a3b8;
 }
@@ -1441,6 +1487,7 @@ th {
 .age-value-heading {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
 }
 
@@ -1479,12 +1526,7 @@ th {
   }
 
   .age-stacked-row {
-    grid-template-columns: 82px minmax(160px, 1fr);
-  }
-
-  .age-stacked-row > strong {
-    grid-column: 2;
-    text-align: left;
+    grid-template-columns: 82px minmax(650px, 1fr) 136px;
   }
 }
 
