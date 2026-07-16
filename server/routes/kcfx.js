@@ -204,6 +204,11 @@ async function buildSalesRowsPayload(db, { force = false } = {}) {
     savedAt: db.kcfxLibrary?.savedAt || '',
     generatedAt: new Date().toISOString(),
     rowCount: rows.length,
+    storeMappingDiagnostics: {
+      matchedRows: rows.filter((row) => row.storeMatchStatus === '已匹配' && row.storeShortName).length,
+      unmatchedRows: rows.filter((row) => row.storeMatchStatus !== '已匹配').length,
+      distinctShortNames: new Set(rows.map((row) => row.storeShortName).filter(Boolean)).size
+    },
     rows,
     records: Object.fromEntries(SALES_ROW_RECORD_IDS.map((id) => {
       const { rows: _rows, ...record } = records[id] || { id };
@@ -295,7 +300,12 @@ app.get('/api/kcfx-library/sales-rows', async (req, res) => {
   try {
     const db = await initDb(dataDir);
     res.setHeader('Cache-Control', 'no-store');
-    res.json(await buildSalesRowsPayload(db, { force: req.query.refresh === '1' }));
+    const payload = await buildSalesRowsPayload(db, { force: req.query.refresh === '1' });
+    if (req.query.summary === '1') {
+      const { rows: _rows, ...summary } = payload;
+      return res.json(summary);
+    }
+    res.json(payload);
   } catch (error) {
     res.status(500).json({
       ok: false,

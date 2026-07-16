@@ -29,6 +29,7 @@ import {
   findInventoryMonthHeaderRowIndex,
   inventoryMonthAgeBuckets
 } from '../shared/kcfxInventoryMonth.js';
+import { isStoreMappingHeaderSet, isStoreMappingRecordValid, pickStoreMappingSheetName, STORE_MAPPING_SHEET_HINT } from '../shared/kcfxStoreMapping.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -1187,13 +1188,24 @@ async function writeKcfxRecordRows(id, rows) {
   await mkdir(kcfxRecordDir, { recursive: true });
   const relativePath = kcfxRecordRowsRelativePath(id);
   const fullPath = path.join(dataDir, relativePath);
+  const tempPath = `${fullPath}.${randomUUID()}.tmp`;
   const savedAt = new Date().toISOString();
-  await writeFile(fullPath, JSON.stringify({
-    id,
-    savedAt,
-    rowCount: rows.length,
-    rows
-  }), 'utf8');
+  try {
+    await writeFile(tempPath, JSON.stringify({
+      id,
+      savedAt,
+      rowCount: rows.length,
+      rows
+    }), 'utf8');
+    const validated = JSON.parse(await readFile(tempPath, 'utf8'));
+    if (validated.id !== id || validated.rowCount !== rows.length || !Array.isArray(validated.rows)) {
+      throw new Error('invalid kcfx rows temporary file');
+    }
+    await rename(tempPath, fullPath);
+  } catch (error) {
+    await unlink(tempPath).catch(() => {});
+    throw error;
+  }
   return {
     rowsPath: relativePath,
     rowsSavedAt: savedAt,
@@ -1270,8 +1282,25 @@ async function resolveKcfxStoredFilePath(record = {}) {
   return '';
 }
 
+let storeMappingRepairPromise = null;
+
 async function ensureKcfxRecordRows(db, id, record = {}) {
-  if (Array.isArray(record.rows) || record.rowsPath) {
+  const needsStoreMappingRepair = id === 'dim-customer-material' && !isStoreMappingRecordValid(record);
+  if (needsStoreMappingRepair) {
+    if (!storeMappingRepairPromise) {
+      const repairPromise = ensureKcfxRecordRowsInternal(db, id, record, true)
+        .finally(() => {
+          if (storeMappingRepairPromise === repairPromise) storeMappingRepairPromise = null;
+        });
+      storeMappingRepairPromise = repairPromise;
+    }
+    return storeMappingRepairPromise;
+  }
+  return ensureKcfxRecordRowsInternal(db, id, record, false);
+}
+
+async function ensureKcfxRecordRowsInternal(db, id, record = {}, needsStoreMappingRepair = false) {
+  if ((Array.isArray(record.rows) || record.rowsPath) && !needsStoreMappingRepair) {
     if (record.parseStatus === 'ready' && (record.parseError || record.parseFailedAt)) {
       const cleanedRecord = {
         ...record,
@@ -1304,13 +1333,14 @@ async function ensureKcfxRecordRows(db, id, record = {}) {
       title: slot.title,
       sheetName: parsed.sheetName,
       parseStatus: 'ready',
-      parseSource: 'server-on-demand',
+      parseSource: needsStoreMappingRepair ? 'server-schema-repair' : 'server-on-demand',
       parseCompletedAt: new Date().toISOString(),
       parseError: '',
       parseFailedAt: '',
       parseDiagnostics: {
         ...buildKcfxParseDiagnostics(parsed),
-        readMode: parsed.readMode || 'server'
+        readMode: parsed.readMode || 'server',
+        repairedFromSheetName: needsStoreMappingRepair ? (record.sheetName || record.parseDiagnostics?.sheetName || '') : ''
       },
       rows: parsed.rows
     }, id);
@@ -2464,6 +2494,9 @@ function kcfxRowFromHeaderValues(headers, values, rawValues = []) {
 
 function kcfxHeaderKeywordsForSlot(slot = {}) {
   const common = ['物料', '编码', '数量', '库存', '仓库', '组织', '结存', '结余'];
+  if (slot.id === 'dim-customer-material') {
+    return ['客户名称', '金蝶名称', '日常汇报沟通简称', '日常沟通简称', '店铺简称', '简称'];
+  }
   if (slot.id === 'fact-inventory') {
     return [...common, '结存数量', '真实成本', '真实成本单价', '货品'];
   }
@@ -2532,6 +2565,10 @@ function chooseKcfxHeaderCandidate(candidates) {
 
 function pickKcfxSheetName(workbook, slot = {}) {
   const sheetNames = workbook.SheetNames || [];
+  if (slot.id === 'dim-customer-material') {
+    const storeMappingSheet = pickStoreMappingSheetName(sheetNames);
+    if (storeMappingSheet) return storeMappingSheet;
+  }
   const hint = normalizeKcfxHeaderName(slot.sheetHint || '');
   if (hint) {
     const matched = sheetNames.find((name) => normalizeKcfxHeaderName(name) === hint)
@@ -2612,6 +2649,7 @@ function buildKcfxParseDiagnostics(parsed) {
 function defaultKcfxSheetHint(slotId) {
   if (slotId === 'dim-purchase-division') return '产品线明细';
   if (slotId === 'dim-product') return 'Dim-YL医疗器械商品分类';
+  if (slotId === 'dim-customer-material') return STORE_MAPPING_SHEET_HINT;
   return '';
 }
 
@@ -2802,8 +2840,12 @@ function parseKcfxWorkbookFile(filePath, slot) {
     cellStyles: false,
     sheets: [sheetName]
   });
+  const parsed = parseKcfxWorkbookRows(workbook, slot);
+  if (slot.id === 'dim-customer-material' && !isStoreMappingHeaderSet(parsed.headers)) {
+    throw new Error('店铺简称维表缺少客户名称或日常汇报沟通简称列');
+  }
   return {
-    ...parseKcfxWorkbookRows(workbook, slot),
+    ...parsed,
     readMode: reader.usedFallback ? 'server-node-zlib-fallback' : 'server'
   };
 }

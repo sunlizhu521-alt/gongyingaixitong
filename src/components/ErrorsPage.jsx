@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API } from '../constants.js';
 import { useKcfxRecordMap } from './kcfxRecordLoader.js';
+import { isStoreMappingRecordValid, STORE_MAPPING_CUSTOMER_HEADERS } from '../../shared/kcfxStoreMapping.js';
 
 const EMPTY_TABLES = {
   closed: emptyErrorResult(),
@@ -536,11 +537,7 @@ function buildDimensionMaps(records) {
 }
 
 function isStoreSummaryRecordValid(record) {
-  if (!record) return false;
-  const sheetName = normalizeHeaderName(record.sheetName || record.parseDiagnostics?.sheetName || '');
-  const headerB = normalizeHeaderName(record.headers?.[1] || record.parseDiagnostics?.headerFirst12?.[1] || '');
-  return sheetName.includes(normalizeHeaderName('店铺名称汇总'))
-    && headerB === normalizeHeaderName('金蝶名称');
+  return isStoreMappingRecordValid(record);
 }
 
 function buildClosedInventoryChecks(records, maps) {
@@ -931,8 +928,8 @@ function mapStoreNames(rows) {
   const map = new Map();
   for (const row of rows) {
     const candidates = [
-      nthValue(row, 2),
-      firstValue(row, ['金蝶', '金蝶名称', '店铺名称', '店铺', '客户名称', '客户', '公司名称', '全称'])
+      firstValue(row, STORE_MAPPING_CUSTOMER_HEADERS),
+      nthValue(row, 2)
     ];
     for (const candidate of candidates) {
       const raw = normalizeText(candidate);

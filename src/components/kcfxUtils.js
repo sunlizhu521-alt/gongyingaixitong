@@ -1,4 +1,5 @@
 import { INVENTORY_TREND_MONTHS } from '../../shared/kcfxTrendMonths.js';
+import { STORE_MAPPING_CUSTOMER_HEADERS, STORE_MAPPING_SHORT_NAME_HEADERS } from '../../shared/kcfxStoreMapping.js';
 
 export { INVENTORY_TREND_MONTHS };
 export const KCFX_COLORS = ['#007aff', '#34c759', '#ff9f0a', '#af52de', '#ff375f', '#5ac8fa', '#5856d6', '#30d158', '#bf5af2', '#ff6b35'];
@@ -445,7 +446,7 @@ export function getSalesRows(records) {
       salesMonthNumber: salesMonth.slice(5, 7),
       salesOrg: departmentMap.get(departmentKey) || '',
       customer,
-      storeShortName: storeInfo?.shortName || customer,
+      storeShortName: storeInfo?.shortName || '',
       salesDepartmentKey: departmentKey,
       materialCode,
       materialName: getSalesMaterialName(row) || product.materialName || '',
@@ -488,23 +489,19 @@ function mapStoreInfo(rows) {
   const map = new Map();
   for (const row of rows) {
     const rawName = firstText([
-      nthValue(row, 2),
-      firstValue(row, ['金蝶名称', '客户名称', '店铺名称', '店铺', '公司名称', '全称'])
+      firstValue(row, STORE_MAPPING_CUSTOMER_HEADERS),
+      nthValue(row, 2)
     ]);
     const normalized = normalizeStoreName(rawName);
-    if (!normalized || map.has(normalized)) continue;
     const shortName = firstText([
-      firstValue(row, ['日常汇报沟通简称', '日常沟通简称', '汇报简称', '店铺简称', '简称']),
+      firstValue(row, STORE_MAPPING_SHORT_NAME_HEADERS),
       firstValueByHeaderIncludes(row, ['日常', '简称']),
-      firstValueByHeaderIncludes(row, ['汇报', '简称']),
-      firstValueByHeaderIncludes(row, ['简称']),
-      nthValue(row, 4),
-      nthValue(row, 3),
-      rawName
+      firstValueByHeaderIncludes(row, ['汇报', '简称'])
     ]);
+    if (!normalized || !normalizeText(shortName) || map.has(normalized)) continue;
     map.set(normalized, {
       rawName,
-      shortName: normalizeText(shortName) || rawName
+      shortName: normalizeText(shortName)
     });
   }
   return map;
