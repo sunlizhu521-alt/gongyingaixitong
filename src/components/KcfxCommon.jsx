@@ -1,5 +1,6 @@
 import React from 'react';
 import { KCFX_COLORS, formatNumber, percent } from './kcfxUtils.js';
+import { DEFAULT_TABLE_PAGE_SIZE, TablePagination, useTablePagination } from './TablePagination.jsx';
 
 export function KcfxPageShell({ title, status, loading, onRefresh, children }) {
   return (
@@ -74,29 +75,41 @@ export function PanelGrid({ children, className = '' }) {
   return <div className={`dashboard-grid receipt-chart-grid ${className}`.trim()}>{children}</div>;
 }
 
-export function SimpleTable({ columns, rows, maxRows = 100 }) {
-  const visibleRows = rows.slice(0, maxRows);
+export function SimpleTable({ columns, rows, pageSize = DEFAULT_TABLE_PAGE_SIZE, paginated = true, resetKey }) {
+  const pagination = useTablePagination(rows, { pageSize, resetKey });
+  const visibleRows = paginated ? pagination.pageRows : rows;
+  const startIndex = paginated ? (pagination.page - 1) * pagination.pageSize : 0;
   return (
-    <div className="kcfx-table-wrap">
-      <table>
-        <thead>
-          <tr>
-            {columns.map((column) => <th key={column.key}>{column.label}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {visibleRows.length ? visibleRows.map((row, index) => (
-            <tr key={row.id || `${index}`}>
-              {columns.map((column) => (
-                <td key={column.key}>{column.render ? column.render(row, index) : row[column.key]}</td>
-              ))}
+    <div className="table-pagination-shell">
+      <div className="kcfx-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              {columns.map((column) => <th key={column.key}>{column.label}</th>)}
             </tr>
-          )) : (
-            <tr><td className="empty" colSpan={columns.length}>暂无数据</td></tr>
-          )}
-        </tbody>
-      </table>
-      {rows.length > maxRows && <p className="kcfx-table-note">仅展示前 {maxRows} 行，共 {rows.length} 行。</p>}
+          </thead>
+          <tbody>
+            {visibleRows.length ? visibleRows.map((row, index) => (
+              <tr key={row.id || `${startIndex + index}`}>
+                {columns.map((column) => (
+                  <td key={column.key}>{column.render ? column.render(row, startIndex + index) : row[column.key]}</td>
+                ))}
+              </tr>
+            )) : (
+              <tr><td className="empty" colSpan={columns.length}>暂无数据</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {paginated && (
+        <TablePagination
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+          totalPages={pagination.totalPages}
+          totalRows={pagination.totalRows}
+          onPageChange={pagination.setPage}
+        />
+      )}
     </div>
   );
 }

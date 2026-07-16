@@ -46,7 +46,6 @@ export default function ComparisonPage({ kcfxData = null, kcfxRecords = {}, erro
         <h3>差异明细</h3>
         <SimpleTable
           rows={filteredRows}
-          maxRows={200}
           columns={[
             { key: 'diffType', label: '差异类型' },
             { key: 'organization', label: '组织' },

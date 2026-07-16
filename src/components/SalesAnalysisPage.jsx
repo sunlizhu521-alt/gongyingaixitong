@@ -205,7 +205,7 @@ export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRe
             导出
           </button>
         </div>
-        <SimpleTable rows={filteredRows} maxRows={150} columns={salesTableColumns} />
+        <SimpleTable rows={filteredRows} columns={salesTableColumns} />
       </section>
       <SourcePanel sources={[
         { label: '销售数据文件', value: recordSourceText(records['sales-data']) },

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API } from '../constants.js';
 import { useKcfxRecordMap } from './kcfxRecordLoader.js';
 import { isStoreMappingRecordValid, STORE_MAPPING_CUSTOMER_HEADERS } from '../../shared/kcfxStoreMapping.js';
+import { TablePagination, useTablePagination } from './TablePagination.jsx';
 
 const EMPTY_TABLES = {
   closed: emptyErrorResult(),
@@ -411,6 +412,7 @@ function MetricCard({ label, value }) {
 }
 
 function ErrorTable({ title, rows, columns, diagnostic, onDownload }) {
+  const pagination = useTablePagination(rows);
   return (
     <section className="error-section">
       <div className="table-title-row">
@@ -428,8 +430,8 @@ function ErrorTable({ title, rows, columns, diagnostic, onDownload }) {
             </tr>
           </thead>
           <tbody>
-            {rows.length ? rows.map((row, index) => (
-              <tr key={`${title}-${index}`}>
+            {pagination.pageRows.length ? pagination.pageRows.map((row, index) => (
+              <tr key={`${title}-${(pagination.page - 1) * pagination.pageSize + index}`}>
                 {columns.map(([key, , className]) => (
                   <td key={key} className={className || ''}>{className === 'num' ? formatNumber(row[key]) : row[key]}</td>
                 ))}
@@ -442,6 +444,13 @@ function ErrorTable({ title, rows, columns, diagnostic, onDownload }) {
           </tbody>
         </table>
       </div>
+      <TablePagination
+        page={pagination.page}
+        pageSize={pagination.pageSize}
+        totalPages={pagination.totalPages}
+        totalRows={pagination.totalRows}
+        onPageChange={pagination.setPage}
+      />
     </section>
   );
 }

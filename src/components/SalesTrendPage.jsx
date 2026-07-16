@@ -5,6 +5,7 @@ import { BarPanel, KcfxPageShell, PanelGrid, SimpleTable } from './KcfxCommon.js
 import { downloadKcfxRowsAsXlsx } from './kcfxExport.js';
 import { KCFX_COLORS, formatNumber, formatQuantity, getCachedSalesRows, groupSum, recordSourceText, sum } from './kcfxUtils.js';
 import { useKcfxRecordMap, useKcfxSalesRows } from './kcfxRecordLoader.js';
+import { TablePagination } from './TablePagination.jsx';
 
 const TREND_YEARS = ['2025', '2026'];
 const TREND_YEAR_COLORS = { 2025: '#007aff', 2026: '#34c759' };
@@ -194,14 +195,15 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
             导出
           </button>
         </div>
-        <SimpleTable rows={detailRows} maxRows={SALES_TREND_PAGE_SIZE} columns={SALES_TREND_TABLE_COLUMNS} />
-        <div className="kcfx-table-pager">
-          <button type="button" className="ghost compact-button" onClick={() => setDetailPage(1)} disabled={detailPage <= 1}>首页</button>
-          <button type="button" className="ghost compact-button" onClick={() => setDetailPage((page) => Math.max(1, page - 1))} disabled={detailPage <= 1}>上一页</button>
-          <span>第 {detailPage} / {detailPageCount} 页</span>
-          <button type="button" className="ghost compact-button" onClick={() => setDetailPage((page) => Math.min(detailPageCount, page + 1))} disabled={detailPage >= detailPageCount}>下一页</button>
-          <button type="button" className="ghost compact-button" onClick={() => setDetailPage(detailPageCount)} disabled={detailPage >= detailPageCount}>末页</button>
-        </div>
+        <SimpleTable rows={detailRows} paginated={false} columns={SALES_TREND_TABLE_COLUMNS} />
+        <TablePagination
+          page={detailPage}
+          pageSize={SALES_TREND_PAGE_SIZE}
+          totalPages={detailPageCount}
+          totalRows={filteredRows.length}
+          onPageChange={setDetailPage}
+          disabled={pageLoading}
+        />
       </section>
 
       <section className="data-source-panel sales-trend-source-panel">

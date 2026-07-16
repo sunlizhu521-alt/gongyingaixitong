@@ -406,7 +406,7 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
             导出
           </button>
         </div>
-        <SimpleTable rows={filteredRows} maxRows={120} columns={receiptTableColumns} />
+        <SimpleTable rows={filteredRows} columns={receiptTableColumns} />
       </section>
 
       <SourcePanel sources={[

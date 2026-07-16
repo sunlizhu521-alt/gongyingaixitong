@@ -104,7 +104,7 @@ export default function KcfxFeedbackPage({ type, user }) {
         </div>
       )}
       <section className="kcfx-panel">
-        <SimpleTable rows={rows} maxRows={500} columns={config.columns} />
+        <SimpleTable rows={rows} columns={config.columns} />
       </section>
     </KcfxPageShell>
   );

@@ -10,6 +10,7 @@ import {
 } from './kcfxUtils.js';
 import { buildAgeTrendMatrix } from '../../shared/kcfxAgeTrend.js';
 import { buildWarehouseTypeTrendMatrix } from '../../shared/kcfxWarehouseTypeTrend.js';
+import { TablePagination } from './TablePagination.jsx';
 
 const FILTERS = [
   { id: 'month', field: 'month', type: 'month', allLabel: '全部月份', monthAllLabel: '全部月份' },
@@ -243,16 +244,15 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
             {exporting ? '导出中...' : '导出'}
           </button>
         </div>
-        <SimpleTable rows={payload?.rows || []} maxRows={20} columns={TABLE_COLUMNS} />
-        <div className="kcfx-pagination">
-          <button type="button" className="ghost compact-button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1 || loading}>
-            上一页
-          </button>
-          <span>第 {pagination.page || page} / {pagination.totalPages || 1} 页</span>
-          <button type="button" className="ghost compact-button" onClick={() => setPage((value) => Math.min(pagination.totalPages || 1, value + 1))} disabled={page >= (pagination.totalPages || 1) || loading}>
-            下一页
-          </button>
-        </div>
+        <SimpleTable rows={payload?.rows || []} paginated={false} columns={TABLE_COLUMNS} />
+        <TablePagination
+          page={pagination.page || page}
+          pageSize={20}
+          totalPages={pagination.totalPages || 1}
+          totalRows={pagination.totalRows || 0}
+          onPageChange={setPage}
+          disabled={loading}
+        />
       </section>
     </KcfxPageShell>
   );

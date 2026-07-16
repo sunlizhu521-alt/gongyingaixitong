@@ -557,6 +557,57 @@ h3 {
   background: white;
 }
 
+.table-pagination-shell {
+  min-width: 0;
+}
+
+.table-pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.table-pagination-summary {
+  white-space: nowrap;
+}
+
+.table-pagination-actions,
+.table-pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.table-pagination-pages .compact-button {
+  width: 30px;
+  min-width: 30px;
+  padding-inline: 0;
+}
+
+.table-pagination-pages .compact-button.active {
+  border-color: #1769e0;
+  background: #1769e0;
+  color: #fff;
+}
+
+@media (max-width: 720px) {
+  .table-pagination-controls {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .table-pagination-actions {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+}
+
 .limited-table {
   max-height: 285px;
 }

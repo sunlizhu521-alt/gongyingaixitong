@@ -100,7 +100,6 @@ export default function KcfxLibraryPage({
         <h3>文件槽位明细</h3>
         <SimpleTable
           rows={rows}
-          maxRows={200}
           columns={[
             { key: 'id', label: '槽位' },
             { key: 'label', label: '名称' },
