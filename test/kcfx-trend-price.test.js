@@ -17,4 +17,8 @@ test('trend implementations preserve dimension price precedence', async () => {
   ));
   assert.match(worker, /selectInventoryTrendPrice\(dimensionSettlementPrice, directSettlementPrice\)/);
   assert.match(server, /selectInventoryTrendPrice\(dimensionSettlementPrice, directSettlementPrice\)/);
+  assert.match(worker, /makePriceAccessor\(productRows\[0\], 10\)/);
+  assert.match(worker, /toNumber\(productPriceAccessor\(row\)\)/);
+  assert.match(server, /makeKcfxTrendPriceAccessor\(productRows\[0\], 10\)/);
+  assert.match(server, /kcfxTrendToNumber\(productPriceAccessor\(row\)\)/);
 });

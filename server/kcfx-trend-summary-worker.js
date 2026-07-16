@@ -139,7 +139,9 @@ function buildDimensionMaps(records) {
   const productSeriesByMaterial = new Map();
   const skuByMaterial = new Map();
   const settlementPriceByMaterial = new Map();
-  for (const row of records['dim-product']?.rows || []) {
+  const productRows = records['dim-product']?.rows || [];
+  const productPriceAccessor = makePriceAccessor(productRows[0], 10);
+  for (const row of productRows) {
     const materialCode = normalizeMaterialCode(nthValue(row, 1));
     const sku = normalizeText(nthValue(row, 3));
     const productLine = normalizeText(nthValue(row, 7));
@@ -147,7 +149,7 @@ function buildDimensionMaps(records) {
     if (materialCode && sku && !skuByMaterial.has(materialCode)) skuByMaterial.set(materialCode, sku);
     if (materialCode && productLine && !productLineByMaterial.has(materialCode)) productLineByMaterial.set(materialCode, productLine);
     if (materialCode && productSeries && !productSeriesByMaterial.has(materialCode)) productSeriesByMaterial.set(materialCode, productSeries);
-    const price = toNumber(nthValue(row, 10));
+    const price = toNumber(productPriceAccessor(row));
     if (materialCode && price && !settlementPriceByMaterial.has(materialCode)) settlementPriceByMaterial.set(materialCode, price);
   }
 

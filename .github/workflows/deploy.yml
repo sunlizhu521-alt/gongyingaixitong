@@ -74,7 +74,7 @@ jobs:
 
             if ! node --input-type=module <<'NODE'
           const baseUrl = 'http://127.0.0.1:4001';
-          const expectedSchemaVersion = 6;
+          const expectedSchemaVersion = 7;
           const expectedJuneValue = 156793401.1207;
           const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
