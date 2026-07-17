@@ -556,22 +556,12 @@ function WarehouseFlowChart({ item, months, mode }) {
       height: barHeight
     };
   });
-  const direction = item.trendDirection || 'flat';
-  const directionText = direction === 'new'
-    ? '新增'
-    : direction === 'up' ? '↑ 上升' : direction === 'down' ? '↓ 下降' : '→ 持平';
-  const percentText = direction === 'new' ? '' : formatOverallTrendPercent(item.trendPercent);
-
   return (
-    <article className={`warehouse-flow-chart is-${direction}${item.dashed ? ' is-dashed' : ''}`}>
+    <article className={`warehouse-flow-chart${item.dashed ? ' is-dashed' : ''}`}>
       <header>
         <strong>{item.warehouseType}</strong>
-        <span className="warehouse-flow-status">
-          <b>{directionText}</b>
-          {percentText ? <small>{percentText}</small> : null}
-        </span>
       </header>
-      <svg style={{ width: `${width}px` }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${item.warehouseType}${directionText}${percentText}`}>
+      <svg style={{ width: `${width}px` }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${item.warehouseType}跨月趋势`}>
         <line className="warehouse-flow-axis-line" x1={padding.left} x2={width - padding.right} y1={chartBottom} y2={chartBottom} />
         {bars.map(({ x, centerX, y, height: currentBarHeight }, index) => {
           const valueItem = item.values[index] || {};
@@ -598,12 +588,6 @@ function WarehouseFlowChart({ item, months, mode }) {
       </svg>
     </article>
   );
-}
-
-function formatOverallTrendPercent(value) {
-  if (!Number.isFinite(value)) return '变化率 --';
-  const sign = value > 0 ? '+' : '';
-  return `${sign}${formatNumber(value, 2)}%`;
 }
 
 function formatWarehouseTypeTrendValue(mode, value) {

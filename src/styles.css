@@ -1635,12 +1635,11 @@ th {
 
 .warehouse-flow-chart header {
   display: flex;
-  min-height: 38px;
+  min-height: 30px;
   padding: 0 10px;
   box-sizing: border-box;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;
 }
 
 .warehouse-flow-chart header > strong {
@@ -1649,51 +1648,6 @@ th {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.warehouse-flow-status {
-  display: inline-flex;
-  width: 76px;
-  min-height: 30px;
-  padding: 2px 4px;
-  border: 1px solid currentColor;
-  border-radius: 4px;
-  box-sizing: border-box;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  line-height: 1.15;
-  white-space: nowrap;
-}
-
-.warehouse-flow-status b {
-  font-size: 10px;
-}
-
-.warehouse-flow-status small {
-  margin-top: 2px;
-  font-size: 9px;
-  font-weight: 800;
-}
-
-.warehouse-flow-chart.is-up .warehouse-flow-status {
-  background: #fff7ed;
-  color: #c2410c;
-}
-
-.warehouse-flow-chart.is-down .warehouse-flow-status {
-  background: #ecfdf5;
-  color: #047857;
-}
-
-.warehouse-flow-chart.is-flat .warehouse-flow-status {
-  background: #f1f5f9;
-  color: #475569;
-}
-
-.warehouse-flow-chart.is-new .warehouse-flow-status {
-  background: #eff6ff;
-  color: #1769e0;
 }
 
 .warehouse-flow-chart.is-dashed {
