@@ -9,7 +9,7 @@ import {
   moneyWan
 } from './kcfxUtils.js';
 import { buildAgeTrendMatrix } from '../../shared/kcfxAgeTrend.js';
-import { buildWarehouseFlowTrend } from '../../shared/kcfxWarehouseTypeTrend.js';
+import { buildForwardMonthlyFlowRows, buildWarehouseFlowTrend } from '../../shared/kcfxWarehouseTypeTrend.js';
 import { TablePagination } from './TablePagination.jsx';
 
 const FILTERS = [
@@ -392,38 +392,109 @@ function formatAgeTrendSegmentValue(mode, value) {
 
 function WarehouseFlowTrend({ rows, months, mode, setMode }) {
   const { groups, months: trendMonths } = buildWarehouseFlowTrend(rows, mode, months);
+  const monthlyFlowRows = buildForwardMonthlyFlowRows(groups, trendMonths);
   const hasData = groups.some((group) => group.series.some((item) => item.values.some(({ value }) => value)));
   return (
-    <section className="kcfx-panel warehouse-flow-trend-panel">
-      <div className="table-title-row">
-        <h3>仓库货物流转跨月趋势</h3>
-        <div className="age-mode-switch" role="group" aria-label="仓库类型趋势口径">
-          <button type="button" className={mode === 'amount' ? 'active' : ''} onClick={() => setMode('amount')}>金额</button>
-          <button type="button" className={mode === 'qty' ? 'active' : ''} onClick={() => setMode('qty')}>数量</button>
+    <>
+      <section className="kcfx-panel warehouse-flow-trend-panel">
+        <div className="table-title-row">
+          <h3>仓库货物流转跨月趋势</h3>
+          <WarehouseFlowModeSwitch mode={mode} setMode={setMode} label="仓库类型趋势口径" />
+        </div>
+        {hasData ? (
+          <div className="warehouse-flow-groups">
+            {groups.map((group) => (
+              <section className={`warehouse-flow-group is-${group.id}`} key={group.id}>
+                <div className="warehouse-flow-group-heading">
+                  <strong>{group.label}</strong>
+                </div>
+                <div className="warehouse-flow-scroll">
+                  <div className="warehouse-flow-row">
+                    {group.series.map((item, index) => (
+                      <React.Fragment key={item.warehouseType}>
+                        {index > 0 && group.usesFlowArrows ? <span className="warehouse-flow-arrow" aria-hidden="true">→</span> : null}
+                        <WarehouseFlowChart item={item} months={trendMonths} mode={mode} />
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : <div className="empty">暂无数据</div>}
+      </section>
+      <section className="kcfx-panel forward-month-flow-panel">
+        <div className="table-title-row">
+          <div className="forward-month-flow-title">
+            <h3>仓库货物流转跨月趋势</h3>
+            <span>正向流转 · 每月一行</span>
+          </div>
+          <WarehouseFlowModeSwitch mode={mode} setMode={setMode} label="正向仓库流转趋势口径" />
+        </div>
+        {hasData ? <ForwardMonthlyFlow rows={monthlyFlowRows} mode={mode} /> : <div className="empty">暂无数据</div>}
+      </section>
+    </>
+  );
+}
+
+function WarehouseFlowModeSwitch({ mode, setMode, label }) {
+  return (
+    <div className="age-mode-switch" role="group" aria-label={label}>
+      <button type="button" className={mode === 'amount' ? 'active' : ''} onClick={() => setMode('amount')}>金额</button>
+      <button type="button" className={mode === 'qty' ? 'active' : ''} onClick={() => setMode('qty')}>数量</button>
+    </div>
+  );
+}
+
+function ForwardMonthlyFlow({ rows, mode }) {
+  const width = 780;
+  const height = 92;
+  const xPositions = [110, 390, 670];
+  return (
+    <div className="forward-month-flow-scroll">
+      <div className="forward-month-flow-content">
+        <div className="forward-month-flow-header" aria-hidden="true">
+          <span>月份</span>
+          <strong>销售供应商仓</strong>
+          <i>→</i>
+          <strong>销售海上在途仓</strong>
+          <i>→</i>
+          <strong>销售出库仓</strong>
+        </div>
+        <div className="forward-month-flow-rows">
+          {rows.map((row) => {
+            const values = row.values.map((item) => Number(item.value) || 0);
+            const minValue = Math.min(...values);
+            const maxValue = Math.max(...values);
+            const range = maxValue - minValue;
+            const points = values.map((value, index) => ({
+              x: xPositions[index],
+              y: range ? 62 - ((value - minValue) / range) * 32 : 46
+            }));
+            return (
+              <div className="forward-month-flow-row" key={row.month}>
+                <strong className="forward-month-flow-month">{formatWarehouseMonth(row.month)}</strong>
+                <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${formatWarehouseMonth(row.month)}正向仓库流转趋势`}>
+                  <line className="forward-month-flow-baseline" x1={xPositions[0]} x2={xPositions[2]} y1="76" y2="76" />
+                  <polyline className="forward-month-flow-line" points={points.map(({ x, y }) => `${x},${y}`).join(' ')} />
+                  {points.map(({ x, y }, index) => {
+                    const item = row.values[index];
+                    const labelY = y < 42 ? y + 20 : y - 10;
+                    return (
+                      <g key={item.warehouseType}>
+                        <title>{`${formatWarehouseMonth(row.month)} ${item.warehouseType} ${formatWarehouseTypeTrendValue(mode, item.value)}，环比 ${formatMonthOverMonth(item.mom)}`}</title>
+                        <circle className="forward-month-flow-point" cx={x} cy={y} r="5" />
+                        <text className="forward-month-flow-value" x={x} y={labelY}>{formatWarehouseFlowPointValue(mode, item.value)}</text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+            );
+          })}
         </div>
       </div>
-      {hasData ? (
-        <div className="warehouse-flow-groups">
-          {groups.map((group) => (
-            <section className={`warehouse-flow-group is-${group.id}`} key={group.id}>
-              <div className="warehouse-flow-group-heading">
-                <strong>{group.label}</strong>
-              </div>
-              <div className="warehouse-flow-scroll">
-                <div className="warehouse-flow-row">
-                  {group.series.map((item, index) => (
-                    <React.Fragment key={item.warehouseType}>
-                      {index > 0 && group.usesFlowArrows ? <span className="warehouse-flow-arrow" aria-hidden="true">→</span> : null}
-                      <WarehouseFlowChart item={item} months={trendMonths} mode={mode} />
-                    </React.Fragment>
-                  ))}
-                </div>
-              </div>
-            </section>
-          ))}
-        </div>
-      ) : <div className="empty">暂无数据</div>}
-    </section>
+    </div>
   );
 }
 

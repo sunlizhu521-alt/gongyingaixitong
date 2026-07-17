@@ -93,6 +93,23 @@ export function buildWarehouseFlowTrend(rows = [], mode = 'amount', availableMon
   return { months, groups };
 }
 
+export function buildForwardMonthlyFlowRows(groups = [], months = []) {
+  const forwardGroup = groups.find((group) => group.id === 'forward');
+  const series = forwardGroup?.series || [];
+  return months.map((month, monthIndex) => ({
+    month,
+    values: series.map((item) => ({
+      warehouseType: item.warehouseType,
+      ...(item.values[monthIndex] || {
+        month,
+        value: 0,
+        previousValue: 0,
+        mom: null
+      })
+    }))
+  }));
+}
+
 function buildWarehouseSeries(definition, months, valuesByMonth) {
   const values = months.map((month, monthIndex) => {
     const value = valuesByMonth.get(month) || 0;

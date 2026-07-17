@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildWarehouseFlowTrend } from '../shared/kcfxWarehouseTypeTrend.js';
+import { buildForwardMonthlyFlowRows, buildWarehouseFlowTrend } from '../shared/kcfxWarehouseTypeTrend.js';
 
 test('warehouse flow trend groups warehouse types in the configured logistics order', () => {
   const rows = [
@@ -93,4 +93,36 @@ test('warehouse flow trend appends future months and reports a flat state', () =
   ]);
   assert.equal(outbound.trendDirection, 'flat');
   assert.equal(outbound.trendPercent, 0);
+});
+
+test('forward monthly flow rows keep months vertical and warehouses in logistics order', () => {
+  const trend = buildWarehouseFlowTrend([
+    { month: '2026-01', warehouseType: '销售供应商仓', qty: 10, amount: 100 },
+    { month: '2026-01', warehouseType: '销售海上在途仓', qty: 20, amount: 200 },
+    { month: '2026-01', warehouseType: '销售出库仓', qty: 30, amount: 300 },
+    { month: '2026-02', warehouseType: '销售供应商仓', qty: 11, amount: 110 },
+    { month: '2026-02', warehouseType: '销售出库仓', qty: 33, amount: 330 }
+  ], 'qty', ['2026-01', '2026-02']);
+  const rows = buildForwardMonthlyFlowRows(trend.groups, trend.months);
+
+  assert.deepEqual(rows.map((row) => row.month), ['2026-01', '2026-02']);
+  assert.deepEqual(rows[0].values.map((item) => item.warehouseType), [
+    '销售供应商仓', '销售海上在途仓', '销售出库仓'
+  ]);
+  assert.deepEqual(rows[0].values.map((item) => item.value), [10, 20, 30]);
+  assert.deepEqual(rows[1].values.map((item) => item.value), [11, 0, 33]);
+  assert.equal(rows[1].values[0].mom, 10);
+});
+
+test('forward monthly flow rows append future months and preserve amount values', () => {
+  const trend = buildWarehouseFlowTrend([
+    { month: '2026-01', warehouseType: '销售供应商仓', qty: 1, amount: 10000 },
+    { month: '2026-07', warehouseType: '销售供应商仓', qty: 2, amount: 25000 }
+  ], 'amount', ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06']);
+  const rows = buildForwardMonthlyFlowRows(trend.groups, trend.months);
+
+  assert.equal(rows.length, 7);
+  assert.equal(rows.at(-1).month, '2026-07');
+  assert.deepEqual(rows.at(-1).values.map((item) => item.value), [25000, 0, 0]);
+  assert.equal(rows.at(-1).values[0].mom, null);
 });
