@@ -536,9 +536,9 @@ function WarehouseMonthlyFlow({ group, mode }) {
 }
 
 function WarehouseFlowChart({ item, months, mode }) {
-  const width = Math.max(392, 72 + Math.max(months.length - 1, 0) * 64);
-  const height = 158;
-  const padding = { left: 36, right: 36, top: 34, bottom: 34 };
+  const width = Math.max(mode === 'qty' ? 432 : 408, 72 + Math.max(months.length - 1, 0) * 68);
+  const height = 176;
+  const padding = { left: 36, right: 36, top: 52, bottom: 34 };
   const values = item.values.map(({ value }) => Number(value) || 0);
   const maxValue = Math.max(...values, 0);
   const chartBottom = height - padding.bottom;
@@ -575,7 +575,7 @@ function WarehouseFlowChart({ item, months, mode }) {
         <line className="warehouse-flow-axis-line" x1={padding.left} x2={width - padding.right} y1={chartBottom} y2={chartBottom} />
         {bars.map(({ x, centerX, y, height: currentBarHeight }, index) => {
           const valueItem = item.values[index] || {};
-          const labelY = Math.max(12, y - 7);
+          const labelY = Math.max(13, y - 24);
           return (
             <g key={valueItem.month || index}>
               <title>{`${item.warehouseType} ${formatWarehouseMonth(valueItem.month)} ${formatWarehouseTypeTrendValue(mode, valueItem.value)}，环比 ${formatMonthOverMonth(valueItem.mom)}`}</title>
@@ -587,7 +587,10 @@ function WarehouseFlowChart({ item, months, mode }) {
                 height={currentBarHeight}
                 rx="2"
               />
-              <text className="warehouse-flow-value-label" x={centerX} y={labelY}>{formatWarehouseFlowPointValue(mode, valueItem.value)}</text>
+              <text className={`warehouse-flow-value-label is-${mode}`} x={centerX} y={labelY}>
+                <tspan x={centerX}>{formatWarehouseFlowBarValue(mode, valueItem.value)}</tspan>
+                <tspan className="warehouse-flow-mom-label" x={centerX} dy="12">环比 {formatMonthOverMonth(valueItem.mom)}</tspan>
+              </text>
               <text className="warehouse-flow-month-label" x={centerX} y={height - 10}>{formatWarehouseMonth(valueItem.month)}</text>
             </g>
           );
@@ -609,6 +612,12 @@ function formatWarehouseTypeTrendValue(mode, value) {
 
 function formatWarehouseFlowPointValue(mode, value) {
   return mode === 'amount' ? `${formatNumber((Number(value) || 0) / 10000, 2)}万` : formatNumber(value, 0);
+}
+
+function formatWarehouseFlowBarValue(mode, value) {
+  return mode === 'amount'
+    ? `${formatNumber((Number(value) || 0) / 10000, 2)}万`
+    : `${formatNumber(value, 0)}件`;
 }
 
 function formatWarehouseMonth(month) {

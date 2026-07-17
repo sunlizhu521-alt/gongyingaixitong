@@ -1702,7 +1702,7 @@ th {
 
 .warehouse-flow-chart svg {
   display: block;
-  height: 158px;
+  height: 176px;
   overflow: visible;
 }
 
@@ -1735,6 +1735,16 @@ th {
 .warehouse-flow-value-label {
   font-size: 9.5px;
   font-weight: 800;
+}
+
+.warehouse-flow-value-label.is-qty {
+  font-size: 8.5px;
+}
+
+.warehouse-flow-mom-label {
+  fill: #64748b;
+  font-size: 8px;
+  font-weight: 700;
 }
 
 .warehouse-flow-month-label {
