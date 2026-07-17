@@ -392,7 +392,7 @@ function formatAgeTrendSegmentValue(mode, value) {
 
 function WarehouseTypeTrendMatrix({ rows, months, mode, setMode }) {
   const { matrix, months: matrixMonths } = buildWarehouseTypeTrendMatrix(rows, mode, months);
-  const tableMinWidth = Math.max(960, matrixMonths.length * 114 + 276);
+  const tableMinWidth = Math.max(1020, matrixMonths.length * 114 + 334);
   return (
     <section className="kcfx-panel warehouse-type-trend-panel">
       <div className="table-title-row">
@@ -443,8 +443,8 @@ function WarehouseTypeTrendMatrix({ rows, months, mode, setMode }) {
 }
 
 function WarehouseTypeSparkline({ item, mode }) {
-  const width = 148;
-  const height = 42;
+  const width = 220;
+  const height = 52;
   const padding = 5;
   const values = item.values.map(({ value }) => Number(value) || 0);
   const minValue = Math.min(...values);
@@ -471,7 +471,7 @@ function WarehouseTypeSparkline({ item, mode }) {
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${item.warehouseType}${directionText}${percentText}`}>
         <polyline points={points.map(({ x, y }) => `${x},${y}`).join(' ')} />
         {points.map(({ x, y }, index) => (
-          <circle key={item.values[index]?.month || index} cx={x} cy={y} r={index === points.length - 1 ? 4 : 2.6} />
+          <circle key={item.values[index]?.month || index} cx={x} cy={y} r={index === points.length - 1 ? 5.5 : 3.2} />
         ))}
       </svg>
       <span className="warehouse-type-trend-status">

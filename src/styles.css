@@ -1583,7 +1583,7 @@ th {
   position: sticky;
   left: 0;
   z-index: 2;
-  min-width: 274px;
+  min-width: 332px;
   background: #f8fafc;
   color: #334155;
   font-weight: 800;
@@ -1596,25 +1596,25 @@ th {
 
 .warehouse-type-sparkline {
   display: grid;
-  grid-template-columns: 148px minmax(88px, 1fr);
+  grid-template-columns: 220px 84px;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   margin-top: 7px;
   font-size: 11px;
   font-weight: 800;
 }
 
 .warehouse-type-sparkline svg {
-  width: 148px;
-  height: 42px;
+  width: 220px;
+  height: 52px;
   overflow: visible;
 }
 
 .warehouse-type-sparkline polyline {
   fill: none;
   stroke: currentColor;
-  stroke-width: 3;
+  stroke-width: 4;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -1622,7 +1622,7 @@ th {
 .warehouse-type-sparkline circle {
   fill: #fff;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 2.25;
 }
 
 .warehouse-type-sparkline circle:last-child {
@@ -1631,8 +1631,9 @@ th {
 
 .warehouse-type-trend-status {
   display: flex;
-  min-height: 42px;
-  padding: 5px 7px;
+  width: 84px;
+  min-height: 34px;
+  padding: 3px 4px;
   border: 1px solid currentColor;
   border-radius: 4px;
   align-items: center;
@@ -1648,13 +1649,33 @@ th {
 }
 
 .warehouse-type-trend-status strong {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .warehouse-type-trend-status small {
-  margin-top: 3px;
-  font-size: 10px;
+  margin-top: 2px;
+  font-size: 9px;
   font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .warehouse-type-trend-table th:first-child {
+    min-width: 274px;
+  }
+
+  .warehouse-type-sparkline {
+    grid-template-columns: 170px 72px;
+  }
+
+  .warehouse-type-sparkline svg {
+    width: 170px;
+    height: 40px;
+  }
+
+  .warehouse-type-trend-status {
+    width: 72px;
+    min-height: 32px;
+  }
 }
 
 .warehouse-type-sparkline.is-up {
