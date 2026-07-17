@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildForwardMonthlyFlowRows, buildWarehouseFlowTrend } from '../shared/kcfxWarehouseTypeTrend.js';
+import {
+  buildForwardMonthlyFlowRows,
+  buildWarehouseFlowTrend,
+  buildWarehouseMonthlyFlowGroups
+} from '../shared/kcfxWarehouseTypeTrend.js';
 
 test('warehouse flow trend groups warehouse types in the configured logistics order', () => {
   const rows = [
@@ -125,4 +129,26 @@ test('forward monthly flow rows append future months and preserve amount values'
   assert.equal(rows.at(-1).month, '2026-07');
   assert.deepEqual(rows.at(-1).values.map((item) => item.value), [25000, 0, 0]);
   assert.equal(rows.at(-1).values[0].mom, null);
+});
+
+test('monthly flow groups include reverse, factory, and other in configured order', () => {
+  const trend = buildWarehouseFlowTrend([
+    { month: '2026-01', warehouseType: '销售退货拆检仓', qty: 4, amount: 40 },
+    { month: '2026-01', warehouseType: '生产材料仓', qty: 5, amount: 50 },
+    { month: '2026-01', warehouseType: '生产成品仓', qty: 6, amount: 60 },
+    { month: '2026-01', warehouseType: '系统集成仓', qty: 7, amount: 70 },
+    { month: '2026-01', warehouseType: '新仓库类型', qty: 8, amount: 80 },
+    { month: '2026-02', warehouseType: '销售退货拆检仓', qty: 9, amount: 90 }
+  ], 'qty', ['2026-01', '2026-02']);
+  const groups = buildWarehouseMonthlyFlowGroups(trend.groups, trend.months);
+
+  assert.deepEqual(groups.map((group) => group.id), ['forward', 'reverse', 'factory', 'other']);
+  assert.deepEqual(groups[1].rows.map((row) => row.values[0].value), [4, 9]);
+  assert.deepEqual(groups[2].rows[0].values.map((item) => item.value), [5, 6]);
+  assert.deepEqual(groups[2].rows[1].values.map((item) => item.value), [0, 0]);
+  assert.deepEqual(groups[3].series.map((item) => item.warehouseType), [
+    '系统集成仓', '样品/展厅仓', '销售售后配件仓', '未分类仓库类型', '新仓库类型'
+  ]);
+  assert.equal(groups[3].rows[0].values.at(-1).value, 8);
+  assert.equal(groups[1].rows[1].values[0].mom, 125);
 });

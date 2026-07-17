@@ -9,7 +9,7 @@ import {
   moneyWan
 } from './kcfxUtils.js';
 import { buildAgeTrendMatrix } from '../../shared/kcfxAgeTrend.js';
-import { buildForwardMonthlyFlowRows, buildWarehouseFlowTrend } from '../../shared/kcfxWarehouseTypeTrend.js';
+import { buildWarehouseFlowTrend, buildWarehouseMonthlyFlowGroups } from '../../shared/kcfxWarehouseTypeTrend.js';
 import { TablePagination } from './TablePagination.jsx';
 
 const FILTERS = [
@@ -392,7 +392,7 @@ function formatAgeTrendSegmentValue(mode, value) {
 
 function WarehouseFlowTrend({ rows, months, mode, setMode }) {
   const { groups, months: trendMonths } = buildWarehouseFlowTrend(rows, mode, months);
-  const monthlyFlowRows = buildForwardMonthlyFlowRows(groups, trendMonths);
+  const monthlyFlowGroups = buildWarehouseMonthlyFlowGroups(groups, trendMonths);
   const hasData = groups.some((group) => group.series.some((item) => item.values.some(({ value }) => value)));
   return (
     <>
@@ -427,11 +427,17 @@ function WarehouseFlowTrend({ rows, months, mode, setMode }) {
         <div className="table-title-row">
           <div className="forward-month-flow-title">
             <h3>仓库货物流转跨月趋势</h3>
-            <span>正向流转 · 每月一行</span>
+            <span>按货物流转分类 · 每月一行</span>
           </div>
-          <WarehouseFlowModeSwitch mode={mode} setMode={setMode} label="正向仓库流转趋势口径" />
+          <WarehouseFlowModeSwitch mode={mode} setMode={setMode} label="仓库流转每月趋势口径" />
         </div>
-        {hasData ? <ForwardMonthlyFlow rows={monthlyFlowRows} mode={mode} /> : <div className="empty">暂无数据</div>}
+        {hasData ? (
+          <div className="warehouse-monthly-flow-groups">
+            {monthlyFlowGroups.map((group) => (
+              <WarehouseMonthlyFlow group={group} mode={mode} key={group.id} />
+            ))}
+          </div>
+        ) : <div className="empty">暂无数据</div>}
       </section>
     </>
   );
@@ -446,55 +452,86 @@ function WarehouseFlowModeSwitch({ mode, setMode, label }) {
   );
 }
 
-function ForwardMonthlyFlow({ rows, mode }) {
-  const width = 780;
+const MONTHLY_FLOW_LABELS = {
+  forward: '正向流转',
+  reverse: '逆向流转',
+  factory: '工厂流转',
+  other: '其他仓库'
+};
+
+function WarehouseMonthlyFlow({ group, mode }) {
+  const stageWidth = 220;
+  const connectorWidth = 60;
   const height = 92;
-  const xPositions = [110, 390, 670];
+  const stageCount = group.series.length;
+  const width = stageCount * stageWidth + (group.usesFlowArrows ? Math.max(stageCount - 1, 0) * connectorWidth : 0);
+  const contentWidth = 90 + width;
+  const xPositions = group.series.map((_, index) => (
+    stageWidth / 2 + index * (stageWidth + (group.usesFlowArrows ? connectorWidth : 0))
+  ));
+  const headerColumns = [];
+  group.series.forEach((_, index) => {
+    headerColumns.push(`${stageWidth}px`);
+    if (group.usesFlowArrows && index < stageCount - 1) headerColumns.push(`${connectorWidth}px`);
+  });
+  const baselineStart = Math.max(24, (xPositions[0] || stageWidth / 2) - 70);
+  const baselineEnd = Math.min(width - 24, (xPositions.at(-1) || stageWidth / 2) + 70);
   return (
-    <div className="forward-month-flow-scroll">
-      <div className="forward-month-flow-content">
-        <div className="forward-month-flow-header" aria-hidden="true">
-          <span>月份</span>
-          <strong>销售供应商仓</strong>
-          <i>→</i>
-          <strong>销售海上在途仓</strong>
-          <i>→</i>
-          <strong>销售出库仓</strong>
-        </div>
-        <div className="forward-month-flow-rows">
-          {rows.map((row) => {
-            const values = row.values.map((item) => Number(item.value) || 0);
-            const minValue = Math.min(...values);
-            const maxValue = Math.max(...values);
-            const range = maxValue - minValue;
-            const points = values.map((value, index) => ({
-              x: xPositions[index],
-              y: range ? 62 - ((value - minValue) / range) * 32 : 46
-            }));
-            return (
-              <div className="forward-month-flow-row" key={row.month}>
-                <strong className="forward-month-flow-month">{formatWarehouseMonth(row.month)}</strong>
-                <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${formatWarehouseMonth(row.month)}正向仓库流转趋势`}>
-                  <line className="forward-month-flow-baseline" x1={xPositions[0]} x2={xPositions[2]} y1="76" y2="76" />
-                  <polyline className="forward-month-flow-line" points={points.map(({ x, y }) => `${x},${y}`).join(' ')} />
-                  {points.map(({ x, y }, index) => {
-                    const item = row.values[index];
-                    const labelY = y < 42 ? y + 20 : y - 10;
-                    return (
-                      <g key={item.warehouseType}>
-                        <title>{`${formatWarehouseMonth(row.month)} ${item.warehouseType} ${formatWarehouseTypeTrendValue(mode, item.value)}，环比 ${formatMonthOverMonth(item.mom)}`}</title>
-                        <circle className="forward-month-flow-point" cx={x} cy={y} r="5" />
-                        <text className="forward-month-flow-value" x={x} y={labelY}>{formatWarehouseFlowPointValue(mode, item.value)}</text>
-                      </g>
-                    );
-                  })}
-                </svg>
-              </div>
-            );
-          })}
+    <section className={`warehouse-monthly-flow-group is-${group.id}`}>
+      <div className="warehouse-monthly-flow-heading">
+        <strong>{MONTHLY_FLOW_LABELS[group.id] || group.label}</strong>
+        <span>每月一行</span>
+      </div>
+      <div className="forward-month-flow-scroll">
+        <div className="forward-month-flow-content" style={{ width: `${contentWidth}px` }}>
+          <div className="forward-month-flow-header" aria-hidden="true">
+            <span>月份</span>
+            <div className="forward-month-flow-stages" style={{ width: `${width}px`, gridTemplateColumns: headerColumns.join(' ') }}>
+              {group.series.map((item, index) => (
+                <React.Fragment key={item.warehouseType}>
+                  <strong>{item.warehouseType}</strong>
+                  {group.usesFlowArrows && index < stageCount - 1 ? <i>→</i> : null}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+          <div className="forward-month-flow-rows">
+            {group.rows.map((row) => {
+              const values = row.values.map((item) => Number(item.value) || 0);
+              const minValue = Math.min(...values);
+              const maxValue = Math.max(...values);
+              const range = maxValue - minValue;
+              const points = values.map((value, index) => ({
+                x: xPositions[index],
+                y: range ? 62 - ((value - minValue) / range) * 32 : 46
+              }));
+              return (
+                <div className="forward-month-flow-row" key={row.month}>
+                  <strong className="forward-month-flow-month">{formatWarehouseMonth(row.month)}</strong>
+                  <div className="forward-month-flow-chart-cell">
+                    <svg style={{ width: `${width}px` }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${formatWarehouseMonth(row.month)}${MONTHLY_FLOW_LABELS[group.id] || group.label}趋势`}>
+                      <line className="forward-month-flow-baseline" x1={baselineStart} x2={baselineEnd} y1="76" y2="76" />
+                      {points.length > 1 ? <polyline className="forward-month-flow-line" points={points.map(({ x, y }) => `${x},${y}`).join(' ')} /> : null}
+                      {points.map(({ x, y }, index) => {
+                        const item = row.values[index];
+                        const labelY = y < 42 ? y + 20 : y - 10;
+                        return (
+                          <g key={item.warehouseType}>
+                            <title>{`${formatWarehouseMonth(row.month)} ${item.warehouseType} ${formatWarehouseTypeTrendValue(mode, item.value)}，环比 ${formatMonthOverMonth(item.mom)}`}</title>
+                            <circle className="forward-month-flow-point" cx={x} cy={y} r="5" />
+                            <text className="forward-month-flow-value" x={x} y={labelY}>{formatWarehouseFlowPointValue(mode, item.value)}</text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 

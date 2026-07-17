@@ -1769,6 +1769,46 @@ th {
   font-weight: 700;
 }
 
+.warehouse-monthly-flow-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.warehouse-monthly-flow-group {
+  --monthly-flow-color: #1769e0;
+  min-width: 0;
+}
+
+.warehouse-monthly-flow-group.is-reverse {
+  --monthly-flow-color: #00897b;
+}
+
+.warehouse-monthly-flow-group.is-factory {
+  --monthly-flow-color: #d97706;
+}
+
+.warehouse-monthly-flow-group.is-other {
+  --monthly-flow-color: #64748b;
+}
+
+.warehouse-monthly-flow-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.warehouse-monthly-flow-heading strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.warehouse-monthly-flow-heading span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .forward-month-flow-scroll {
   width: 100%;
   min-width: 0;
@@ -1779,13 +1819,12 @@ th {
 }
 
 .forward-month-flow-content {
-  width: 870px;
   min-width: 100%;
 }
 
 .forward-month-flow-header {
   display: grid;
-  grid-template-columns: 90px 220px 60px 220px 60px 220px;
+  grid-template-columns: 90px minmax(0, 1fr);
   min-height: 44px;
   align-items: center;
   border-bottom: 1px solid #cbd8e6;
@@ -1795,11 +1834,19 @@ th {
 }
 
 .forward-month-flow-header span,
-.forward-month-flow-header strong {
+.forward-month-flow-stages strong {
   font-size: 12px;
 }
 
-.forward-month-flow-header i {
+.forward-month-flow-stages {
+  display: grid;
+  min-width: 0;
+  margin: 0 auto;
+  align-items: center;
+  text-align: center;
+}
+
+.forward-month-flow-stages i {
   color: #1769e0;
   font-size: 22px;
   font-style: normal;
@@ -1812,7 +1859,7 @@ th {
 
 .forward-month-flow-row {
   display: grid;
-  grid-template-columns: 90px 780px;
+  grid-template-columns: 90px minmax(0, 1fr);
   min-height: 92px;
   align-items: center;
   border-bottom: 1px solid #e1e8f0;
@@ -1833,9 +1880,14 @@ th {
   font-size: 13px;
 }
 
-.forward-month-flow-row svg {
+.forward-month-flow-chart-cell {
+  display: flex;
+  min-width: 0;
+  justify-content: center;
+}
+
+.forward-month-flow-chart-cell svg {
   display: block;
-  width: 780px;
   height: 92px;
   overflow: visible;
 }
@@ -1848,7 +1900,7 @@ th {
 
 .forward-month-flow-line {
   fill: none;
-  stroke: #1769e0;
+  stroke: var(--monthly-flow-color);
   stroke-width: 3.5;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -1856,12 +1908,12 @@ th {
 
 .forward-month-flow-point {
   fill: #fff;
-  stroke: #1769e0;
+  stroke: var(--monthly-flow-color);
   stroke-width: 2.5;
 }
 
 .forward-month-flow-row svg g:last-child .forward-month-flow-point {
-  fill: #1769e0;
+  fill: var(--monthly-flow-color);
 }
 
 .forward-month-flow-value {
