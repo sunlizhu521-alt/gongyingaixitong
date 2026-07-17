@@ -1549,211 +1549,219 @@ th {
   box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18);
 }
 
-.warehouse-type-trend-panel {
+.warehouse-flow-trend-panel {
   min-width: 0;
   width: 100%;
   margin-bottom: 16px;
 }
 
-.warehouse-type-trend-wrap {
+.warehouse-flow-groups {
+  display: grid;
+  gap: 12px;
   min-width: 0;
+}
+
+.warehouse-flow-group {
+  --flow-color: #1769e0;
+  --flow-surface: #f5f9ff;
+  min-width: 0;
+}
+
+.warehouse-flow-group.is-reverse {
+  --flow-color: #b45309;
+  --flow-surface: #fffaf0;
+}
+
+.warehouse-flow-group.is-factory {
+  --flow-color: #0f766e;
+  --flow-surface: #f0fdfa;
+}
+
+.warehouse-flow-group.is-other {
+  --flow-color: #64748b;
+  --flow-surface: #f8fafc;
+}
+
+.warehouse-flow-group-heading {
+  display: flex;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-left: 4px solid var(--flow-color);
+  align-items: center;
+  background: var(--flow-surface);
+  color: #0f172a;
+}
+
+.warehouse-flow-group-heading strong {
+  font-size: 13px;
+}
+
+.warehouse-flow-scroll {
   width: 100%;
+  min-width: 0;
   overflow-x: auto;
-  border: 1px solid #d7e2ee;
-  border-radius: 6px;
-}
-
-.warehouse-type-trend-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-
-.warehouse-type-trend-table th,
-.warehouse-type-trend-table td {
-  min-width: 114px;
-  padding: 9px 10px;
-  border-right: 1px solid #dce5ef;
+  border-top: 1px solid #dce5ef;
   border-bottom: 1px solid #dce5ef;
-  text-align: center;
+  background: var(--flow-surface);
+}
+
+.warehouse-flow-row {
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 12px;
+}
+
+.warehouse-flow-arrow {
+  display: inline-flex;
+  flex: 0 0 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  color: var(--flow-color);
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.warehouse-flow-chart {
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: 392px;
+  color: var(--flow-color);
+}
+
+.warehouse-flow-chart header {
+  display: flex;
+  min-height: 38px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.warehouse-flow-chart header > strong {
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 12px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.warehouse-type-trend-table th:first-child {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  min-width: 332px;
-  background: #f8fafc;
-  color: #334155;
-  font-weight: 800;
-}
-
-.warehouse-type-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.warehouse-type-sparkline {
-  display: grid;
-  grid-template-columns: 220px 84px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 7px;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.warehouse-type-sparkline svg {
-  width: 220px;
-  height: 52px;
-  overflow: visible;
-}
-
-.warehouse-type-sparkline polyline {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.warehouse-type-sparkline circle {
-  fill: #fff;
-  stroke: currentColor;
-  stroke-width: 2.25;
-}
-
-.warehouse-type-sparkline circle:last-child {
-  fill: currentColor;
-}
-
-.warehouse-type-trend-status {
-  display: flex;
-  width: 84px;
-  min-height: 34px;
-  padding: 3px 4px;
+.warehouse-flow-status {
+  display: inline-flex;
+  width: 76px;
+  min-height: 30px;
+  padding: 2px 4px;
   border: 1px solid currentColor;
   border-radius: 4px;
+  box-sizing: border-box;
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  line-height: 1.25;
+  line-height: 1.15;
   white-space: nowrap;
 }
 
-.warehouse-type-trend-status strong,
-.warehouse-type-trend-status small {
-  display: block;
+.warehouse-flow-status b {
+  font-size: 10px;
 }
 
-.warehouse-type-trend-status strong {
-  font-size: 11px;
-}
-
-.warehouse-type-trend-status small {
+.warehouse-flow-status small {
   margin-top: 2px;
   font-size: 9px;
   font-weight: 800;
 }
 
-@media (max-width: 760px) {
-  .warehouse-type-trend-table th:first-child {
-    min-width: 274px;
-  }
-
-  .warehouse-type-sparkline {
-    grid-template-columns: 170px 72px;
-  }
-
-  .warehouse-type-sparkline svg {
-    width: 170px;
-    height: 40px;
-  }
-
-  .warehouse-type-trend-status {
-    width: 72px;
-    min-height: 32px;
-  }
-}
-
-.warehouse-type-sparkline.is-up {
+.warehouse-flow-chart.is-up .warehouse-flow-status {
+  background: #fff7ed;
   color: #c2410c;
 }
 
-.warehouse-type-sparkline.is-up .warehouse-type-trend-status {
-  background: #fff7ed;
-}
-
-.warehouse-type-sparkline.is-down {
+.warehouse-flow-chart.is-down .warehouse-flow-status {
+  background: #ecfdf5;
   color: #047857;
 }
 
-.warehouse-type-sparkline.is-down .warehouse-type-trend-status {
-  background: #ecfdf5;
-}
-
-.warehouse-type-sparkline.is-flat {
+.warehouse-flow-chart.is-flat .warehouse-flow-status {
+  background: #f1f5f9;
   color: #475569;
 }
 
-.warehouse-type-sparkline.is-flat .warehouse-type-trend-status {
-  background: #f1f5f9;
+.warehouse-flow-chart.is-new .warehouse-flow-status {
+  background: #eff6ff;
+  color: #1769e0;
 }
 
-.warehouse-type-trend-table thead th {
-  background: #f8fafc;
-  color: #334155;
-  font-weight: 800;
+.warehouse-flow-chart.is-dashed {
+  color: #64748b;
 }
 
-.warehouse-type-trend-table thead th:first-child {
-  z-index: 3;
-}
-
-.warehouse-type-trend-table td {
-  background: rgba(23, 105, 224, var(--warehouse-heat-opacity, 0));
-  color: #0f172a;
-  font-variant-numeric: tabular-nums;
-}
-
-.warehouse-type-trend-table td span,
-.warehouse-type-trend-table td small {
+.warehouse-flow-chart svg {
   display: block;
+  height: 158px;
+  overflow: visible;
 }
 
-.warehouse-type-trend-table td span {
+.warehouse-flow-grid-line {
+  stroke: #d8e2ee;
+  stroke-width: 1;
+}
+
+.warehouse-flow-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.warehouse-flow-chart.is-dashed .warehouse-flow-line {
+  stroke-dasharray: 7 5;
+}
+
+.warehouse-flow-point {
+  fill: #fff;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.warehouse-flow-chart svg g:last-child .warehouse-flow-point {
+  fill: currentColor;
+}
+
+.warehouse-flow-value-label,
+.warehouse-flow-month-label {
+  fill: #334155;
+  font-variant-numeric: tabular-nums;
+  text-anchor: middle;
+}
+
+.warehouse-flow-value-label {
+  font-size: 9.5px;
   font-weight: 800;
 }
 
-.warehouse-type-trend-table td small {
-  margin-top: 3px;
+.warehouse-flow-month-label {
   font-size: 10px;
   font-weight: 700;
 }
 
-.warehouse-type-trend-table td small.is-up {
-  color: #b45309;
-}
+@media (max-width: 760px) {
+  .warehouse-flow-trend-panel .table-title-row {
+    flex-wrap: wrap;
+  }
 
-.warehouse-type-trend-table td small.is-down {
-  color: #0f766e;
-}
+  .warehouse-flow-row {
+    padding: 8px;
+  }
 
-.warehouse-type-trend-table td small.is-flat,
-.warehouse-type-trend-table td.is-zero {
-  color: #64748b;
-}
-
-.warehouse-type-trend-table tr:last-child th,
-.warehouse-type-trend-table tr:last-child td {
-  border-bottom: 0;
-}
-
-.warehouse-type-trend-table th:last-child,
-.warehouse-type-trend-table td:last-child {
-  border-right: 0;
+  .warehouse-flow-chart {
+    min-width: 392px;
+  }
 }
 
 .age-stacked-track > div {

@@ -9,7 +9,7 @@ import {
   moneyWan
 } from './kcfxUtils.js';
 import { buildAgeTrendMatrix } from '../../shared/kcfxAgeTrend.js';
-import { buildWarehouseTypeTrendMatrix } from '../../shared/kcfxWarehouseTypeTrend.js';
+import { buildWarehouseFlowTrend } from '../../shared/kcfxWarehouseTypeTrend.js';
 import { TablePagination } from './TablePagination.jsx';
 
 const FILTERS = [
@@ -219,7 +219,7 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
 
       <AgeStackedTrend rows={payload?.ageTrend || []} mode={ageMode} setMode={setAgeMode} />
 
-      <WarehouseTypeTrendMatrix
+      <WarehouseFlowTrend
         rows={payload?.warehouseTypeTrend || []}
         months={(payload?.monthSummaries || []).map((item) => item.month)}
         mode={warehouseTypeMode}
@@ -390,95 +390,94 @@ function formatAgeTrendSegmentValue(mode, value) {
   return formatNumber(value, 0);
 }
 
-function WarehouseTypeTrendMatrix({ rows, months, mode, setMode }) {
-  const { matrix, months: matrixMonths } = buildWarehouseTypeTrendMatrix(rows, mode, months);
-  const tableMinWidth = Math.max(1020, matrixMonths.length * 114 + 334);
+function WarehouseFlowTrend({ rows, months, mode, setMode }) {
+  const { groups, months: trendMonths } = buildWarehouseFlowTrend(rows, mode, months);
+  const hasData = groups.some((group) => group.series.some((item) => item.values.some(({ value }) => value)));
   return (
-    <section className="kcfx-panel warehouse-type-trend-panel">
+    <section className="kcfx-panel warehouse-flow-trend-panel">
       <div className="table-title-row">
-        <h3>全部仓库类型跨月变化</h3>
+        <h3>仓库货物流转跨月趋势</h3>
         <div className="age-mode-switch" role="group" aria-label="仓库类型趋势口径">
           <button type="button" className={mode === 'amount' ? 'active' : ''} onClick={() => setMode('amount')}>金额</button>
           <button type="button" className={mode === 'qty' ? 'active' : ''} onClick={() => setMode('qty')}>数量</button>
         </div>
       </div>
-      {matrix.length ? (
-        <div className="warehouse-type-trend-wrap">
-          <table className="warehouse-type-trend-table" style={{ minWidth: `${tableMinWidth}px` }}>
-            <thead>
-              <tr>
-                <th>仓库类型</th>
-                {matrixMonths.map((month) => <th key={month}>{month.replace('-', '年')}月</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {matrix.map((item) => (
-                <tr key={item.warehouseType}>
-                  <th>
-                    <div className="warehouse-type-label">{item.warehouseType}</div>
-                    <WarehouseTypeSparkline item={item} mode={mode} />
-                  </th>
-                  {item.values.map(({ month, value, mom }) => {
-                    const intensity = item.maxValue ? value / item.maxValue : 0;
-                    return (
-                      <td
-                        className={value ? '' : 'is-zero'}
-                        key={month}
-                        style={{ '--warehouse-heat-opacity': value ? 0.08 + intensity * 0.28 : 0 }}
-                        title={`${item.warehouseType} ${month} ${formatWarehouseTypeTrendValue(mode, value)}，环比 ${formatMonthOverMonth(mom)}`}
-                      >
-                        <span>{formatWarehouseTypeTrendValue(mode, value)}</span>
-                        <small className={monthOverMonthClass(mom)}>环比 {formatMonthOverMonth(mom)}</small>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {hasData ? (
+        <div className="warehouse-flow-groups">
+          {groups.map((group) => (
+            <section className={`warehouse-flow-group is-${group.id}`} key={group.id}>
+              <div className="warehouse-flow-group-heading">
+                <strong>{group.label}</strong>
+              </div>
+              <div className="warehouse-flow-scroll">
+                <div className="warehouse-flow-row">
+                  {group.series.map((item, index) => (
+                    <React.Fragment key={item.warehouseType}>
+                      {index > 0 && group.usesFlowArrows ? <span className="warehouse-flow-arrow" aria-hidden="true">→</span> : null}
+                      <WarehouseFlowChart item={item} months={trendMonths} mode={mode} />
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ))}
         </div>
       ) : <div className="empty">暂无数据</div>}
     </section>
   );
 }
 
-function WarehouseTypeSparkline({ item, mode }) {
-  const width = 220;
-  const height = 52;
-  const padding = 5;
+function WarehouseFlowChart({ item, months, mode }) {
+  const width = Math.max(392, 72 + Math.max(months.length - 1, 0) * 64);
+  const height = 158;
+  const padding = { left: 36, right: 36, top: 34, bottom: 34 };
   const values = item.values.map(({ value }) => Number(value) || 0);
   const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
   const range = maxValue - minValue;
   const points = values.map((value, index) => {
     const x = values.length > 1
-      ? padding + (index / (values.length - 1)) * (width - padding * 2)
+      ? padding.left + (index / (values.length - 1)) * (width - padding.left - padding.right)
       : width / 2;
     const y = range
-      ? padding + ((maxValue - value) / range) * (height - padding * 2)
-      : height / 2;
+      ? padding.top + ((maxValue - value) / range) * (height - padding.top - padding.bottom)
+      : (padding.top + height - padding.bottom) / 2;
     return { x, y };
   });
   const direction = item.trendDirection || 'flat';
-  const directionText = direction === 'up' ? '↑ 上升' : direction === 'down' ? '↓ 下降' : '→ 持平';
-  const percentText = formatOverallTrendPercent(item.trendPercent);
-  const detail = item.values.map(({ month, value }) => (
-    `${month} ${formatWarehouseTypeTrendValue(mode, value)}`
-  )).join('，');
+  const directionText = direction === 'new'
+    ? '新增'
+    : direction === 'up' ? '↑ 上升' : direction === 'down' ? '↓ 下降' : '→ 持平';
+  const percentText = direction === 'new' ? '' : formatOverallTrendPercent(item.trendPercent);
 
   return (
-    <div className={`warehouse-type-sparkline is-${direction}`} title={`${item.warehouseType}：${detail}；整体${directionText} ${percentText}`}>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${item.warehouseType}${directionText}${percentText}`}>
-        <polyline points={points.map(({ x, y }) => `${x},${y}`).join(' ')} />
-        {points.map(({ x, y }, index) => (
-          <circle key={item.values[index]?.month || index} cx={x} cy={y} r={index === points.length - 1 ? 5.5 : 3.2} />
+    <article className={`warehouse-flow-chart is-${direction}${item.dashed ? ' is-dashed' : ''}`}>
+      <header>
+        <strong>{item.warehouseType}</strong>
+        <span className="warehouse-flow-status">
+          <b>{directionText}</b>
+          {percentText ? <small>{percentText}</small> : null}
+        </span>
+      </header>
+      <svg style={{ width: `${width}px` }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${item.warehouseType}${directionText}${percentText}`}>
+        {points.map(({ x }, index) => (
+          <line className="warehouse-flow-grid-line" key={`grid-${item.values[index]?.month || index}`} x1={x} x2={x} y1={padding.top} y2={height - padding.bottom} />
         ))}
+        <polyline className="warehouse-flow-line" points={points.map(({ x, y }) => `${x},${y}`).join(' ')} />
+        {points.map(({ x, y }, index) => {
+          const valueItem = item.values[index] || {};
+          const labelY = y <= padding.top + 14 ? y + 20 : y - 10;
+          return (
+            <g key={valueItem.month || index}>
+              <title>{`${item.warehouseType} ${formatWarehouseMonth(valueItem.month)} ${formatWarehouseTypeTrendValue(mode, valueItem.value)}，环比 ${formatMonthOverMonth(valueItem.mom)}`}</title>
+              <circle className="warehouse-flow-point" cx={x} cy={y} r={index === points.length - 1 ? 4.5 : 3.5} />
+              <text className="warehouse-flow-value-label" x={x} y={labelY}>{formatWarehouseFlowPointValue(mode, valueItem.value)}</text>
+              <text className="warehouse-flow-month-label" x={x} y={height - 10}>{formatWarehouseMonth(valueItem.month)}</text>
+            </g>
+          );
+        })}
       </svg>
-      <span className="warehouse-type-trend-status">
-        <strong>{directionText}</strong>
-        <small>{percentText}</small>
-      </span>
-    </div>
+    </article>
   );
 }
 
@@ -492,7 +491,11 @@ function formatWarehouseTypeTrendValue(mode, value) {
   return mode === 'amount' ? moneyWan(value) : formatNumber(value, 0);
 }
 
-function monthOverMonthClass(value) {
-  if (!Number.isFinite(value) || Math.abs(value) < 0.005) return 'is-flat';
-  return value > 0 ? 'is-up' : 'is-down';
+function formatWarehouseFlowPointValue(mode, value) {
+  return mode === 'amount' ? `${formatNumber((Number(value) || 0) / 10000, 2)}万` : formatNumber(value, 0);
+}
+
+function formatWarehouseMonth(month) {
+  const monthNumber = Number(String(month || '').split('-').at(-1));
+  return monthNumber ? `${monthNumber}月` : String(month || '');
 }
