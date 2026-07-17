@@ -13,6 +13,8 @@ test('warehouse type trend fills missing months and calculates month-over-month 
   assert.deepEqual(result.warehouseTypes, ['销售出库仓', '生产成品仓']);
   assert.equal(result.matrix[0].trendDirection, 'down');
   assert.equal(result.matrix[1].trendDirection, 'down');
+  assert.equal(result.matrix[0].trendPercent, -20);
+  assert.equal(result.matrix[1].trendPercent, -100);
   assert.deepEqual(result.matrix[0].values[1], {
     month: '2026-02',
     value: 8,
@@ -39,6 +41,8 @@ test('warehouse type trend sorts by the latest value for the selected mode', () 
   assert.deepEqual(buildWarehouseTypeTrendMatrix(rows, 'amount').warehouseTypes, ['类型A', '类型B']);
   assert.equal(buildWarehouseTypeTrendMatrix(rows, 'qty').matrix[0].trendDirection, 'up');
   assert.equal(buildWarehouseTypeTrendMatrix(rows, 'amount').matrix[0].trendDirection, 'up');
+  assert.equal(buildWarehouseTypeTrendMatrix(rows, 'qty').matrix[0].trendPercent, 900);
+  assert.equal(buildWarehouseTypeTrendMatrix(rows, 'amount').matrix[0].trendPercent, 900);
 });
 
 test('warehouse type trend reports a stable direction when first and latest values match', () => {
@@ -49,4 +53,15 @@ test('warehouse type trend reports a stable direction when first and latest valu
   ], 'qty');
 
   assert.equal(result.matrix[0].trendDirection, 'flat');
+  assert.equal(result.matrix[0].trendPercent, 0);
+});
+
+test('warehouse type trend omits a percentage when the first month is zero', () => {
+  const result = buildWarehouseTypeTrendMatrix([
+    { month: '2026-01', warehouseType: '类型A', qty: 0, amount: 0 },
+    { month: '2026-02', warehouseType: '类型A', qty: 10, amount: 100 }
+  ], 'qty');
+
+  assert.equal(result.matrix[0].trendDirection, 'up');
+  assert.equal(result.matrix[0].trendPercent, null);
 });

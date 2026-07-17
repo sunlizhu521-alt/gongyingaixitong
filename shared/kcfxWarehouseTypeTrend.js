@@ -26,6 +26,7 @@ export function buildWarehouseTypeTrendMatrix(rows = [], mode = 'amount', availa
       warehouseType,
       values,
       trendDirection: compareTrend(values[0]?.value, values.at(-1)?.value),
+      trendPercent: percentageChange(values[0]?.value, values.at(-1)?.value),
       latestValue: values.at(-1)?.value || 0,
       maxValue: Math.max(...values.map((item) => item.value), 0)
     };
@@ -50,4 +51,11 @@ function compareTrend(firstValue, latestValue) {
   const tolerance = Math.max(Math.abs(first), Math.abs(latest), 1) * 1e-9;
   if (Math.abs(latest - first) <= tolerance) return 'flat';
   return latest > first ? 'up' : 'down';
+}
+
+function percentageChange(firstValue, latestValue) {
+  const first = Number(firstValue);
+  const latest = Number(latestValue);
+  if (!Number.isFinite(first) || !Number.isFinite(latest) || first === 0) return null;
+  return ((latest - first) / Math.abs(first)) * 100;
 }

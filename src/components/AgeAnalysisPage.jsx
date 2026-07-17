@@ -179,7 +179,7 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
     : error || `筛选后 ${formatNumber(metrics.rowCount || 0)} 行，库存数量 ${formatNumber(metrics.qty || 0, 2)}，库存货值 ${moneyWan(metrics.amount || 0)}`;
 
   return (
-    <KcfxPageShell title="库龄维度分析" status={status} loading={loading} onRefresh={refresh}>
+    <KcfxPageShell className="age-analysis-page" title="库龄维度分析" status={status} loading={loading} onRefresh={refresh}>
       <FilterToolbar
         filters={FILTERS}
         optionsById={optionsById}
@@ -392,7 +392,7 @@ function formatAgeTrendSegmentValue(mode, value) {
 
 function WarehouseTypeTrendMatrix({ rows, months, mode, setMode }) {
   const { matrix, months: matrixMonths } = buildWarehouseTypeTrendMatrix(rows, mode, months);
-  const tableMinWidth = Math.max(920, matrixMonths.length * 118 + 242);
+  const tableMinWidth = Math.max(960, matrixMonths.length * 114 + 276);
   return (
     <section className="kcfx-panel warehouse-type-trend-panel">
       <div className="table-title-row">
@@ -443,12 +443,12 @@ function WarehouseTypeTrendMatrix({ rows, months, mode, setMode }) {
 }
 
 function WarehouseTypeSparkline({ item, mode }) {
-  const width = 104;
-  const height = 30;
-  const padding = 3;
+  const width = 148;
+  const height = 42;
+  const padding = 5;
   const values = item.values.map(({ value }) => Number(value) || 0);
-  const minValue = Math.min(...values, 0);
-  const maxValue = Math.max(...values, 0);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
   const range = maxValue - minValue;
   const points = values.map((value, index) => {
     const x = values.length > 1
@@ -461,21 +461,31 @@ function WarehouseTypeSparkline({ item, mode }) {
   });
   const direction = item.trendDirection || 'flat';
   const directionText = direction === 'up' ? '↑ 上升' : direction === 'down' ? '↓ 下降' : '→ 持平';
+  const percentText = formatOverallTrendPercent(item.trendPercent);
   const detail = item.values.map(({ month, value }) => (
     `${month} ${formatWarehouseTypeTrendValue(mode, value)}`
   )).join('，');
 
   return (
-    <div className={`warehouse-type-sparkline is-${direction}`} title={`${item.warehouseType}：${detail}`}>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${item.warehouseType}${directionText}`}>
+    <div className={`warehouse-type-sparkline is-${direction}`} title={`${item.warehouseType}：${detail}；整体${directionText} ${percentText}`}>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${item.warehouseType}${directionText}${percentText}`}>
         <polyline points={points.map(({ x, y }) => `${x},${y}`).join(' ')} />
         {points.map(({ x, y }, index) => (
-          <circle key={item.values[index]?.month || index} cx={x} cy={y} r={index === points.length - 1 ? 2.8 : 2} />
+          <circle key={item.values[index]?.month || index} cx={x} cy={y} r={index === points.length - 1 ? 4 : 2.6} />
         ))}
       </svg>
-      <span>{directionText}</span>
+      <span className="warehouse-type-trend-status">
+        <strong>{directionText}</strong>
+        <small>{percentText}</small>
+      </span>
     </div>
   );
+}
+
+function formatOverallTrendPercent(value) {
+  if (!Number.isFinite(value)) return '变化率 --';
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${formatNumber(value, 2)}%`;
 }
 
 function formatWarehouseTypeTrendValue(mode, value) {
