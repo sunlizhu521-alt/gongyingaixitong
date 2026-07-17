@@ -1706,31 +1706,23 @@ th {
   overflow: visible;
 }
 
-.warehouse-flow-grid-line {
+.warehouse-flow-axis-line {
   stroke: #d8e2ee;
   stroke-width: 1;
 }
 
-.warehouse-flow-line {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 3.25;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.warehouse-flow-chart.is-dashed .warehouse-flow-line {
-  stroke-dasharray: 7 5;
-}
-
-.warehouse-flow-point {
-  fill: #fff;
-  stroke: currentColor;
-  stroke-width: 2;
-}
-
-.warehouse-flow-chart svg g:last-child .warehouse-flow-point {
+.warehouse-flow-bar {
   fill: currentColor;
+  opacity: 0.76;
+}
+
+.warehouse-flow-bar.is-latest {
+  opacity: 1;
+}
+
+.warehouse-flow-chart.is-dashed .warehouse-flow-bar {
+  fill: #64748b;
+  opacity: 0.62;
 }
 
 .warehouse-flow-value-label,

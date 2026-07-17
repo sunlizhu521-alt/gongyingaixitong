@@ -540,17 +540,21 @@ function WarehouseFlowChart({ item, months, mode }) {
   const height = 158;
   const padding = { left: 36, right: 36, top: 34, bottom: 34 };
   const values = item.values.map(({ value }) => Number(value) || 0);
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
-  const range = maxValue - minValue;
-  const points = values.map((value, index) => {
-    const x = values.length > 1
-      ? padding.left + (index / (values.length - 1)) * (width - padding.left - padding.right)
-      : width / 2;
-    const y = range
-      ? padding.top + ((maxValue - value) / range) * (height - padding.top - padding.bottom)
-      : (padding.top + height - padding.bottom) / 2;
-    return { x, y };
+  const maxValue = Math.max(...values, 0);
+  const chartBottom = height - padding.bottom;
+  const chartHeight = chartBottom - padding.top;
+  const slotWidth = (width - padding.left - padding.right) / Math.max(values.length, 1);
+  const barWidth = Math.min(34, Math.max(18, slotWidth * 0.56));
+  const bars = values.map((value, index) => {
+    const scaledHeight = maxValue > 0 && value > 0 ? (value / maxValue) * chartHeight : 0;
+    const barHeight = scaledHeight > 0 ? Math.max(2, scaledHeight) : 0;
+    const x = padding.left + index * slotWidth + (slotWidth - barWidth) / 2;
+    return {
+      x,
+      centerX: x + barWidth / 2,
+      y: chartBottom - barHeight,
+      height: barHeight
+    };
   });
   const direction = item.trendDirection || 'flat';
   const directionText = direction === 'new'
@@ -568,19 +572,23 @@ function WarehouseFlowChart({ item, months, mode }) {
         </span>
       </header>
       <svg style={{ width: `${width}px` }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${item.warehouseType}${directionText}${percentText}`}>
-        {points.map(({ x }, index) => (
-          <line className="warehouse-flow-grid-line" key={`grid-${item.values[index]?.month || index}`} x1={x} x2={x} y1={padding.top} y2={height - padding.bottom} />
-        ))}
-        <polyline className="warehouse-flow-line" points={points.map(({ x, y }) => `${x},${y}`).join(' ')} />
-        {points.map(({ x, y }, index) => {
+        <line className="warehouse-flow-axis-line" x1={padding.left} x2={width - padding.right} y1={chartBottom} y2={chartBottom} />
+        {bars.map(({ x, centerX, y, height: currentBarHeight }, index) => {
           const valueItem = item.values[index] || {};
-          const labelY = y <= padding.top + 14 ? y + 20 : y - 10;
+          const labelY = Math.max(12, y - 7);
           return (
             <g key={valueItem.month || index}>
               <title>{`${item.warehouseType} ${formatWarehouseMonth(valueItem.month)} ${formatWarehouseTypeTrendValue(mode, valueItem.value)}，环比 ${formatMonthOverMonth(valueItem.mom)}`}</title>
-              <circle className="warehouse-flow-point" cx={x} cy={y} r={index === points.length - 1 ? 4.5 : 3.5} />
-              <text className="warehouse-flow-value-label" x={x} y={labelY}>{formatWarehouseFlowPointValue(mode, valueItem.value)}</text>
-              <text className="warehouse-flow-month-label" x={x} y={height - 10}>{formatWarehouseMonth(valueItem.month)}</text>
+              <rect
+                className={`warehouse-flow-bar${index === bars.length - 1 ? ' is-latest' : ''}`}
+                x={x}
+                y={y}
+                width={barWidth}
+                height={currentBarHeight}
+                rx="2"
+              />
+              <text className="warehouse-flow-value-label" x={centerX} y={labelY}>{formatWarehouseFlowPointValue(mode, valueItem.value)}</text>
+              <text className="warehouse-flow-month-label" x={centerX} y={height - 10}>{formatWarehouseMonth(valueItem.month)}</text>
             </g>
           );
         })}
