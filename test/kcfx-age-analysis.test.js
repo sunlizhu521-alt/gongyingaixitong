@@ -169,6 +169,48 @@ test('uses fact-2 as the June analysis source until the June slot is uploaded', 
   assert.equal(cache.monthSummaries[0].expandedQty, 6);
 });
 
+test('orders department and age filter options by the business sequence', () => {
+  const departments = ['其他事业部B', '品牌市场部', '海外事业二部', '国内事业部', '全球招商部', '海外事业一部', '其他事业部A'];
+  const ageGroups = ['181天以上', '121-150天', '31-60天', '0-30天', '151-180天', '91-120天', '61-90天', '31天以上'];
+  const rows = departments.flatMap((department, departmentIndex) => ageGroups.map((ageGroup, ageIndex) => ({
+    id: `${departmentIndex}-${ageIndex}`,
+    month: '2026-06',
+    warehouseType: '销售出库仓',
+    department,
+    ageGroup,
+    saleStatus: '可售-全新品',
+    productCategory: '分类A',
+    productLine: '产品线A',
+    productSeries: '系列A',
+    warehouseLocation: '国内',
+    materialCode: `M${departmentIndex}${ageIndex}`,
+    warehouse: '仓库A',
+    qty: 1,
+    amount: 1
+  })));
+
+  const result = queryAgeAnalysis({ rows }, {});
+  assert.deepEqual(result.options.department, [
+    '国内事业部',
+    '海外事业一部',
+    '海外事业二部',
+    '全球招商部',
+    '品牌市场部',
+    '其他事业部A',
+    '其他事业部B'
+  ]);
+  assert.deepEqual(result.options.ageGroup, [
+    '0-30天',
+    '31-60天',
+    '61-90天',
+    '91-120天',
+    '121-150天',
+    '151-180天',
+    '181天以上',
+    '31天以上'
+  ]);
+});
+
 test('server serializes background file parsing to protect library writes', async () => {
   const source = await readFile(new URL('../server/app.js', import.meta.url), 'utf8');
   assert.match(source, /let kcfxFileParseQueue = Promise\.resolve\(\)/);

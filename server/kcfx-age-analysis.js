@@ -24,6 +24,24 @@ export const AGE_ANALYSIS_FILTER_FIELDS = [
   'warehouseLocation'
 ];
 
+const AGE_ANALYSIS_DEPARTMENT_ORDER = [
+  '国内事业部',
+  '海外事业一部',
+  '海外事业二部',
+  '全球招商部',
+  '品牌市场部'
+];
+
+const AGE_ANALYSIS_AGE_GROUP_ORDER = [
+  '0-30天',
+  '31-60天',
+  '61-90天',
+  '91-120天',
+  '121-150天',
+  '151-180天',
+  '181天以上'
+];
+
 const SALEABLE_NEW_WAREHOUSE_TYPES = new Set(['销售出库仓', '销售供应商仓', '生产成品仓']);
 const RAW_MATERIAL_WAREHOUSE_TYPES = new Set(['生产材料仓', '生成材料仓']);
 const OTHER_UNSALEABLE_WAREHOUSE_TYPES = new Set(['系统集成仓', '销售海上在途仓', '销售售后配件仓', '样品/展厅仓', '样品展厅仓']);
@@ -195,9 +213,19 @@ function linkedOptions(rows, filters = {}) {
     }
     return [field, [...values].sort((a, b) => {
       if (field === 'month') return a.localeCompare(b);
+      if (field === 'department') return compareByPreferredOrder(a, b, AGE_ANALYSIS_DEPARTMENT_ORDER);
+      if (field === 'ageGroup') return compareByPreferredOrder(a, b, AGE_ANALYSIS_AGE_GROUP_ORDER);
       return a.localeCompare(b, 'zh-CN');
     })];
   }));
+}
+
+function compareByPreferredOrder(a, b, preferredOrder) {
+  const aIndex = preferredOrder.indexOf(a);
+  const bIndex = preferredOrder.indexOf(b);
+  const normalizedAIndex = aIndex >= 0 ? aIndex : Number.MAX_SAFE_INTEGER;
+  const normalizedBIndex = bIndex >= 0 ? bIndex : Number.MAX_SAFE_INTEGER;
+  return normalizedAIndex - normalizedBIndex || a.localeCompare(b, 'zh-CN');
 }
 
 function sum(rows, field) {
