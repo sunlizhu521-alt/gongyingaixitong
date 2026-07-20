@@ -286,6 +286,29 @@ function warehouseTypeSeries(rows) {
   ));
 }
 
+function dimensionSeries(rows, field) {
+  const totals = new Map();
+  for (const row of rows) {
+    const name = normalizeText(row[field]);
+    if (!name) continue;
+    const key = `${row.month}\u001f${name}`;
+    const current = totals.get(key) || {
+      month: row.month,
+      monthLabel: row.monthLabel,
+      name,
+      qty: 0,
+      amount: 0
+    };
+    current.qty += Number(row.qty) || 0;
+    current.amount += Number(row.amount) || 0;
+    totals.set(key, current);
+  }
+  return [...totals.values()].sort((a, b) => (
+    a.month.localeCompare(b.month)
+    || a.name.localeCompare(b.name, 'zh-CN')
+  ));
+}
+
 function salesOutboundWarehouseLocationSeries(rows) {
   const totals = new Map();
   for (const row of rows) {
@@ -451,6 +474,11 @@ export function queryAgeAnalysis(cache, request = {}) {
       amountMom: currentTrend && previousTrend ? ratio(currentTrend.amount, previousTrend.amount) : null
     },
     trend,
+    dimensionTrends: {
+      department: dimensionSeries(trendRows, 'department'),
+      productLine: dimensionSeries(trendRows, 'productLine'),
+      productSeries: dimensionSeries(trendRows, 'productSeries')
+    },
     ageTrend: ageSeries(panoramaRows),
     warehouseTypeTrend: warehouseTypeSeries(panoramaRows),
     salesOutboundWarehouseLocationTrend: salesOutboundWarehouseLocationSeries(panoramaRows),

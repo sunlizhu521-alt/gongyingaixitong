@@ -1275,6 +1275,167 @@ th {
   margin-bottom: 16px;
 }
 
+.age-dimension-trend-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.dimension-trend-panel {
+  min-width: 0;
+  padding: 14px;
+}
+
+.dimension-trend-header {
+  align-items: center;
+  gap: 10px;
+}
+
+.dimension-trend-header h3 {
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.dimension-trend-header .age-mode-switch {
+  flex: 0 0 auto;
+}
+
+.dimension-trend-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid #dbe4ef;
+  border-radius: 6px;
+}
+
+.dimension-trend-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  color: #1e293b;
+  font-size: 11px;
+}
+
+.dimension-trend-table th,
+.dimension-trend-table td {
+  height: 52px;
+  padding: 6px;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.dimension-trend-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 34px;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 800;
+}
+
+.dimension-trend-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  width: 190px;
+  max-width: 190px;
+  background: #fff;
+}
+
+.dimension-trend-table thead th:first-child {
+  z-index: 4;
+  background: #f8fafc;
+}
+
+.dimension-trend-table tbody th:first-child {
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 12px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dimension-trend-table th:not(:first-child),
+.dimension-trend-table td:not(:first-child) {
+  width: 108px;
+}
+
+.dimension-trend-table th:last-child,
+.dimension-trend-table td:last-child {
+  width: 106px;
+  border-right: 0;
+}
+
+.dimension-trend-table tbody tr:last-child th,
+.dimension-trend-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.dimension-trend-table td strong,
+.dimension-trend-table td small {
+  display: block;
+  white-space: nowrap;
+}
+
+.dimension-trend-table td strong {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dimension-trend-table td small {
+  margin-top: 3px;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.dimension-trend-spark-cell {
+  background: #fff;
+}
+
+.dimension-trend-sparkline {
+  display: block;
+  width: 88px;
+  height: 34px;
+  margin: auto;
+  overflow: visible;
+}
+
+.dimension-trend-sparkline polyline {
+  fill: none;
+  stroke: #1769e0;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.dimension-trend-sparkline circle {
+  fill: #fff;
+  stroke: #1769e0;
+  stroke-width: 1.5;
+}
+
+.dimension-trend-sparkline circle:last-child {
+  fill: #1769e0;
+}
+
+.dimension-trend-panel .table-pagination-controls {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.dimension-trend-panel .table-pagination-actions {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
 .age-month-bars {
   display: grid;
   grid-template-columns: repeat(var(--age-month-count), minmax(76px, 1fr));
@@ -1764,6 +1925,10 @@ th {
 
 @media (max-width: 900px) {
   .inventory-trend-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .age-dimension-trend-grid {
     grid-template-columns: 1fr;
   }
 

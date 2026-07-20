@@ -130,7 +130,32 @@ test('builds, filters, paginates and exports age analysis rows', () => {
   assert.equal(result.metrics.comparisonMonth, '2026-01');
   assert.equal(result.metrics.qtyMom, 20);
   assert.equal(result.metrics.amountMom, 20);
+  assert.deepEqual(result.dimensionTrends.department, [
+    { month: '2026-01', monthLabel: '2026年1月', name: '事业部A', qty: 5, amount: 50 },
+    { month: '2026-02', monthLabel: '2026年2月', name: '事业部A', qty: 6, amount: 60 }
+  ]);
+  assert.deepEqual(result.dimensionTrends.productLine, [
+    { month: '2026-01', monthLabel: '2026年1月', name: '产品线A', qty: 5, amount: 50 },
+    { month: '2026-02', monthLabel: '2026年2月', name: '产品线A', qty: 6, amount: 60 }
+  ]);
+  assert.deepEqual(result.dimensionTrends.productSeries, [
+    { month: '2026-01', monthLabel: '2026年1月', name: '系列A', qty: 5, amount: 50 },
+    { month: '2026-02', monthLabel: '2026年2月', name: '系列A', qty: 6, amount: 60 }
+  ]);
   const panorama = queryAgeAnalysis(cache, {});
+  const monthOnly = queryAgeAnalysis(cache, { filters: { month: ['2026-02'] } });
+  assert.deepEqual(monthOnly.dimensionTrends, panorama.dimensionTrends);
+  for (const dimensionRows of Object.values(panorama.dimensionTrends)) {
+    for (const trendRow of panorama.trend) {
+      const sameMonthRows = dimensionRows.filter((row) => row.month === trendRow.month);
+      assert.equal(sameMonthRows.reduce((total, row) => total + row.qty, 0), trendRow.qty);
+      assert.equal(sameMonthRows.reduce((total, row) => total + row.amount, 0), trendRow.amount);
+    }
+  }
+  const searchedDimensions = queryAgeAnalysis(cache, { search: '产品B' });
+  assert.equal(searchedDimensions.dimensionTrends.department.length, 1);
+  assert.equal(searchedDimensions.dimensionTrends.productLine[0].name, '产品线B');
+  assert.equal(searchedDimensions.dimensionTrends.productSeries[0].name, '系列B');
   assert.deepEqual(result.ageTrend, panorama.ageTrend);
   assert.deepEqual(result.warehouseTypeTrend, panorama.warehouseTypeTrend);
   assert.deepEqual(result.salesOutboundWarehouseLocationTrend, panorama.salesOutboundWarehouseLocationTrend);

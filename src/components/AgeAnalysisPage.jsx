@@ -9,6 +9,7 @@ import {
   moneyWan
 } from './kcfxUtils.js';
 import { buildAgeTrendMatrix } from '../../shared/kcfxAgeTrend.js';
+import { buildDimensionTrendMatrix } from '../../shared/kcfxDimensionTrend.js';
 import { buildSalesOutboundWarehouseLocationTrend, buildWarehouseFlowTrend } from '../../shared/kcfxWarehouseTypeTrend.js';
 import { TablePagination } from './TablePagination.jsx';
 
@@ -212,6 +213,24 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
         { label: '对比月份', value: metrics.comparisonMonth ? metrics.comparisonMonth.replace('-', '年') + '月' : '-' }
       ]} />
 
+      <div className="age-dimension-trend-grid">
+        <DimensionTrendPanel
+          title="每月事业部变化趋势"
+          rows={payload?.dimensionTrends?.department || []}
+          months={(payload?.monthSummaries || []).map((item) => item.month)}
+        />
+        <DimensionTrendPanel
+          title="每月销售产品线变化趋势"
+          rows={payload?.dimensionTrends?.productLine || []}
+          months={(payload?.monthSummaries || []).map((item) => item.month)}
+        />
+        <DimensionTrendPanel
+          title="每月销售系列变化趋势"
+          rows={payload?.dimensionTrends?.productSeries || []}
+          months={(payload?.monthSummaries || []).map((item) => item.month)}
+        />
+      </div>
+
       <div className="trend-chart-grid inventory-trend-chart-grid age-analysis-trend-grid">
         <TrendPanel title="库存货值趋势" rows={payload?.trend || []} valueKey="amount" formatter={moneyWan} />
         <TrendPanel title="库存数量趋势" rows={payload?.trend || []} valueKey="qty" formatter={(value) => formatNumber(value, 2)} />
@@ -257,6 +276,119 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
       </section>
     </KcfxPageShell>
   );
+}
+
+function DimensionTrendPanel({ title, rows, months }) {
+  const [mode, setMode] = useState('amount');
+  const [page, setPage] = useState(1);
+  const matrix = useMemo(() => buildDimensionTrendMatrix(rows, mode, months, {
+    page,
+    pageSize: 20
+  }), [mode, months, page, rows]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [rows]);
+
+  const changeMode = (nextMode) => {
+    setMode(nextMode);
+    setPage(1);
+  };
+  const minWidth = 190 + matrix.months.length * 108 + 106;
+
+  return (
+    <section className="kcfx-panel dimension-trend-panel">
+      <div className="table-title-row dimension-trend-header">
+        <h3>{title}</h3>
+        <div className="age-mode-switch" role="group" aria-label={`${title}口径`}>
+          <button type="button" className={mode === 'amount' ? 'active' : ''} onClick={() => changeMode('amount')}>金额</button>
+          <button type="button" className={mode === 'qty' ? 'active' : ''} onClick={() => changeMode('qty')}>数量</button>
+        </div>
+      </div>
+      <div className="dimension-trend-scroll">
+        <table className="dimension-trend-table" style={{ minWidth: `${minWidth}px` }}>
+          <thead>
+            <tr>
+              <th>分类</th>
+              {matrix.months.map((month) => <th key={month}>{formatDimensionMonth(month)}</th>)}
+              <th>走势</th>
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.rows.length ? matrix.rows.map((item) => (
+              <tr key={item.name}>
+                <th scope="row" title={item.name}>{item.name}</th>
+                {item.values.map((valueItem) => {
+                  const intensity = item.maxValue > 0 ? valueItem.value / item.maxValue : 0;
+                  const alpha = valueItem.value > 0 ? 0.08 + intensity * 0.34 : 0;
+                  return (
+                    <td
+                      key={valueItem.month}
+                      style={{ backgroundColor: alpha ? `rgba(23, 105, 224, ${alpha})` : undefined }}
+                      title={`${item.name} ${formatDimensionMonth(valueItem.month)} ${formatDimensionTrendValue(mode, valueItem.value)}，环比 ${formatMonthOverMonth(valueItem.mom)}`}
+                    >
+                      <strong>{formatDimensionTrendValue(mode, valueItem.value)}</strong>
+                      <small>环比 {formatMonthOverMonth(valueItem.mom)}</small>
+                    </td>
+                  );
+                })}
+                <td className="dimension-trend-spark-cell">
+                  <DimensionSparkline values={item.values.map((valueItem) => valueItem.value)} label={item.name} />
+                </td>
+              </tr>
+            )) : (
+              <tr><td className="empty" colSpan={matrix.months.length + 2}>暂无数据</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {matrix.totalRows > matrix.pageSize && (
+        <TablePagination
+          page={matrix.page}
+          pageSize={matrix.pageSize}
+          totalPages={matrix.totalPages}
+          totalRows={matrix.totalRows}
+          onPageChange={setPage}
+        />
+      )}
+    </section>
+  );
+}
+
+function DimensionSparkline({ values, label }) {
+  const width = 88;
+  const height = 34;
+  const padding = 4;
+  const min = Math.min(...values, 0);
+  const max = Math.max(...values, 0);
+  const range = max - min;
+  const points = values.map((value, index) => {
+    const x = values.length > 1
+      ? padding + (index / (values.length - 1)) * (width - padding * 2)
+      : width / 2;
+    const y = range
+      ? height - padding - ((value - min) / range) * (height - padding * 2)
+      : height / 2;
+    return { x, y };
+  });
+
+  return (
+    <svg className="dimension-trend-sparkline" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}跨月走势`}>
+      <polyline points={points.map(({ x, y }) => `${x},${y}`).join(' ')} />
+      {points.map(({ x, y }, index) => (
+        <circle key={index} cx={x} cy={y} r={index === points.length - 1 ? 2.6 : 1.8} />
+      ))}
+    </svg>
+  );
+}
+
+function formatDimensionTrendValue(mode, value) {
+  return mode === 'amount' ? moneyWan(value) : formatNumber(value, 0);
+}
+
+function formatDimensionMonth(month) {
+  const monthNumber = Number(String(month || '').split('-').at(-1));
+  return monthNumber ? `${monthNumber}月` : String(month || '');
 }
 
 function TrendPanel({ title, rows, valueKey, formatter }) {
