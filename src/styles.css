@@ -1596,6 +1596,25 @@ th {
   font-size: 13px;
 }
 
+.warehouse-flow-subgroup {
+  margin-top: 8px;
+}
+
+.warehouse-flow-subgroup-heading {
+  display: flex;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-left: 4px solid var(--flow-color);
+  box-sizing: border-box;
+  align-items: center;
+  background: #eaf3ff;
+  color: #0f172a;
+}
+
+.warehouse-flow-subgroup-heading strong {
+  font-size: 13px;
+}
+
 .warehouse-flow-scroll {
   width: 100%;
   min-width: 0;

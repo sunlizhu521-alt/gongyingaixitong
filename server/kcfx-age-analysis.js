@@ -286,6 +286,30 @@ function warehouseTypeSeries(rows) {
   ));
 }
 
+function salesOutboundWarehouseSeries(rows) {
+  const totals = new Map();
+  for (const row of rows) {
+    if (normalizeText(row.warehouseType) !== '销售出库仓') continue;
+    const warehouse = normalizeText(row.warehouse);
+    if (!warehouse) continue;
+    const key = `${row.month}\u001f${warehouse}`;
+    const current = totals.get(key) || {
+      month: row.month,
+      monthLabel: row.monthLabel,
+      warehouse,
+      qty: 0,
+      amount: 0
+    };
+    current.qty += Number(row.qty) || 0;
+    current.amount += Number(row.amount) || 0;
+    totals.set(key, current);
+  }
+  return [...totals.values()].sort((a, b) => (
+    a.month.localeCompare(b.month)
+    || a.warehouse.localeCompare(b.warehouse, 'zh-CN')
+  ));
+}
+
 function ratio(current, previous) {
   if (!previous) return null;
   return ((current - previous) / Math.abs(previous)) * 100;
@@ -430,6 +454,7 @@ export function queryAgeAnalysis(cache, request = {}) {
     trend,
     ageTrend: ageSeries(panoramaRows),
     warehouseTypeTrend: warehouseTypeSeries(panoramaRows),
+    salesOutboundWarehouseTrend: salesOutboundWarehouseSeries(panoramaRows),
     distributions: {
       ageQty: summarize(filteredRows, 'ageGroup', 'qty', 30),
       ageAmount: summarize(filteredRows, 'ageGroup', 'amount', 30),

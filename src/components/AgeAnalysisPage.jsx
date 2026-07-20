@@ -9,7 +9,7 @@ import {
   moneyWan
 } from './kcfxUtils.js';
 import { buildAgeTrendMatrix } from '../../shared/kcfxAgeTrend.js';
-import { buildWarehouseFlowTrend } from '../../shared/kcfxWarehouseTypeTrend.js';
+import { buildSalesOutboundWarehouseTrend, buildWarehouseFlowTrend } from '../../shared/kcfxWarehouseTypeTrend.js';
 import { TablePagination } from './TablePagination.jsx';
 
 const FILTERS = [
@@ -221,6 +221,7 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
 
       <WarehouseFlowTrend
         rows={payload?.warehouseTypeTrend || []}
+        salesOutboundRows={payload?.salesOutboundWarehouseTrend || []}
         months={(payload?.monthSummaries || []).map((item) => item.month)}
         mode={warehouseTypeMode}
         setMode={setWarehouseTypeMode}
@@ -390,8 +391,9 @@ function formatAgeTrendSegmentValue(mode, value) {
   return formatNumber(value, 0);
 }
 
-function WarehouseFlowTrend({ rows, months, mode, setMode }) {
+function WarehouseFlowTrend({ rows, salesOutboundRows, months, mode, setMode }) {
   const { groups, months: trendMonths } = buildWarehouseFlowTrend(rows, mode, months);
+  const { series: salesOutboundSeries } = buildSalesOutboundWarehouseTrend(salesOutboundRows, mode, trendMonths);
   const hasData = groups.some((group) => group.series.some((item) => item.values.some(({ value }) => value)));
   return (
     <section className="kcfx-panel warehouse-flow-trend-panel">
@@ -416,6 +418,20 @@ function WarehouseFlowTrend({ rows, months, mode, setMode }) {
                   ))}
                 </div>
               </div>
+              {group.id === 'forward' && salesOutboundSeries.length > 0 ? (
+                <div className="warehouse-flow-subgroup">
+                  <div className="warehouse-flow-subgroup-heading">
+                    <strong>销售出库仓-正向</strong>
+                  </div>
+                  <div className="warehouse-flow-scroll">
+                    <div className="warehouse-flow-row">
+                      {salesOutboundSeries.map((item) => (
+                        <WarehouseFlowChart item={item} months={trendMonths} mode={mode} key={item.warehouseType} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </section>
           ))}
         </div>
@@ -457,7 +473,7 @@ function WarehouseFlowChart({ item, months, mode }) {
   return (
     <article className={`warehouse-flow-chart${item.dashed ? ' is-dashed' : ''}`}>
       <header>
-        <strong>{item.warehouseType}</strong>
+        <strong title={item.warehouseType}>{item.warehouseType}</strong>
       </header>
       <svg style={{ width: `${width}px` }} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${item.warehouseType}跨月趋势`}>
         <line className="warehouse-flow-axis-line" x1={padding.left} x2={width - padding.right} y1={chartBottom} y2={chartBottom} />

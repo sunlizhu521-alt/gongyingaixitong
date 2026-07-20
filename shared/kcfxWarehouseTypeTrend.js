@@ -93,6 +93,31 @@ export function buildWarehouseFlowTrend(rows = [], mode = 'amount', availableMon
   return { months, groups };
 }
 
+export function buildSalesOutboundWarehouseTrend(rows = [], mode = 'amount', availableMonths = []) {
+  const months = [...new Set([
+    ...availableMonths,
+    ...rows.map((row) => row.month)
+  ].filter(Boolean))].sort();
+  const valuesByWarehouse = new Map();
+  for (const row of rows) {
+    const warehouse = String(row.warehouse || '').trim();
+    if (!warehouse) continue;
+    const valuesByMonth = valuesByWarehouse.get(warehouse) || new Map();
+    valuesByMonth.set(row.month, (valuesByMonth.get(row.month) || 0) + (Number(row[mode]) || 0));
+    valuesByWarehouse.set(warehouse, valuesByMonth);
+  }
+  const series = [...valuesByWarehouse.entries()]
+    .map(([warehouse, valuesByMonth]) => buildWarehouseSeries({ warehouseType: warehouse }, months, valuesByMonth))
+    .sort((a, b) => {
+      const latestDifference = (b.latestValue || 0) - (a.latestValue || 0);
+      if (latestDifference) return latestDifference;
+      const aTotal = a.values.reduce((total, item) => total + item.value, 0);
+      const bTotal = b.values.reduce((total, item) => total + item.value, 0);
+      return bTotal - aTotal || a.warehouseType.localeCompare(b.warehouseType, 'zh-CN');
+    });
+  return { months, series };
+}
+
 function buildWarehouseSeries(definition, months, valuesByMonth) {
   const values = months.map((month, monthIndex) => {
     const value = valuesByMonth.get(month) || 0;
