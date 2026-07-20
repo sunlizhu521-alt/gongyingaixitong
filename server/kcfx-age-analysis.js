@@ -402,10 +402,7 @@ export function queryAgeAnalysis(cache, request = {}) {
     if (!rowMatches(row, nonMonthFilters)) return false;
     return rowMatchesSearch(row, search);
   });
-  const warehouseTypeTrendRows = (cache?.rows || []).filter((row) => {
-    const comparisonFilters = { ...filters, month: [], warehouseType: [] };
-    return rowMatches(row, comparisonFilters) && rowMatchesSearch(row, search);
-  });
+  const panoramaRows = cache?.rows || [];
   const trend = monthSeries(trendRows);
   const selectedMonths = selectedValues(filters, 'month');
   const currentMonth = [...(selectedMonths.length ? selectedMonths : trend.map((row) => row.month))].sort().at(-1) || '';
@@ -431,8 +428,8 @@ export function queryAgeAnalysis(cache, request = {}) {
       amountMom: currentTrend && previousTrend ? ratio(currentTrend.amount, previousTrend.amount) : null
     },
     trend,
-    ageTrend: ageSeries(trendRows),
-    warehouseTypeTrend: warehouseTypeSeries(warehouseTypeTrendRows),
+    ageTrend: ageSeries(panoramaRows),
+    warehouseTypeTrend: warehouseTypeSeries(panoramaRows),
     distributions: {
       ageQty: summarize(filteredRows, 'ageGroup', 'qty', 30),
       ageAmount: summarize(filteredRows, 'ageGroup', 'amount', 30),

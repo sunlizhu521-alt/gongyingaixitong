@@ -130,24 +130,24 @@ test('builds, filters, paginates and exports age analysis rows', () => {
   assert.equal(result.metrics.comparisonMonth, '2026-01');
   assert.equal(result.metrics.qtyMom, 20);
   assert.equal(result.metrics.amountMom, 20);
+  const panorama = queryAgeAnalysis(cache, {});
+  assert.deepEqual(result.ageTrend, panorama.ageTrend);
+  assert.deepEqual(result.warehouseTypeTrend, panorama.warehouseTypeTrend);
   const allWarehouseTypes = queryAgeAnalysis(cache, {
     filters: { month: ['2026-02'], warehouseType: ['生产成品仓'] }
   });
-  assert.deepEqual(allWarehouseTypes.warehouseTypeTrend, [
-    { month: '2026-01', monthLabel: '2026年1月', warehouseType: '生产成品仓', qty: 4, amount: 80 },
-    { month: '2026-01', monthLabel: '2026年1月', warehouseType: '销售出库仓', qty: 5, amount: 50 },
-    { month: '2026-02', monthLabel: '2026年2月', warehouseType: '销售出库仓', qty: 6, amount: 60 }
-  ]);
+  assert.deepEqual(allWarehouseTypes.ageTrend, panorama.ageTrend);
+  assert.deepEqual(allWarehouseTypes.warehouseTypeTrend, panorama.warehouseTypeTrend);
   assert.equal(allWarehouseTypes.warehouseTypeTrend.reduce((total, row) => total + row.qty, 0), 15);
   assert.equal(allWarehouseTypes.warehouseTypeTrend.reduce((total, row) => total + row.amount, 0), 190);
   const departmentWarehouseTypes = queryAgeAnalysis(cache, {
     filters: { month: ['2026-02'], warehouseType: ['生产成品仓'], department: ['事业部A'] }
   });
-  assert.equal(departmentWarehouseTypes.warehouseTypeTrend.length, 2);
-  assert.ok(departmentWarehouseTypes.warehouseTypeTrend.every((row) => row.warehouseType === '销售出库仓'));
+  assert.deepEqual(departmentWarehouseTypes.ageTrend, panorama.ageTrend);
+  assert.deepEqual(departmentWarehouseTypes.warehouseTypeTrend, panorama.warehouseTypeTrend);
   const searchedWarehouseTypes = queryAgeAnalysis(cache, { search: '产品B' });
-  assert.equal(searchedWarehouseTypes.warehouseTypeTrend.length, 1);
-  assert.equal(searchedWarehouseTypes.warehouseTypeTrend[0].warehouseType, '生产成品仓');
+  assert.deepEqual(searchedWarehouseTypes.ageTrend, panorama.ageTrend);
+  assert.deepEqual(searchedWarehouseTypes.warehouseTypeTrend, panorama.warehouseTypeTrend);
   assert.equal(exportAgeAnalysisRows(cache, {
     filters: { month: ['2026-01'], department: ['事业部A'] }
   }).length, 2);
