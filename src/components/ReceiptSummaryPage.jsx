@@ -6,6 +6,7 @@ import { readFeedbackDrafts, writeFeedbackDrafts } from './feedbackDraftStorage.
 import { downloadKcfxRowsAsXlsx } from './kcfxExport.js';
 import { formatNumber, groupSum, moneyWan, recordSourceText, sum, uniqueCount } from './kcfxUtils.js';
 import { CURRENT_INVENTORY_AGE_BUCKETS, LEGACY_INVENTORY_AGE_BUCKETS } from '../../shared/kcfxInventoryMonth.js';
+import { collapseReceiptSummaryRows, expandReceiptSummaryRows, receiptAgeAmountRows } from '../../shared/kcfxReceiptSummary.js';
 
 const AGE_BUCKET_ORDER = [
   ...CURRENT_INVENTORY_AGE_BUCKETS,
@@ -110,16 +111,18 @@ export default function ReceiptSummaryPage({ user = null, kcfxData = null, kcfxR
 
   const records = summary?.records || kcfxRecords || {};
   const pageError = summaryError || error;
-  const rows = useMemo(() => expandReceiptSummaryRows(summary), [summary]);
-  const filterState = useDashboardFilters(rows, RECEIPT_FILTERS, {
+  const ageRows = useMemo(() => expandReceiptSummaryRows(summary), [summary]);
+  const rows = useMemo(() => collapseReceiptSummaryRows(ageRows), [ageRows]);
+  const filterState = useDashboardFilters(ageRows, RECEIPT_FILTERS, {
     searchFields: RECEIPT_SEARCH_FIELDS,
     searchValue: search,
     storageKey: 'gongyingai:filters:receipt-summary:v1'
   });
-  const filteredRows = filterState.filteredRows;
+  const filteredAgeRows = filterState.filteredRows;
+  const filteredRows = useMemo(() => collapseReceiptSummaryRows(filteredAgeRows), [filteredAgeRows]);
   const totalAmount = useMemo(() => sum(filteredRows, 'amount'), [filteredRows]);
   const totalQty = useMemo(() => sum(filteredRows, 'qty'), [filteredRows]);
-  const ageAmountRows = useMemo(() => orderedAgeGroupSum(filteredRows), [filteredRows]);
+  const ageAmountRows = useMemo(() => receiptAgeAmountRows(filteredAgeRows, AGE_BUCKET_ORDER), [filteredAgeRows]);
   const status = summaryLoading
     ? '数据加载中...'
     : pageError || `已读取 ${formatNumber(rows.length)} 行关账库存，筛选后 ${formatNumber(filteredRows.length)} 行，库存金额 ${moneyWan(totalAmount)}${lastLoadedAt ? `；读取时间：${lastLoadedAt}` : ''}`;
@@ -471,57 +474,4 @@ function buildReceiptFilterFeedbackSnapshot({
 function selectedFilterValue(values = [], allLabel = '全部') {
   if (!Array.isArray(values) || !values.length) return allLabel || '全部';
   return values.join('、');
-}
-
-function expandReceiptSummaryRows(summary) {
-  const fields = Array.isArray(summary?.rowFields) ? summary.rowFields : [];
-  const compactRows = Array.isArray(summary?.rowsCompact) ? summary.rowsCompact : [];
-  const ageBuckets = Array.isArray(summary?.ageBuckets) ? summary.ageBuckets : [];
-  return compactRows.map((values) => {
-    const row = {};
-    fields.forEach((field, index) => {
-      const value = values[index];
-      if (field === 'ageQuantities' || field === 'ageSettlementAmounts') {
-        row[field] = Object.fromEntries(ageBuckets.map((bucket, bucketIndex) => [bucket, Number(value?.[bucketIndex]) || 0]));
-      } else {
-        row[field] = value;
-      }
-    });
-    const qty = Number(row.inventoryTotal || row.endingQty || row.ageQuantityTotal) || 0;
-    const amount = Number(row.inventoryAmountTotal || row.settlementAmount || row.ageSettlementAmount) || 0;
-    return {
-      ...row,
-      qty,
-      amount,
-      productSeries: row.productSeries || row.series || '',
-      ageGroup: dominantAgeBucket(row.ageQuantities, row.ageSettlementAmounts)
-    };
-  });
-}
-
-function dominantAgeBucket(ageQuantities = {}, ageSettlementAmounts = {}) {
-  const entries = Object.keys(ageQuantities).map((bucket) => ({
-    bucket,
-    value: Number(ageSettlementAmounts[bucket]) || Number(ageQuantities[bucket]) || 0
-  }));
-  return entries.sort((a, b) => b.value - a.value)[0]?.bucket || '';
-}
-
-function orderedAgeGroupSum(rows) {
-  const totals = new Map(AGE_BUCKET_ORDER.map((bucket) => [bucket, 0]));
-  for (const row of rows) {
-    const name = String(row.ageGroup || '').trim();
-    if (!name) continue;
-    totals.set(name, (totals.get(name) || 0) + (Number(row.amount) || 0));
-  }
-  return [...totals.entries()]
-    .map(([name, value]) => ({ name, value }))
-    .filter((row) => row.value !== 0)
-    .sort((a, b) => {
-      const ai = AGE_BUCKET_ORDER.indexOf(a.name);
-      const bi = AGE_BUCKET_ORDER.indexOf(b.name);
-      const aIndex = ai >= 0 ? ai : Number.MAX_SAFE_INTEGER;
-      const bIndex = bi >= 0 ? bi : Number.MAX_SAFE_INTEGER;
-      return aIndex - bIndex || a.name.localeCompare(b.name, 'zh-CN');
-    });
 }
