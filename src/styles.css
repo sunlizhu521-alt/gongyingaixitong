@@ -1284,6 +1284,7 @@ th {
 
 .dimension-trend-panel {
   min-width: 0;
+  align-content: start;
   padding: 14px;
 }
 
