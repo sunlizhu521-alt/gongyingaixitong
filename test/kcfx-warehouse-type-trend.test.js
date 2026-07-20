@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSalesOutboundWarehouseTrend, buildWarehouseFlowTrend } from '../shared/kcfxWarehouseTypeTrend.js';
+import { buildSalesOutboundWarehouseLocationTrend, buildWarehouseFlowTrend } from '../shared/kcfxWarehouseTypeTrend.js';
 
 test('warehouse flow trend groups warehouse types in the configured logistics order', () => {
   const rows = [
@@ -95,16 +95,16 @@ test('warehouse flow trend appends future months and reports a flat state', () =
   assert.equal(outbound.trendPercent, 0);
 });
 
-test('sales outbound warehouse trend includes every warehouse and fills missing months', () => {
-  const result = buildSalesOutboundWarehouseTrend([
-    { month: '2026-01', warehouse: '出库仓A', qty: 10, amount: 100 },
-    { month: '2026-01', warehouse: '出库仓B', qty: 20, amount: 200 },
-    { month: '2026-02', warehouse: '出库仓A', qty: 15, amount: 150 },
-    { month: '2026-02', warehouse: '出库仓C', qty: 30, amount: 300 }
+test('sales outbound warehouse location trend includes every location and fills missing months', () => {
+  const result = buildSalesOutboundWarehouseLocationTrend([
+    { month: '2026-01', warehouseLocation: '国内', qty: 10, amount: 100 },
+    { month: '2026-01', warehouseLocation: '欧洲', qty: 20, amount: 200 },
+    { month: '2026-02', warehouseLocation: '国内', qty: 15, amount: 150 },
+    { month: '2026-02', warehouseLocation: '北美', qty: 30, amount: 300 }
   ], 'qty', ['2026-01', '2026-02']);
 
   assert.deepEqual(result.months, ['2026-01', '2026-02']);
-  assert.deepEqual(result.series.map((item) => item.warehouseType), ['出库仓C', '出库仓A', '出库仓B']);
+  assert.deepEqual(result.series.map((item) => item.warehouseType), ['北美', '国内', '欧洲']);
   assert.deepEqual(result.series[0].values.map((item) => item.value), [0, 30]);
   assert.deepEqual(result.series[1].values.map((item) => item.value), [10, 15]);
   assert.equal(result.series[1].values[1].mom, 50);

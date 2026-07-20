@@ -93,21 +93,21 @@ export function buildWarehouseFlowTrend(rows = [], mode = 'amount', availableMon
   return { months, groups };
 }
 
-export function buildSalesOutboundWarehouseTrend(rows = [], mode = 'amount', availableMonths = []) {
+export function buildSalesOutboundWarehouseLocationTrend(rows = [], mode = 'amount', availableMonths = []) {
   const months = [...new Set([
     ...availableMonths,
     ...rows.map((row) => row.month)
   ].filter(Boolean))].sort();
-  const valuesByWarehouse = new Map();
+  const valuesByLocation = new Map();
   for (const row of rows) {
-    const warehouse = String(row.warehouse || '').trim();
-    if (!warehouse) continue;
-    const valuesByMonth = valuesByWarehouse.get(warehouse) || new Map();
+    const warehouseLocation = String(row.warehouseLocation || '').trim();
+    if (!warehouseLocation) continue;
+    const valuesByMonth = valuesByLocation.get(warehouseLocation) || new Map();
     valuesByMonth.set(row.month, (valuesByMonth.get(row.month) || 0) + (Number(row[mode]) || 0));
-    valuesByWarehouse.set(warehouse, valuesByMonth);
+    valuesByLocation.set(warehouseLocation, valuesByMonth);
   }
-  const series = [...valuesByWarehouse.entries()]
-    .map(([warehouse, valuesByMonth]) => buildWarehouseSeries({ warehouseType: warehouse }, months, valuesByMonth))
+  const series = [...valuesByLocation.entries()]
+    .map(([warehouseLocation, valuesByMonth]) => buildWarehouseSeries({ warehouseType: warehouseLocation }, months, valuesByMonth))
     .sort((a, b) => {
       const latestDifference = (b.latestValue || 0) - (a.latestValue || 0);
       if (latestDifference) return latestDifference;

@@ -286,17 +286,16 @@ function warehouseTypeSeries(rows) {
   ));
 }
 
-function salesOutboundWarehouseSeries(rows) {
+function salesOutboundWarehouseLocationSeries(rows) {
   const totals = new Map();
   for (const row of rows) {
     if (normalizeText(row.warehouseType) !== '销售出库仓') continue;
-    const warehouse = normalizeText(row.warehouse);
-    if (!warehouse) continue;
-    const key = `${row.month}\u001f${warehouse}`;
+    const warehouseLocation = normalizeText(row.warehouseLocation) || '未分类仓库位置';
+    const key = `${row.month}\u001f${warehouseLocation}`;
     const current = totals.get(key) || {
       month: row.month,
       monthLabel: row.monthLabel,
-      warehouse,
+      warehouseLocation,
       qty: 0,
       amount: 0
     };
@@ -306,7 +305,7 @@ function salesOutboundWarehouseSeries(rows) {
   }
   return [...totals.values()].sort((a, b) => (
     a.month.localeCompare(b.month)
-    || a.warehouse.localeCompare(b.warehouse, 'zh-CN')
+    || a.warehouseLocation.localeCompare(b.warehouseLocation, 'zh-CN')
   ));
 }
 
@@ -454,7 +453,7 @@ export function queryAgeAnalysis(cache, request = {}) {
     trend,
     ageTrend: ageSeries(panoramaRows),
     warehouseTypeTrend: warehouseTypeSeries(panoramaRows),
-    salesOutboundWarehouseTrend: salesOutboundWarehouseSeries(panoramaRows),
+    salesOutboundWarehouseLocationTrend: salesOutboundWarehouseLocationSeries(panoramaRows),
     distributions: {
       ageQty: summarize(filteredRows, 'ageGroup', 'qty', 30),
       ageAmount: summarize(filteredRows, 'ageGroup', 'amount', 30),
