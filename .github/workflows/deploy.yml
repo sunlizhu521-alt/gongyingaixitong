@@ -72,13 +72,11 @@ jobs:
 
             PM2_NAME=gongyingaixitong
             if pm2 describe gongyingaixitong > /dev/null 2>&1; then
-              pm2 restart gongyingaixitong --update-env
+              pm2 delete gongyingaixitong
             elif pm2 describe gongyinglianaixitong > /dev/null 2>&1; then
-              PM2_NAME=gongyinglianaixitong
-              pm2 restart gongyinglianaixitong --update-env
-            else
-              pm2 start server/app.js --name gongyingaixitong --update-env
+              pm2 delete gongyinglianaixitong
             fi
+            pm2 start "$APP_DIR/server/app.js" --name "$PM2_NAME" --cwd "$APP_DIR" --update-env
             pm2 save
             pm2 list
 
@@ -105,6 +103,15 @@ jobs:
             await sleep(2000);
           }
           if (!health?.ok) throw new Error('health check did not become ready');
+
+          const protectedResponse = await fetch(`${baseUrl}/api/kcfx-library/inventory-summary/query`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}'
+          });
+          if (protectedResponse.status !== 403) {
+            throw new Error(`inventory summary route check returned HTTP ${protectedResponse.status}`);
+          }
 
           let trend;
           for (let attempt = 1; attempt <= 60; attempt += 1) {
