@@ -36,9 +36,9 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
             set -e
 
-            APP_DIR=/home/ubuntu/zhuge-ai-lab/gongyinglianaixitong
-            RELEASE_DIR=/tmp/gongyinglianaixitong-release
-            BACKUP_DIR=/home/ubuntu/backups/gongyinglianaixitong
+            APP_DIR=/home/ubuntu/zhuge-ai-lab/gongyingaixitong
+            RELEASE_DIR=/tmp/gongyingaixitong-release
+            BACKUP_DIR=/home/ubuntu/backups/gongyingaixitong
 
             mkdir -p "$BACKUP_DIR"
             rm -rf "$RELEASE_DIR"
@@ -76,7 +76,29 @@ jobs:
             elif pm2 describe gongyinglianaixitong > /dev/null 2>&1; then
               pm2 delete gongyinglianaixitong
             fi
+
+            if command -v lsof > /dev/null 2>&1; then
+              for LISTENER_PID in $(lsof -t -iTCP:4001 -sTCP:LISTEN 2>/dev/null || true); do
+                LISTENER_CWD=$(readlink -f "/proc/$LISTENER_PID/cwd" 2>/dev/null || true)
+                case "$LISTENER_CWD" in
+                  "$APP_DIR"|"$APP_DIR"/*)
+                    kill "$LISTENER_PID"
+                    ;;
+                  *)
+                    echo "Refusing to stop unexpected port 4001 listener PID=$LISTENER_PID cwd=$LISTENER_CWD"
+                    exit 1
+                    ;;
+                esac
+              done
+            fi
+
+            grep -F "/api/kcfx-library/inventory-summary/query" "$APP_DIR/server/routes/kcfx.js"
             pm2 start "$APP_DIR/server/app.js" --name "$PM2_NAME" --cwd "$APP_DIR" --update-env
+            sleep 2
+            PM2_PID=$(pm2 pid "$PM2_NAME")
+            test -n "$PM2_PID"
+            test "$PM2_PID" != "0"
+            test "$(readlink -f "/proc/$PM2_PID/cwd")" = "$APP_DIR"
             pm2 save
             pm2 list
 
