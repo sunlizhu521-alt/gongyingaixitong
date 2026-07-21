@@ -1109,6 +1109,41 @@ th {
   flex-wrap: wrap;
 }
 
+.errors-filter-panel {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.errors-filter-field {
+  width: min(280px, 100%);
+  margin: 0;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.errors-filter-field select {
+  height: 38px;
+}
+
+.errors-filter-summary {
+  margin-left: auto;
+  padding-bottom: 9px;
+  color: #64748b;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.errors-filter-summary strong {
+  color: #0f172a;
+  font-size: 16px;
+}
+
 .error-source-panel {
   padding: 16px;
   border: 1px solid #c9d8e5;
@@ -1220,6 +1255,23 @@ th {
 .error-table-panel .empty {
   color: #64748b;
   text-align: center;
+}
+
+@media (max-width: 820px) {
+  .errors-filter-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .errors-filter-field {
+    width: 100%;
+  }
+
+  .errors-filter-summary {
+    margin-left: 0;
+    padding-bottom: 0;
+    white-space: normal;
+  }
 }
 
 .sales-trend-page {

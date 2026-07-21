@@ -104,6 +104,36 @@ const ERROR_DOWNLOAD_CONFIG = {
   }
 };
 
+const ERROR_SOURCE_OPTIONS = [
+  { value: 'closed', label: '关账库存事实表' },
+  { value: 'detail', label: '库存分析月份表' },
+  { value: 'sales', label: '销售数据文件' },
+  { value: 'trend', label: '库存趋势事实表' },
+  { value: 'age', label: '库龄维度分析' }
+];
+
+const ERROR_TYPE_OPTIONS = {
+  closed: [
+    { value: 'productMissing', label: '商品分类缺失' },
+    { value: 'divisionMissing', label: '事业部对照缺失' },
+    { value: 'warehouseMissing', label: '仓库对照缺失' },
+    { value: 'settlementMissing', label: '结算价缺失' }
+  ],
+  detail: [
+    { value: 'productMissing', label: '商品分类缺失' },
+    { value: 'divisionMissing', label: '事业部对照缺失' },
+    { value: 'warehouseMissing', label: '仓库对照缺失' },
+    { value: 'settlementMissing', label: '结算价缺失' }
+  ],
+  sales: [
+    { value: 'productMissing', label: '商品分类缺失' },
+    { value: 'customerMaterialMissing', label: '客户物料缺失' },
+    { value: 'storeMissing', label: '店铺名称缺失' }
+  ],
+  trend: [{ value: 'trendDivisionMissing', label: '事业部对照缺失' }],
+  age: [{ value: 'ageDivisionMissing', label: '事业部对照缺失' }]
+};
+
 function userHeaders(user) {
   return {
     ...(user?.id ? { 'x-user-id': user.id } : {}),
@@ -128,6 +158,8 @@ export default function ErrorsPage({
   const [ageSummary, setAgeSummary] = useState(null);
   const [ageLoading, setAgeLoading] = useState(false);
   const [ageError, setAgeError] = useState('');
+  const [selectedSource, setSelectedSource] = useState('closed');
+  const [selectedErrorType, setSelectedErrorType] = useState('productMissing');
   const { records: loadedRecords, loading: recordsLoading, error: recordsError, reload } = useKcfxRecordMap(kcfxData, ERROR_RECORD_IDS);
   const records = useMemo(() => ({ ...kcfxRecords, ...loadedRecords }), [kcfxRecords, loadedRecords]);
   const pageLoading = loading || recordsLoading || trendLoading || ageLoading;
@@ -207,6 +239,14 @@ export default function ErrorsPage({
   const refresh = async () => {
     await Promise.all([reload(), onRefresh?.(), loadTrendSummary(), loadAgeSummary()]);
   };
+  const errorTypeOptions = ERROR_TYPE_OPTIONS[selectedSource] || [];
+  const selectedRows = checks[selectedSource]?.[selectedErrorType] || [];
+  const selectSource = (source) => {
+    setSelectedSource(source);
+    setSelectedErrorType(ERROR_TYPE_OPTIONS[source]?.[0]?.value || '');
+  };
+  const sourceIssueCount = (source) => (ERROR_TYPE_OPTIONS[source] || [])
+    .reduce((total, option) => total + (checks[source]?.[option.value]?.length || 0), 0);
 
   async function downloadSingle(source, tableName) {
     const result = checks[source];
@@ -250,30 +290,58 @@ export default function ErrorsPage({
       </header>
       {downloadMessage && <div className="import-summary">{downloadMessage}</div>}
 
-      <CheckGroup
+      <section className="errors-filter-panel" aria-label="报错信息筛选">
+        <label className="errors-filter-field">
+          <span>数据来源</span>
+          <select value={selectedSource} onChange={(event) => selectSource(event.target.value)}>
+            {ERROR_SOURCE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}（{formatNumber(sourceIssueCount(option.value))}）
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="errors-filter-field">
+          <span>异常类型</span>
+          <select value={selectedErrorType} onChange={(event) => setSelectedErrorType(event.target.value)}>
+            {errorTypeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}（{formatNumber(checks[selectedSource]?.[option.value]?.length || 0)}）
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="errors-filter-summary">
+          当前展示 <strong>{formatNumber(selectedRows.length)}</strong> 条异常，表格每页 20 条
+        </div>
+      </section>
+
+      {selectedSource === 'closed' && <CheckGroup
         source="closed"
         title="根据关账库存事实表"
         description="数量取关账库存事实表有库存的物料和仓库。"
         result={checks.closed}
+        activeIssue={selectedErrorType}
         onDownload={downloadSingle}
-      />
-      <CheckGroup
+      />}
+      {selectedSource === 'detail' && <CheckGroup
         source="detail"
         title="根据库存分析月份表"
         description="数量取库存分析月份表的合计库存数量；结算价、销售产品线、销售系列通过物料编码匹配商品分类维表；事业部按使用组织 + 结库 + 物料编码匹配仓库物料事业部对照表。"
         result={checks.detail}
+        activeIssue={selectedErrorType}
         onDownload={downloadSingle}
-      />
-      <SalesCheckGroup result={checks.sales} onDownload={downloadSingle} />
-      <TrendCheckGroup result={checks.trend} onDownload={downloadSingle} />
-      <AgeAnalysisCheckGroup result={checks.age} onDownload={downloadSingle} />
+      />}
+      {selectedSource === 'sales' && <SalesCheckGroup result={checks.sales} activeIssue={selectedErrorType} onDownload={downloadSingle} />}
+      {selectedSource === 'trend' && <TrendCheckGroup result={checks.trend} activeIssue={selectedErrorType} onDownload={downloadSingle} />}
+      {selectedSource === 'age' && <AgeAnalysisCheckGroup result={checks.age} activeIssue={selectedErrorType} onDownload={downloadSingle} />}
     </section>
   );
 }
 
 const ERROR_RECORD_IDS = ['fact-inventory', 'fact-2', 'sales-data', 'dim-product', 'dim-warehouse', 'dim-warehouse-material', 'dim-store-name', 'dim-customer-material'];
 
-function CheckGroup({ source, title, description, result, onDownload }) {
+function CheckGroup({ source, title, description, result, activeIssue, onDownload }) {
   return (
     <section className="error-source-panel">
       <section className="error-source-title">
@@ -289,7 +357,7 @@ function CheckGroup({ source, title, description, result, onDownload }) {
         <MetricCard label="结算价缺失" value={result.settlementMissing.length} />
       </section>
 
-      <ErrorTable
+      {activeIssue === 'productMissing' && <ErrorTable
         title="有库存商品维度表没有信息"
         columns={[
           ['materialCode', '物料编码'],
@@ -305,8 +373,8 @@ function CheckGroup({ source, title, description, result, onDownload }) {
           '需要维护：维度表文件库的商品分类维表。'
         ]}
         onDownload={() => onDownload(source, 'productMissing')}
-      />
-      <ErrorTable
+      />}
+      {activeIssue === 'divisionMissing' && <ErrorTable
         title="有库存仓库物料事业部对照表没有信息"
         columns={[
           ['organization', '库存组织'],
@@ -324,8 +392,8 @@ function CheckGroup({ source, title, description, result, onDownload }) {
           '需要维护：维度表文件库的仓库物料事业部对照表。'
         ]}
         onDownload={() => onDownload(source, 'divisionMissing')}
-      />
-      <ErrorTable
+      />}
+      {activeIssue === 'warehouseMissing' && <ErrorTable
         title="有库存仓库没有信息"
         columns={[
           ['warehouse', '仓库'],
@@ -339,8 +407,8 @@ function CheckGroup({ source, title, description, result, onDownload }) {
           '需要维护：维度表文件库的仓库维表。'
         ]}
         onDownload={() => onDownload(source, 'warehouseMissing')}
-      />
-      <ErrorTable
+      />}
+      {activeIssue === 'settlementMissing' && <ErrorTable
         title="有库存没有结算价（含税）的物料"
         columns={[
           ['materialCode', '物料编码'],
@@ -356,12 +424,12 @@ function CheckGroup({ source, title, description, result, onDownload }) {
           '需要维护：维度表文件库的商品分类维表结算价（含税）。'
         ]}
         onDownload={() => onDownload(source, 'settlementMissing')}
-      />
+      />}
     </section>
   );
 }
 
-function SalesCheckGroup({ result, onDownload }) {
+function SalesCheckGroup({ result, activeIssue, onDownload }) {
   return (
     <section className="error-source-panel">
       <section className="error-source-title">
@@ -377,7 +445,7 @@ function SalesCheckGroup({ result, onDownload }) {
         <MetricCard label="店铺名称缺失" value={result.storeMissing.length} />
       </section>
 
-      <ErrorTable
+      {activeIssue === 'productMissing' && <ErrorTable
         title="销售数据商品维度表没有信息"
         columns={[
           ['materialCode', '物料编码'],
@@ -393,8 +461,8 @@ function SalesCheckGroup({ result, onDownload }) {
           '需要维护：维度表文件库的商品分类维表。'
         ]}
         onDownload={() => onDownload('sales', 'productMissing')}
-      />
-      <ErrorTable
+      />}
+      {activeIssue === 'customerMaterialMissing' && <ErrorTable
         title="销售数据客户与物料对照表没有信息"
         columns={[
           ['salesDepartment', '销售部门名称'],
@@ -412,8 +480,8 @@ function SalesCheckGroup({ result, onDownload }) {
           '需要维护：维度表文件库的客户与物料对照表。'
         ]}
         onDownload={() => onDownload('sales', 'customerMaterialMissing')}
-      />
-      <ErrorTable
+      />}
+      {activeIssue === 'storeMissing' && <ErrorTable
         title="销售数据店铺名称汇总没有信息"
         columns={[
           ['store', '客户名称'],
@@ -422,12 +490,12 @@ function SalesCheckGroup({ result, onDownload }) {
         rows={result.storeMissing}
         diagnostic={salesStoreDiagnosticLines(result.storeDiagnostic)}
         onDownload={() => onDownload('sales', 'storeMissing')}
-      />
+      />}
     </section>
   );
 }
 
-function TrendCheckGroup({ result, onDownload }) {
+function TrendCheckGroup({ result, activeIssue, onDownload }) {
   return (
     <section className="error-source-panel">
       <section className="error-source-title">
@@ -437,7 +505,7 @@ function TrendCheckGroup({ result, onDownload }) {
       <section className="metric-grid error-metrics">
         <MetricCard label="事业部对照缺失" value={result.trendDivisionMissing.length} />
       </section>
-      <ErrorTable
+      {activeIssue === 'trendDivisionMissing' && <ErrorTable
         title="有库存仓库物料事业部对照表没有信息"
         columns={ERROR_DOWNLOAD_CONFIG.trendDivisionMissing.columns.map(([key, label]) => [key, label, key === 'qty' ? 'num' : ''])}
         rows={result.trendDivisionMissing}
@@ -448,12 +516,12 @@ function TrendCheckGroup({ result, onDownload }) {
           '需要维护：维度表文件库中的有库存仓库物料事业部对照表。'
         ]}
         onDownload={() => onDownload('trend', 'trendDivisionMissing')}
-      />
+      />}
     </section>
   );
 }
 
-function AgeAnalysisCheckGroup({ result, onDownload }) {
+function AgeAnalysisCheckGroup({ result, activeIssue, onDownload }) {
   return (
     <section className="error-source-panel">
       <section className="error-source-title">
@@ -463,7 +531,7 @@ function AgeAnalysisCheckGroup({ result, onDownload }) {
       <section className="metric-grid error-metrics">
         <MetricCard label="事业部对照缺失" value={result.ageDivisionMissing.length} />
       </section>
-      <ErrorTable
+      {activeIssue === 'ageDivisionMissing' && <ErrorTable
         title="有库存仓库物料事业部对照表没有信息"
         columns={ERROR_DOWNLOAD_CONFIG.ageDivisionMissing.columns.map(([key, label]) => [key, label, key === 'qty' ? 'num' : ''])}
         rows={result.ageDivisionMissing}
@@ -474,7 +542,7 @@ function AgeAnalysisCheckGroup({ result, onDownload }) {
           '需要维护：维度表文件库中的有库存仓库物料事业部对照表。'
         ]}
         onDownload={() => onDownload('age', 'ageDivisionMissing')}
-      />
+      />}
     </section>
   );
 }
