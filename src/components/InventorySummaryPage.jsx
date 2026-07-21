@@ -115,8 +115,7 @@ function modeButton(active, label, onClick) {
   return <button type="button" className={active ? 'active' : ''} onClick={onClick}>{label}</button>;
 }
 
-export default function InventorySummaryPage({ user = null, kcfxData = null, onRefresh }) {
-  const [report, setReport] = useState('inventory');
+export default function InventorySummaryPage({ user = null, kcfxData = null, onRefresh, reportType = 'inventory' }) {
   const [inventoryMode, setInventoryMode] = useState('summary');
   const [segmentView, setSegmentView] = useState('onHand');
   const [tableStates, setTableStates] = useState(initialTableStates);
@@ -126,7 +125,9 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
   const [refreshVersion, setRefreshVersion] = useState(0);
-  const activeView = report === 'sales' ? 'sales' : inventoryMode === 'summary' ? 'summary' : segmentView;
+  const isSalesReport = reportType === 'sales';
+  const pageTitle = isSalesReport ? '销售汇总报表' : '库存汇总报表';
+  const activeView = isSalesReport ? 'sales' : inventoryMode === 'summary' ? 'summary' : segmentView;
   const config = VIEW_CONFIG[activeView];
   const tableState = tableStates[activeView];
   const stateKey = useMemo(() => JSON.stringify(tableState), [tableState]);
@@ -160,7 +161,7 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const result = await response.json();
-        if (!result?.ok) throw new Error(result?.message || result?.error || '库存汇总报表读取失败');
+        if (!result?.ok) throw new Error(result?.message || result?.error || `${pageTitle}读取失败`);
         if (cancelled) return;
         setPayloads((current) => ({ ...current, [activeView]: result }));
         if (activeView === 'sales' && result.defaultYear && !tableState.filters.salesYear.length) {
@@ -180,7 +181,7 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [activeView, kcfxData?.savedAt, refreshVersion, stateKey, tableState.filters, tableState.page, tableState.search, updateTableState, user]);
+  }, [activeView, kcfxData?.savedAt, pageTitle, refreshVersion, stateKey, tableState.filters, tableState.page, tableState.search, updateTableState, user]);
 
   const optionsById = useMemo(() => Object.fromEntries(config.filters.map((filter) => [
     filter.id,
@@ -265,28 +266,22 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
     : error || `${config.label}共 ${formatNumber(pagination.totalRows)} 行，每页20行`;
 
   return (
-    <KcfxPageShell className="inventory-summary-page" title="库存汇总报表" status={status} loading={loading} onRefresh={refresh}>
-      <section className="inventory-summary-controls" aria-label="报表类型">
-        <div className="age-mode-switch inventory-summary-primary-switch">
-          {modeButton(report === 'inventory', '库存数据', () => { setReport('inventory'); setOpenFilter(''); })}
-          {modeButton(report === 'sales', '销售数据', () => { setReport('sales'); setOpenFilter(''); })}
-        </div>
-        {report === 'inventory' && (
-          <>
+    <KcfxPageShell className="inventory-summary-page" title={pageTitle} status={status} loading={loading} onRefresh={refresh}>
+      {!isSalesReport && (
+        <section className="inventory-summary-controls" aria-label="库存报表类型">
+          <div className="age-mode-switch">
+            {modeButton(inventoryMode === 'summary', '库存汇总', () => { setInventoryMode('summary'); setOpenFilter(''); })}
+            {modeButton(inventoryMode === 'segment', '分段库存', () => { setInventoryMode('segment'); setOpenFilter(''); })}
+          </div>
+          {inventoryMode === 'segment' && (
             <div className="age-mode-switch">
-              {modeButton(inventoryMode === 'summary', '库存汇总', () => { setInventoryMode('summary'); setOpenFilter(''); })}
-              {modeButton(inventoryMode === 'segment', '分段库存', () => { setInventoryMode('segment'); setOpenFilter(''); })}
+              {modeButton(segmentView === 'onHand', '在库数量', () => { setSegmentView('onHand'); setOpenFilter(''); })}
+              {modeButton(segmentView === 'inTransit', '在途数量', () => { setSegmentView('inTransit'); setOpenFilter(''); })}
+              {modeButton(segmentView === 'undelivered', '未交付总数量', () => { setSegmentView('undelivered'); setOpenFilter(''); })}
             </div>
-            {inventoryMode === 'segment' && (
-              <div className="age-mode-switch">
-                {modeButton(segmentView === 'onHand', '在库数量', () => { setSegmentView('onHand'); setOpenFilter(''); })}
-                {modeButton(segmentView === 'inTransit', '在途数量', () => { setSegmentView('inTransit'); setOpenFilter(''); })}
-                {modeButton(segmentView === 'undelivered', '未交付总数量', () => { setSegmentView('undelivered'); setOpenFilter(''); })}
-              </div>
-            )}
-          </>
-        )}
-      </section>
+          )}
+        </section>
+      )}
 
       <FilterToolbar
         filters={config.filters}

@@ -172,6 +172,7 @@ const SALES_INVENTORY_PERMISSIONS = [
   'salesInventory.ageAnalysis',
   'salesInventory.inventoryTrend',
   'salesInventory.inventorySummary',
+  'salesInventory.salesSummary',
   'salesInventory.salesAnalysis',
   'salesInventory.salesTrend',
   'salesInventory.comparison'
@@ -695,6 +696,7 @@ function canSeeAllRole(role) {
 const LEGACY_PERMISSION_ALIASES = {
   'salesInventory.receiptSummary': ['salesInventory'],
   'salesInventory.inventorySummary': ['salesInventory'],
+  'salesInventory.salesSummary': ['salesInventory'],
   'salesInventory.salesAnalysis': ['salesInventory'],
   'maintenanceLibrary.receiptFeedback': ['maintenanceLibrary', 'salesInventory', 'salesInventory.receiptFeedback'],
   'maintenanceLibrary.salesFeedback': ['maintenanceLibrary', 'salesInventory', 'salesInventory.salesFeedback'],

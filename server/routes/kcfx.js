@@ -40,6 +40,12 @@ function feedbackTypeConfig(type) {
   return KCFX_FEEDBACK_TYPES[key] ? { key, ...KCFX_FEEDBACK_TYPES[key] } : null;
 }
 
+function inventorySummaryPermission(body = {}) {
+  return body.report === 'sales'
+    ? 'salesInventory.salesSummary'
+    : 'salesInventory.inventorySummary';
+}
+
 function normalizeFeedbackRow(type, body = {}, requestUser, formatDate) {
   const createdAt = formatDate(new Date(), 'yyyy-MM-dd HH:mm:ss');
   const rowData = body.rowData && typeof body.rowData === 'object' ? body.rowData : {};
@@ -404,7 +410,7 @@ app.post('/api/kcfx-library/age-analysis/export', async (req, res) => {
 app.post('/api/kcfx-library/inventory-summary/query', async (req, res) => {
   try {
     const database = await initDb(dataDir);
-    const requestUser = requirePermission(database, req, res, 'salesInventory.inventorySummary');
+    const requestUser = requirePermission(database, req, res, inventorySummaryPermission(req.body));
     if (!requestUser) return;
     res.setHeader('Cache-Control', 'no-store');
     const cache = await getInventorySummaryCache(database, { force: req.body?.refresh === true });
@@ -422,7 +428,7 @@ app.post('/api/kcfx-library/inventory-summary/query', async (req, res) => {
 app.post('/api/kcfx-library/inventory-summary/export', async (req, res) => {
   try {
     const database = await initDb(dataDir);
-    const requestUser = requirePermission(database, req, res, 'salesInventory.inventorySummary');
+    const requestUser = requirePermission(database, req, res, inventorySummaryPermission(req.body));
     if (!requestUser) return;
     const cache = await getInventorySummaryCache(database);
     const rows = exportInventorySummaryRows(cache, req.body || {});

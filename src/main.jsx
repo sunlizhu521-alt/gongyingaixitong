@@ -54,6 +54,7 @@ import SalesTrendPage from './components/SalesTrendPage.jsx';
 import ReceiptSummaryPage from './components/ReceiptSummaryPage.jsx';
 import InventoryTrendPage from './components/InventoryTrendPage.jsx';
 import InventorySummaryPage from './components/InventorySummaryPage.jsx';
+import SalesSummaryPage from './components/SalesSummaryPage.jsx';
 import AgeAnalysisPage from './components/AgeAnalysisPage.jsx';
 import SalesAnalysisPage from './components/SalesAnalysisPage.jsx';
 import ComparisonPage from './components/ComparisonPage.jsx';
@@ -68,13 +69,19 @@ import { getCache, setCache } from './indexedDbCache.js';
 import './styles.css';
 
 const SALES_KCFX_TABS = new Set(['salesInventorySalesAnalysis', 'salesInventorySalesTrend']);
+const SERVER_QUERY_KCFX_TABS = new Set([
+  'salesInventoryReceiptSummary',
+  'salesInventoryAgeAnalysis',
+  'salesInventoryInventorySummary',
+  'salesInventorySalesSummary'
+]);
 function priorityKcfxRecordIdsForTab(tab) {
-  if (tab === 'salesInventoryReceiptSummary' || tab === 'salesInventoryAgeAnalysis' || tab === 'salesInventoryInventorySummary') return [];
+  if (SERVER_QUERY_KCFX_TABS.has(tab)) return [];
   if (SALES_KCFX_TABS.has(tab)) return [];
   return KCFX_PRIORITY_PRELOAD_RECORD_IDS.filter((id) => id !== 'sales-data');
 }
 function deferredKcfxRecordIdsForTab(tab, priorityIds = []) {
-  if (tab === 'salesInventoryReceiptSummary' || tab === 'salesInventoryAgeAnalysis' || tab === 'salesInventoryInventorySummary') return [];
+  if (SERVER_QUERY_KCFX_TABS.has(tab)) return [];
   const prioritySet = new Set(priorityIds);
   return KCFX_DASHBOARD_PRELOAD_RECORD_IDS.filter((id) => {
     if (prioritySet.has(id)) return false;
@@ -1903,6 +1910,16 @@ function App() {
         {mountedReactKcfxTabs.has('salesInventoryInventorySummary') && canAccessTab('salesInventoryInventorySummary') && (
           <div className={activeTab === 'salesInventoryInventorySummary' ? '' : 'kept-page-hidden'}>
             <InventorySummaryPage
+              user={user}
+              kcfxData={kcfxData}
+              onRefresh={loadKcfxMetadata}
+            />
+          </div>
+        )}
+
+        {mountedReactKcfxTabs.has('salesInventorySalesSummary') && canAccessTab('salesInventorySalesSummary') && (
+          <div className={activeTab === 'salesInventorySalesSummary' ? '' : 'kept-page-hidden'}>
+            <SalesSummaryPage
               user={user}
               kcfxData={kcfxData}
               onRefresh={loadKcfxMetadata}

@@ -128,17 +128,27 @@ test('查询接口固定每页20行并导出全部筛选结果', () => {
   assert.equal(exportInventorySummaryRows(cache, { report: 'inventory', view: 'summary' }).length, 25);
 });
 
-test('库存汇总报表已接入菜单、页面、权限和受保护接口', async () => {
-  const [constantsSource, mainSource, appSource, routeSource] = await Promise.all([
+test('库存和销售汇总报表已分别接入菜单、页面、权限和受保护接口', async () => {
+  const [constantsSource, mainSource, inventoryPageSource, salesPageSource, appSource, routeSource] = await Promise.all([
     readFile(new URL('../src/constants.js', import.meta.url), 'utf8'),
     readFile(new URL('../src/main.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/InventorySummaryPage.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/SalesSummaryPage.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../server/app.js', import.meta.url), 'utf8'),
     readFile(new URL('../server/routes/kcfx.js', import.meta.url), 'utf8')
   ]);
   assert.match(constantsSource, /salesInventoryInventorySummary/);
   assert.match(constantsSource, /key: 'inventorySummary'/);
+  assert.match(constantsSource, /salesInventorySalesSummary/);
+  assert.match(constantsSource, /key: 'salesSummary'/);
   assert.match(mainSource, /<InventorySummaryPage/);
+  assert.match(mainSource, /<SalesSummaryPage/);
+  assert.match(inventoryPageSource, /reportType = 'inventory'/);
+  assert.match(inventoryPageSource, /isSalesReport \? '销售汇总报表' : '库存汇总报表'/);
+  assert.match(salesPageSource, /reportType="sales"/);
   assert.match(appSource, /'salesInventory\.inventorySummary'/);
+  assert.match(appSource, /'salesInventory\.salesSummary'/);
   assert.match(routeSource, /inventory-summary\/query/);
-  assert.match(routeSource, /requirePermission\(database, req, res, 'salesInventory\.inventorySummary'\)/);
+  assert.match(routeSource, /function inventorySummaryPermission\(body = \{\}\)[\s\S]*body\.report === 'sales'[\s\S]*'salesInventory\.salesSummary'[\s\S]*'salesInventory\.inventorySummary'/);
+  assert.equal((routeSource.match(/requirePermission\(database, req, res, inventorySummaryPermission\(req\.body\)\)/g) || []).length, 2);
 });

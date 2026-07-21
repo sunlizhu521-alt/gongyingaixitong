@@ -66,6 +66,7 @@ const SALES_INVENTORY_PAGES = [
   { tab: 'salesInventoryAgeAnalysis', key: 'ageAnalysis', label: '库龄维度分析' },
   { tab: 'salesInventoryInventoryTrend', key: 'inventoryTrend', label: '库存趋势分析', sourceFile: 'inventory-trend.html' },
   { tab: 'salesInventoryInventorySummary', key: 'inventorySummary', label: '库存汇总报表' },
+  { tab: 'salesInventorySalesSummary', key: 'salesSummary', label: '销售汇总报表' },
   { tab: 'salesInventorySalesAnalysis', key: 'salesAnalysis', label: '月度销售数据', sourceFile: 'sales-analysis.html' },
   { tab: 'salesInventorySalesTrend', key: 'salesTrend', label: '销售趋势变化', sourceFile: 'sales-trend.html' },
   { tab: 'salesInventoryComparison', key: 'comparison', label: '表格对比分析', sourceFile: 'comparison.html' }
@@ -86,6 +87,7 @@ const KCFX_REACT_DATA_TABS = new Set([
   'salesInventoryAgeAnalysis',
   'salesInventoryInventoryTrend',
   'salesInventoryInventorySummary',
+  'salesInventorySalesSummary',
   'salesInventorySalesAnalysis',
   'salesInventoryComparison',
   'salesInventoryErrors',
