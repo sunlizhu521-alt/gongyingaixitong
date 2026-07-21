@@ -112,6 +112,7 @@ export default function registerKcfxRoutes(app, db) {
     getKcfxTrendSummaryResponse,
     queryKcfxAgeAnalysis,
     getKcfxAgeAnalysisExportRows,
+    getKcfxAgeAnalysisDepartmentMissing,
     recoverKcfxRecordFromRowsFile,
     resolveKcfxStoredFilePath,
     ensureKcfxRecordRows,
@@ -354,6 +355,23 @@ app.post('/api/kcfx-library/age-analysis/export', async (req, res) => {
     res.send(buffer);
   } catch (error) {
     res.status(500).json({ error: error?.message || String(error) });
+  }
+});
+
+app.get('/api/kcfx-library/age-analysis/department-missing', async (req, res) => {
+  try {
+    const database = await initDb(dataDir);
+    const requestUser = requirePermission(database, req, res, 'salesInventory.errors');
+    if (!requestUser) return;
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await getKcfxAgeAnalysisDepartmentMissing());
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      status: 'failed',
+      source: 'server-age-analysis',
+      error: error?.message || String(error)
+    });
   }
 });
 

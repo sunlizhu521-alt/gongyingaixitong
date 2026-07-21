@@ -37,6 +37,7 @@ import {
   latestInventoryAgeSlotId
 } from '../shared/kcfxAgeMonths.js';
 import {
+  ageAnalysisDepartmentMissingRows,
   buildAgeAnalysisCache,
   exportAgeAnalysisRows,
   KCFX_AGE_ANALYSIS_VERSION,
@@ -2051,6 +2052,30 @@ async function getKcfxAgeAnalysisExportRows(request = {}) {
   return exportAgeAnalysisRows(cache, request);
 }
 
+async function getKcfxAgeAnalysisDepartmentMissing() {
+  const cache = await getKcfxAgeAnalysisCacheResponse({ waitMs: 30000 });
+  if (!cache) {
+    return {
+      ok: false,
+      status: 'loading',
+      source: 'server-age-analysis',
+      message: '库龄维度分析汇总正在生成中，请稍后刷新',
+      rows: [],
+      totalRows: 0
+    };
+  }
+  const rows = ageAnalysisDepartmentMissingRows(cache);
+  return {
+    ok: true,
+    status: 'ready',
+    source: 'server-age-analysis',
+    savedAt: cache.savedAt || '',
+    generatedAt: cache.generatedAt || '',
+    rows,
+    totalRows: rows.length
+  };
+}
+
 function buildKcfxReceiptDimensionMaps(records) {
   return {
     productMap: mapKcfxReceiptProductsByMaterialCode(records['dim-product']?.rows || []),
@@ -3161,6 +3186,7 @@ const gongyingContext = {
   getKcfxTrendSummaryResponse,
   queryKcfxAgeAnalysis,
   getKcfxAgeAnalysisExportRows,
+  getKcfxAgeAnalysisDepartmentMissing,
   recoverKcfxRecordFromRowsFile,
   resolveKcfxStoredFilePath,
   ensureKcfxRecordRows,

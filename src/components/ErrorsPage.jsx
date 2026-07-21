@@ -8,7 +8,8 @@ const EMPTY_TABLES = {
   closed: emptyErrorResult(),
   detail: emptyErrorResult(),
   sales: emptySalesErrorResult(),
-  trend: emptyTrendErrorResult()
+  trend: emptyTrendErrorResult(),
+  age: emptyAgeErrorResult()
 };
 
 const ERROR_DOWNLOAD_CONFIG = {
@@ -86,12 +87,35 @@ const ERROR_DOWNLOAD_CONFIG = {
       ['qty', '数量'],
       ['reason', '缺失原因']
     ]
+  },
+  ageDivisionMissing: {
+    sources: ['age'],
+    name: '库龄维度分析事业部对照缺失表',
+    columns: [
+      ['monthLabel', '月份'],
+      ['organization', '库存组织'],
+      ['warehouse', '仓库名称'],
+      ['materialCode', '物料编码'],
+      ['sku', 'SKU'],
+      ['materialName', '物料名称'],
+      ['qty', '数量'],
+      ['reason', '缺失原因']
+    ]
   }
 };
+
+function userHeaders(user) {
+  return {
+    ...(user?.id ? { 'x-user-id': user.id } : {}),
+    ...(user?.sessionToken ? { 'x-session-token': user.sessionToken } : {}),
+    ...(user?.deviceId ? { 'x-device-id': user.deviceId } : {})
+  };
+}
 
 export default function ErrorsPage({
   kcfxData = null,
   kcfxRecords = {},
+  user = null,
   loading = false,
   error = '',
   lastLoadedAt = '',
@@ -101,10 +125,13 @@ export default function ErrorsPage({
   const [trendSummary, setTrendSummary] = useState(null);
   const [trendLoading, setTrendLoading] = useState(false);
   const [trendError, setTrendError] = useState('');
+  const [ageSummary, setAgeSummary] = useState(null);
+  const [ageLoading, setAgeLoading] = useState(false);
+  const [ageError, setAgeError] = useState('');
   const { records: loadedRecords, loading: recordsLoading, error: recordsError, reload } = useKcfxRecordMap(kcfxData, ERROR_RECORD_IDS);
   const records = useMemo(() => ({ ...kcfxRecords, ...loadedRecords }), [kcfxRecords, loadedRecords]);
-  const pageLoading = loading || recordsLoading || trendLoading;
-  const pageError = recordsError || trendError || error;
+  const pageLoading = loading || recordsLoading || trendLoading || ageLoading;
+  const pageError = recordsError || trendError || ageError || error;
 
   const loadTrendSummary = useCallback(async () => {
     setTrendLoading(true);
@@ -120,9 +147,30 @@ export default function ErrorsPage({
     }
   }, []);
 
+  const loadAgeSummary = useCallback(async () => {
+    setAgeLoading(true);
+    setAgeError('');
+    try {
+      const response = await fetch(`${API}/api/kcfx-library/age-analysis/department-missing`, {
+        cache: 'no-store',
+        headers: userHeaders(user)
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setAgeSummary(await response.json());
+    } catch (loadError) {
+      setAgeError(loadError?.message || String(loadError));
+    } finally {
+      setAgeLoading(false);
+    }
+  }, [user]);
+
   useEffect(() => {
     loadTrendSummary();
   }, [loadTrendSummary, kcfxData?.savedAt]);
+
+  useEffect(() => {
+    loadAgeSummary();
+  }, [loadAgeSummary, kcfxData?.savedAt]);
 
   useEffect(() => {
     if (!trendSummary?.refreshing) return undefined;
@@ -137,9 +185,10 @@ export default function ErrorsPage({
       closed: buildClosedInventoryChecks(records, maps),
       detail: buildInventoryMonthChecks(records, maps),
       sales: buildSalesDataChecks(records, maps),
-      trend: buildTrendChecks(trendSummary)
+      trend: buildTrendChecks(trendSummary),
+      age: buildAgeAnalysisChecks(ageSummary)
     };
-  }, [records, trendSummary]);
+  }, [ageSummary, records, trendSummary]);
 
   const statusText = useMemo(() => {
     if (pageLoading) return '数据加载中...';
@@ -149,13 +198,14 @@ export default function ErrorsPage({
       checks.closed.message || `关账库存事实表：有库存物料 ${formatNumber(checks.closed.stockMaterials.length)} 个，缺失 ${formatNumber(totalMissingCount(checks.closed))} 项`,
       checks.detail.message || `库存分析月份表：有库存物料 ${formatNumber(checks.detail.stockMaterials.length)} 个，缺失 ${formatNumber(totalMissingCount(checks.detail))} 项`,
       checks.sales.message || `销售数据文件：销售物料 ${formatNumber(checks.sales.stockMaterials.length)} 个，缺失 ${formatNumber(totalMissingCount(checks.sales))} 项`,
-      `库存趋势事实表：事业部对照缺失 ${formatNumber(checks.trend.trendDivisionMissing.length)} 项`
+      `库存趋势事实表：事业部对照缺失 ${formatNumber(checks.trend.trendDivisionMissing.length)} 项`,
+      checks.age.message || `库龄维度分析：事业部对照缺失 ${formatNumber(checks.age.ageDivisionMissing.length)} 项`
     ];
     const loadedText = lastLoadedAt ? `；读取时间：${lastLoadedAt}` : '';
     return `检查完成：${messages.join('；')}${loadedText}`;
   }, [checks, pageError, records, lastLoadedAt, pageLoading]);
   const refresh = async () => {
-    await Promise.all([reload(), onRefresh?.(), loadTrendSummary()]);
+    await Promise.all([reload(), onRefresh?.(), loadTrendSummary(), loadAgeSummary()]);
   };
 
   async function downloadSingle(source, tableName) {
@@ -173,7 +223,7 @@ export default function ErrorsPage({
   async function downloadAll() {
     const XLSX = await import('xlsx');
     const stamp = downloadTimestamp();
-    for (const source of ['closed', 'detail', 'sales', 'trend']) {
+    for (const source of ['closed', 'detail', 'sales', 'trend', 'age']) {
       for (const [tableName, config] of Object.entries(ERROR_DOWNLOAD_CONFIG)) {
         if (!config.sources.includes(source)) continue;
         downloadRowsAsWorkbook(XLSX, `${errorSourceLabel(source)}-${config.name}`, stamp, checks[source][tableName] || [], config.columns);
@@ -216,6 +266,7 @@ export default function ErrorsPage({
       />
       <SalesCheckGroup result={checks.sales} onDownload={downloadSingle} />
       <TrendCheckGroup result={checks.trend} onDownload={downloadSingle} />
+      <AgeAnalysisCheckGroup result={checks.age} onDownload={downloadSingle} />
     </section>
   );
 }
@@ -402,6 +453,32 @@ function TrendCheckGroup({ result, onDownload }) {
   );
 }
 
+function AgeAnalysisCheckGroup({ result, onDownload }) {
+  return (
+    <section className="error-source-panel">
+      <section className="error-source-title">
+        <h2>根据库龄维度分析</h2>
+        <p>{result.message || '按所有库龄月份检查库存组织、仓库名称和物料编码是否能匹配有库存仓库物料事业部对照表。'}</p>
+      </section>
+      <section className="metric-grid error-metrics">
+        <MetricCard label="事业部对照缺失" value={result.ageDivisionMissing.length} />
+      </section>
+      <ErrorTable
+        title="有库存仓库物料事业部对照表没有信息"
+        columns={ERROR_DOWNLOAD_CONFIG.ageDivisionMissing.columns.map(([key, label]) => [key, label, key === 'qty' ? 'num' : ''])}
+        rows={result.ageDivisionMissing}
+        diagnostic={[
+          '来源：库龄维度分析全部月份中有库存数量的记录。',
+          '比对：库存组织 + 仓库名称 + 物料编码匹配有库存仓库物料事业部对照表。',
+          '缺失提示：下方记录就是库龄维度分析中显示为“未匹配事业部”的数据。',
+          '需要维护：维度表文件库中的有库存仓库物料事业部对照表。'
+        ]}
+        onDownload={() => onDownload('age', 'ageDivisionMissing')}
+      />
+    </section>
+  );
+}
+
 function MetricCard({ label, value }) {
   return (
     <div className="metric-card">
@@ -477,6 +554,18 @@ function emptySalesErrorResult(message = '') {
 
 function emptyTrendErrorResult() {
   return { trendDivisionMissing: [] };
+}
+
+function emptyAgeErrorResult(message = '') {
+  return { message, ageDivisionMissing: [] };
+}
+
+function buildAgeAnalysisChecks(summary) {
+  if (!summary?.ok) return emptyAgeErrorResult(summary?.message || '库龄维度分析：汇总尚未生成完成');
+  return {
+    message: '',
+    ageDivisionMissing: Array.isArray(summary.rows) ? summary.rows : []
+  };
 }
 
 function buildTrendChecks(summary) {
@@ -1182,7 +1271,8 @@ function errorSourceLabel(source) {
     closed: '关账库存事实表',
     detail: '库存分析月份表',
     sales: '销售数据文件',
-    trend: '库存趋势事实表'
+    trend: '库存趋势事实表',
+    age: '库龄维度分析'
   }[source] || '报错信息';
 }
 

@@ -10,6 +10,7 @@ import {
   inventoryMonthAgeQuantity
 } from '../shared/kcfxInventoryMonth.js';
 import {
+  ageAnalysisDepartmentMissingRows,
   buildAgeAnalysisCache,
   exportAgeAnalysisRows,
   queryAgeAnalysis
@@ -202,6 +203,57 @@ test('uses fact-2 as the June analysis source until the June slot is uploaded', 
   assert.equal(cache.monthSummaries[0].expandedQty, 6);
 });
 
+test('groups every unmatched age-analysis row for the error report without double counting age buckets', () => {
+  const rows = [
+    {
+      month: '2026-05',
+      monthLabel: '2026年5月',
+      organization: '组织A',
+      warehouse: '仓库A',
+      materialCode: '1001',
+      sku: 'SKU-1',
+      materialName: '产品A',
+      department: '未匹配事业部',
+      ageGroup: '0-30天',
+      qty: 2
+    },
+    {
+      month: '2026-05',
+      monthLabel: '2026年5月',
+      organization: '组织A',
+      warehouse: '仓库A',
+      materialCode: '1001',
+      sku: 'SKU-1',
+      materialName: '产品A',
+      department: '未匹配事业部',
+      ageGroup: '31-60天',
+      qty: 3
+    },
+    {
+      month: '2026-06',
+      monthLabel: '2026年6月',
+      organization: '组织A',
+      warehouse: '仓库A',
+      materialCode: '1001',
+      department: '事业部A',
+      ageGroup: '0-30天',
+      qty: 9
+    }
+  ];
+
+  assert.deepEqual(ageAnalysisDepartmentMissingRows({ rows }), [{
+    month: '2026-05',
+    monthLabel: '2026年5月',
+    organization: '组织A',
+    warehouse: '仓库A',
+    materialCode: '1001',
+    sku: 'SKU-1',
+    materialName: '产品A',
+    qty: 5,
+    reason: '有库存仓库物料事业部对照表没有信息'
+  }]);
+});
+
 test('orders department and age filter options by the business sequence', () => {
   const departments = ['其他事业部B', '品牌市场部', '海外事业二部', '国内事业部', '全球招商部', '海外事业一部', '其他事业部A'];
   const ageGroups = ['181天以上', '121-150天', '31-60天', '0-30天', '151-180天', '91-120天', '61-90天', '31天以上'];
@@ -248,4 +300,11 @@ test('server serializes background file parsing to protect library writes', asyn
   const source = await readFile(new URL('../server/app.js', import.meta.url), 'utf8');
   assert.match(source, /let kcfxFileParseQueue = Promise\.resolve\(\)/);
   assert.match(source, /kcfxFileParseQueue = kcfxFileParseQueue\s*\.then\(\(\) => parseKcfxStoredFile\(job\)\)/);
+});
+
+test('age-analysis department-missing endpoint is protected by the error-page permission', async () => {
+  const source = await readFile(new URL('../server/routes/kcfx.js', import.meta.url), 'utf8');
+  assert.match(source, /age-analysis\/department-missing/);
+  assert.match(source, /getKcfxAgeAnalysisDepartmentMissing\(\)/);
+  assert.match(source, /salesInventory\.errors/);
 });

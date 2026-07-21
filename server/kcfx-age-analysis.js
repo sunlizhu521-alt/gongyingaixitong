@@ -502,6 +502,40 @@ export function queryAgeAnalysis(cache, request = {}) {
   };
 }
 
+export function ageAnalysisDepartmentMissingRows(cache) {
+  const grouped = new Map();
+  for (const row of cache?.rows || []) {
+    if (normalizeText(row.department) !== '未匹配事业部') continue;
+    const month = normalizeText(row.month);
+    const organization = normalizeText(row.organization);
+    const warehouse = normalizeText(row.warehouse);
+    const materialCode = normalizeMaterialCode(row.materialCode);
+    const key = [month, organization, warehouse, materialCode].join('\u001f');
+    const current = grouped.get(key) || {
+      month,
+      monthLabel: normalizeText(row.monthLabel),
+      organization,
+      warehouse,
+      materialCode,
+      sku: normalizeText(row.sku),
+      materialName: normalizeText(row.materialName),
+      qty: 0,
+      reason: '有库存仓库物料事业部对照表没有信息'
+    };
+    current.qty += Number(row.qty) || 0;
+    if (!current.sku) current.sku = normalizeText(row.sku);
+    if (!current.materialName) current.materialName = normalizeText(row.materialName);
+    grouped.set(key, current);
+  }
+  return [...grouped.values()].sort((a, b) => (
+    a.month.localeCompare(b.month)
+    || b.qty - a.qty
+    || a.organization.localeCompare(b.organization, 'zh-CN')
+    || a.warehouse.localeCompare(b.warehouse, 'zh-CN')
+    || a.materialCode.localeCompare(b.materialCode, 'zh-CN')
+  ));
+}
+
 export function exportAgeAnalysisRows(cache, request = {}) {
   return filterRows(cache?.rows || [], request.filters || {}, request.search || '');
 }

@@ -1986,6 +1986,7 @@ function App() {
             <ErrorsPage
               kcfxData={kcfxData}
               kcfxRecords={kcfxErrorRecords}
+              user={user}
               loading={false}
               error={kcfxErrorMessage}
               lastLoadedAt={kcfxErrorLoadedAt}
