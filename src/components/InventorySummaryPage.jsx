@@ -160,7 +160,7 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const result = await response.json();
-        if (!result?.ok) throw new Error(result?.message || result?.error || '库存汇总分析读取失败');
+        if (!result?.ok) throw new Error(result?.message || result?.error || '库存汇总报表读取失败');
         if (cancelled) return;
         setPayloads((current) => ({ ...current, [activeView]: result }));
         if (activeView === 'sales' && result.defaultYear && !tableState.filters.salesYear.length) {
@@ -265,7 +265,7 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
     : error || `${config.label}共 ${formatNumber(pagination.totalRows)} 行，每页20行`;
 
   return (
-    <KcfxPageShell className="inventory-summary-page" title="库存汇总分析" status={status} loading={loading} onRefresh={refresh}>
+    <KcfxPageShell className="inventory-summary-page" title="库存汇总报表" status={status} loading={loading} onRefresh={refresh}>
       <section className="inventory-summary-controls" aria-label="报表类型">
         <div className="age-mode-switch inventory-summary-primary-switch">
           {modeButton(report === 'inventory', '库存数据', () => { setReport('inventory'); setOpenFilter(''); })}

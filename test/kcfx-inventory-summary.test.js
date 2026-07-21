@@ -128,7 +128,7 @@ test('查询接口固定每页20行并导出全部筛选结果', () => {
   assert.equal(exportInventorySummaryRows(cache, { report: 'inventory', view: 'summary' }).length, 25);
 });
 
-test('库存汇总分析已接入菜单、页面、权限和受保护接口', async () => {
+test('库存汇总报表已接入菜单、页面、权限和受保护接口', async () => {
   const [constantsSource, mainSource, appSource, routeSource] = await Promise.all([
     readFile(new URL('../src/constants.js', import.meta.url), 'utf8'),
     readFile(new URL('../src/main.jsx', import.meta.url), 'utf8'),
