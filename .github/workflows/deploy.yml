@@ -69,8 +69,18 @@ jobs:
             cd "$APP_DIR"
             npm ci
             npm run build
-            pm2 restart gongyingaixitong --update-env
+
+            PM2_NAME=gongyingaixitong
+            if pm2 describe gongyingaixitong > /dev/null 2>&1; then
+              pm2 restart gongyingaixitong --update-env
+            elif pm2 describe gongyinglianaixitong > /dev/null 2>&1; then
+              PM2_NAME=gongyinglianaixitong
+              pm2 restart gongyinglianaixitong --update-env
+            else
+              pm2 start server/app.js --name gongyingaixitong --update-env
+            fi
             pm2 save
+            pm2 list
 
             if ! node --input-type=module <<'NODE'
           const baseUrl = 'http://127.0.0.1:4001';
@@ -136,7 +146,7 @@ jobs:
           }));
           NODE
             then
-              pm2 logs gongyingaixitong --lines 100 --nostream
+              pm2 logs "$PM2_NAME" --lines 100 --nostream
               exit 1
             fi
           EOF
