@@ -213,6 +213,11 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
         { label: '对比月份', value: metrics.comparisonMonth ? metrics.comparisonMonth.replace('-', '年') + '月' : '-' }
       ]} />
 
+      <div className="trend-chart-grid inventory-trend-chart-grid age-analysis-trend-grid">
+        <TrendPanel title="库存货值趋势" rows={payload?.trend || []} valueKey="amount" formatter={moneyWan} />
+        <TrendPanel title="库存数量趋势" rows={payload?.trend || []} valueKey="qty" formatter={(value) => formatNumber(value, 2)} />
+      </div>
+
       <div className="age-dimension-trend-grid">
         <DimensionTrendPanel
           title="每月事业部变化趋势"
@@ -229,11 +234,6 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
           rows={payload?.dimensionTrends?.productSeries || []}
           months={(payload?.monthSummaries || []).map((item) => item.month)}
         />
-      </div>
-
-      <div className="trend-chart-grid inventory-trend-chart-grid age-analysis-trend-grid">
-        <TrendPanel title="库存货值趋势" rows={payload?.trend || []} valueKey="amount" formatter={moneyWan} />
-        <TrendPanel title="库存数量趋势" rows={payload?.trend || []} valueKey="qty" formatter={(value) => formatNumber(value, 2)} />
       </div>
 
       <AgeStackedTrend rows={payload?.ageTrend || []} mode={ageMode} setMode={setAgeMode} />
