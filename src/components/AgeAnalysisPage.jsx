@@ -26,6 +26,11 @@ const FILTERS = [
 ];
 
 const EMPTY_SELECTIONS = Object.fromEntries(FILTERS.map((filter) => [filter.id, []]));
+const DIMENSION_TREND_VIEWS = [
+  { id: 'department', label: '事业部变化趋势' },
+  { id: 'productLine', label: '销售产品线变化趋势' },
+  { id: 'productSeries', label: '销售系列变化趋势' }
+];
 const AGE_TREND_COLORS = [
   '#007aff',
   '#30b85a',
@@ -83,6 +88,7 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
   const [exporting, setExporting] = useState(false);
   const [ageMode, setAgeMode] = useState('amount');
   const [warehouseTypeMode, setWarehouseTypeMode] = useState('amount');
+  const [dimensionTrendView, setDimensionTrendView] = useState('department');
   const filtersKey = useMemo(() => JSON.stringify(selections), [selections]);
 
   useEffect(() => {
@@ -178,103 +184,146 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
   const status = loading
     ? '数据加载中...'
     : error || `筛选后 ${formatNumber(metrics.rowCount || 0)} 行，库存数量 ${formatNumber(metrics.qty || 0, 2)}，库存货值 ${moneyWan(metrics.amount || 0)}`;
+  const activeDimensionTrend = DIMENSION_TREND_VIEWS.find((item) => item.id === dimensionTrendView) || DIMENSION_TREND_VIEWS[0];
+  const trendMonths = (payload?.monthSummaries || []).map((item) => item.month);
 
   return (
     <KcfxPageShell className="age-analysis-page" title="库龄维度分析" status={status} loading={loading} onRefresh={refresh}>
-      <FilterToolbar
-        filters={FILTERS}
-        optionsById={optionsById}
-        selections={selections}
-        openFilter={openFilter}
-        setOpenFilter={setOpenFilter}
-        setFilterValue={setFilterValue}
-        resetFilters={resetFilters}
-        searchValue={search}
-        setSearchValue={(value) => {
-          setSearch(value);
-          setPage(1);
-        }}
-        searchPlaceholder="搜索物料、SKU、仓库、事业部"
-      />
-
-      <MetricCards metrics={[
-        {
-          label: '库存货值',
-          value: moneyWan(metrics.amount || 0),
-          note: `环比 ${formatMonthOverMonth(metrics.amountMom)}`
-        },
-        {
-          label: '库存数量',
-          value: formatNumber(metrics.qty || 0, 2),
-          note: `环比 ${formatMonthOverMonth(metrics.qtyMom)}`
-        },
-        { label: '物料数量', value: formatNumber(metrics.materialCount || 0) },
-        { label: '仓库数量', value: formatNumber(metrics.warehouseCount || 0) },
-        { label: '对比月份', value: metrics.comparisonMonth ? metrics.comparisonMonth.replace('-', '年') + '月' : '-' }
-      ]} />
-
-      <div className="trend-chart-grid inventory-trend-chart-grid age-analysis-trend-grid">
-        <TrendPanel title="库存货值趋势" rows={payload?.trend || []} valueKey="amount" formatter={moneyWan} />
-        <TrendPanel title="库存数量趋势" rows={payload?.trend || []} valueKey="qty" formatter={(value) => formatNumber(value, 2)} />
-      </div>
-
-      <div className="age-dimension-trend-grid">
-        <DimensionTrendPanel
-          title="每月事业部变化趋势"
-          rows={payload?.dimensionTrends?.department || []}
-          months={(payload?.monthSummaries || []).map((item) => item.month)}
+      <AgeAnalysisZone title="筛选条件" subtitle="按月份、仓库、事业部和商品维度限定分析范围" tone="filter">
+        <FilterToolbar
+          filters={FILTERS}
+          optionsById={optionsById}
+          selections={selections}
+          openFilter={openFilter}
+          setOpenFilter={setOpenFilter}
+          setFilterValue={setFilterValue}
+          resetFilters={resetFilters}
+          searchValue={search}
+          setSearchValue={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          searchPlaceholder="搜索物料、SKU、仓库、事业部"
         />
-        <DimensionTrendPanel
-          title="每月销售产品线变化趋势"
-          rows={payload?.dimensionTrends?.productLine || []}
-          months={(payload?.monthSummaries || []).map((item) => item.month)}
-        />
-        <DimensionTrendPanel
-          title="每月销售系列变化趋势"
-          rows={payload?.dimensionTrends?.productSeries || []}
-          months={(payload?.monthSummaries || []).map((item) => item.month)}
-        />
-      </div>
+      </AgeAnalysisZone>
 
-      <AgeStackedTrend rows={payload?.ageTrend || []} mode={ageMode} setMode={setAgeMode} />
+      <AgeAnalysisZone title="核心指标" subtitle="当前筛选范围的库存规模和月份环比" tone="metrics">
+        <MetricCards metrics={[
+          {
+            label: '库存货值',
+            value: moneyWan(metrics.amount || 0),
+            note: `环比 ${formatMonthOverMonth(metrics.amountMom)}`
+          },
+          {
+            label: '库存数量',
+            value: formatNumber(metrics.qty || 0, 2),
+            note: `环比 ${formatMonthOverMonth(metrics.qtyMom)}`
+          },
+          { label: '物料数量', value: formatNumber(metrics.materialCount || 0) },
+          { label: '仓库数量', value: formatNumber(metrics.warehouseCount || 0) },
+          { label: '对比月份', value: metrics.comparisonMonth ? metrics.comparisonMonth.replace('-', '年') + '月' : '-' }
+        ]} />
+      </AgeAnalysisZone>
 
-      <WarehouseFlowTrend
-        rows={payload?.warehouseTypeTrend || []}
-        salesOutboundLocationRows={payload?.salesOutboundWarehouseLocationTrend || []}
-        months={(payload?.monthSummaries || []).map((item) => item.month)}
-        mode={warehouseTypeMode}
-        setMode={setWarehouseTypeMode}
-      />
-
-      <PanelGrid className="age-analysis-distribution-grid">
-        <BarPanel title="库龄库存数量" rows={payload?.distributions?.ageQty || []} valueFormatter={(value) => formatNumber(value, 2)} />
-        <BarPanel title="库龄库存金额" rows={payload?.distributions?.ageAmount || []} valueFormatter={moneyWan} />
-        <BarPanel title="事业部库存货值" rows={payload?.distributions?.departmentAmount || []} valueFormatter={moneyWan} />
-        <BarPanel title="销售产品线库存货值" rows={payload?.distributions?.productLineAmount || []} valueFormatter={moneyWan} />
-        <BarPanel title="仓库位置库存货值" rows={payload?.distributions?.warehouseLocationAmount || []} valueFormatter={moneyWan} />
-      </PanelGrid>
-
-      <section className="kcfx-panel">
-        <div className="table-title-row">
-          <div>
-            <h3>库龄维度分析明细</h3>
-            <p className="kcfx-table-note">共 {formatNumber(pagination.totalRows)} 行，每页20行</p>
-          </div>
-          <button type="button" className="ghost compact-button" onClick={exportRows} disabled={exporting || loading}>
-            {exporting ? '导出中...' : '导出'}
-          </button>
+      <AgeAnalysisZone title="库存总体趋势" subtitle="库存货值与库存数量的跨月变化" tone="overview">
+        <div className="trend-chart-grid inventory-trend-chart-grid age-analysis-trend-grid">
+          <TrendPanel title="库存货值趋势" rows={payload?.trend || []} valueKey="amount" formatter={moneyWan} />
+          <TrendPanel title="库存数量趋势" rows={payload?.trend || []} valueKey="qty" formatter={(value) => formatNumber(value, 2)} />
         </div>
-        <SimpleTable rows={payload?.rows || []} paginated={false} columns={TABLE_COLUMNS} />
-        <TablePagination
-          page={pagination.page || page}
-          pageSize={20}
-          totalPages={pagination.totalPages || 1}
-          totalRows={pagination.totalRows || 0}
-          onPageChange={setPage}
-          disabled={loading}
+      </AgeAnalysisZone>
+
+      <AgeAnalysisZone
+        title="维度变化趋势"
+        subtitle="切换查看事业部、销售产品线或销售系列的跨月表现"
+        tone="dimension"
+        actions={(
+          <div className="dimension-trend-switch" role="tablist" aria-label="维度变化趋势">
+            {DIMENSION_TREND_VIEWS.map((item) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={dimensionTrendView === item.id}
+                className={dimensionTrendView === item.id ? 'active' : ''}
+                key={item.id}
+                onClick={() => setDimensionTrendView(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
+      >
+        <div className="age-dimension-trend-grid">
+          <DimensionTrendPanel
+            title={activeDimensionTrend.label}
+            rows={payload?.dimensionTrends?.[activeDimensionTrend.id] || []}
+            months={trendMonths}
+          />
+        </div>
+      </AgeAnalysisZone>
+
+      <AgeAnalysisZone title="库龄结构趋势" subtitle="各库龄区间的库存金额或数量变化" tone="age">
+        <AgeStackedTrend rows={payload?.ageTrend || []} mode={ageMode} setMode={setAgeMode} />
+      </AgeAnalysisZone>
+
+      <AgeAnalysisZone title="仓库货物流转" subtitle="按仓库类型和仓库位置查看跨月流转变化" tone="warehouse">
+        <WarehouseFlowTrend
+          rows={payload?.warehouseTypeTrend || []}
+          salesOutboundLocationRows={payload?.salesOutboundWarehouseLocationTrend || []}
+          months={trendMonths}
+          mode={warehouseTypeMode}
+          setMode={setWarehouseTypeMode}
         />
-      </section>
+      </AgeAnalysisZone>
+
+      <AgeAnalysisZone title="库存分布" subtitle="按库龄、事业部、产品线和仓库位置拆分库存" tone="distribution">
+        <PanelGrid className="age-analysis-distribution-grid">
+          <BarPanel title="库龄库存数量" rows={payload?.distributions?.ageQty || []} valueFormatter={(value) => formatNumber(value, 2)} />
+          <BarPanel title="库龄库存金额" rows={payload?.distributions?.ageAmount || []} valueFormatter={moneyWan} />
+          <BarPanel title="事业部库存货值" rows={payload?.distributions?.departmentAmount || []} valueFormatter={moneyWan} />
+          <BarPanel title="销售产品线库存货值" rows={payload?.distributions?.productLineAmount || []} valueFormatter={moneyWan} />
+          <BarPanel title="仓库位置库存货值" rows={payload?.distributions?.warehouseLocationAmount || []} valueFormatter={moneyWan} />
+        </PanelGrid>
+      </AgeAnalysisZone>
+
+      <AgeAnalysisZone title="明细数据" subtitle="当前筛选结果的逐行库存明细" tone="detail">
+        <section className="kcfx-panel">
+          <div className="table-title-row">
+            <div>
+              <h3>库龄维度分析明细</h3>
+              <p className="kcfx-table-note">共 {formatNumber(pagination.totalRows)} 行，每页20行</p>
+            </div>
+            <button type="button" className="ghost compact-button" onClick={exportRows} disabled={exporting || loading}>
+              {exporting ? '导出中...' : '导出'}
+            </button>
+          </div>
+          <SimpleTable rows={payload?.rows || []} paginated={false} columns={TABLE_COLUMNS} />
+          <TablePagination
+            page={pagination.page || page}
+            pageSize={20}
+            totalPages={pagination.totalPages || 1}
+            totalRows={pagination.totalRows || 0}
+            onPageChange={setPage}
+            disabled={loading}
+          />
+        </section>
+      </AgeAnalysisZone>
     </KcfxPageShell>
+  );
+}
+
+function AgeAnalysisZone({ title, subtitle, tone, actions = null, children }) {
+  return (
+    <section className={`age-analysis-zone is-${tone}`}>
+      <header className="age-analysis-zone-heading">
+        <div>
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+        {actions}
+      </header>
+      {children}
+    </section>
   );
 }
 
