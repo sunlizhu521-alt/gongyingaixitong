@@ -38,6 +38,11 @@ import {
   latestInventoryAgeSlotId
 } from '../shared/kcfxAgeMonths.js';
 import {
+  PURCHASE_ORDER_HEADER_KEYWORDS,
+  PURCHASE_ORDER_RECORD_ID,
+  PURCHASE_ORDER_SHEET_HINT
+} from '../shared/kcfxPurchaseOrder.js';
+import {
   ageAnalysisDepartmentMissingRows,
   buildAgeAnalysisCache,
   exportAgeAnalysisRows,
@@ -177,6 +182,7 @@ const MAINTENANCE_LIBRARY_PERMISSIONS = [
   'maintenanceLibrary.factLibrary',
   'maintenanceLibrary.ageLibrary',
   'maintenanceLibrary.salesLibrary',
+  'maintenanceLibrary.purchaseOrderLibrary',
   'maintenanceLibrary.fileLibrary',
   'maintenanceLibrary.supplierManagement'
 ];
@@ -233,7 +239,8 @@ const KC_LIBRARY_SLOT_IDS = new Set([
   'fact-13',
   'fact-14',
   ...INVENTORY_AGE_SLOT_IDS,
-  'sales-data'
+  'sales-data',
+  PURCHASE_ORDER_RECORD_ID
 ]);
 const KC_PRIORITY_PRELOAD_SLOT_IDS = new Set([
   'dim-product',
@@ -2695,6 +2702,9 @@ function kcfxHeaderKeywordsForSlot(slot = {}) {
   if (slot.id === 'fact-inventory') {
     return [...common, '结存数量', '真实成本', '真实成本单价', '货品'];
   }
+  if (slot.id === PURCHASE_ORDER_RECORD_ID) {
+    return PURCHASE_ORDER_HEADER_KEYWORDS;
+  }
   if (isInventoryMonthSlotId(slot.id)) {
     return [...common, '数量(库存)', '0天到30天', '151天到180天', '181天以上', '结余库存数量', '库龄'];
   }
@@ -2845,6 +2855,7 @@ function defaultKcfxSheetHint(slotId) {
   if (slotId === 'dim-purchase-division') return '产品线明细';
   if (slotId === 'dim-product') return 'Dim-YL医疗器械商品分类';
   if (slotId === 'dim-customer-material') return STORE_MAPPING_SHEET_HINT;
+  if (slotId === PURCHASE_ORDER_RECORD_ID) return PURCHASE_ORDER_SHEET_HINT;
   return '';
 }
 

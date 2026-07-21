@@ -59,6 +59,7 @@ import ComparisonPage from './components/ComparisonPage.jsx';
 import FactLibraryPage from './components/FactLibraryPage.jsx';
 import AgeLibraryPage from './components/AgeLibraryPage.jsx';
 import SalesLibraryPage from './components/SalesLibraryPage.jsx';
+import PurchaseOrderLibraryPage from './components/PurchaseOrderLibraryPage.jsx';
 import FileLibraryPage from './components/FileLibraryPage.jsx';
 import KcfxFeedbackPage from './components/KcfxFeedbackPage.jsx';
 import { prefetchKcfxRecords } from './components/kcfxRecordLoader.js';
@@ -1959,6 +1960,18 @@ function App() {
 
         {activeTab === 'maintenanceSalesLibrary' && canAccessTab('maintenanceSalesLibrary') && (
           <SalesLibraryPage
+            kcfxData={kcfxData}
+            library={kcfxLibrary}
+            user={user}
+            loading={kcfxLoading}
+            error={kcfxLibraryMessage}
+            lastLoadedAt={kcfxLibraryLoadedAt}
+            onRefresh={loadKcfxLibrary}
+          />
+        )}
+
+        {activeTab === 'maintenancePurchaseOrderLibrary' && canAccessTab('maintenancePurchaseOrderLibrary') && (
+          <PurchaseOrderLibraryPage
             kcfxData={kcfxData}
             library={kcfxLibrary}
             user={user}

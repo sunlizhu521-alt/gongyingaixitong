@@ -77,6 +77,7 @@ const MAINTENANCE_LIBRARY_PAGES = [
   { tab: 'maintenanceFactLibrary', key: 'factLibrary', label: '库存数据文件', sourceFile: 'fact-library.html' },
   { tab: 'maintenanceAgeLibrary', key: 'ageLibrary', label: '库龄数据文件' },
   { tab: 'maintenanceSalesLibrary', key: 'salesLibrary', label: '销售数据文件', sourceFile: 'sales-library.html' },
+  { tab: 'maintenancePurchaseOrderLibrary', key: 'purchaseOrderLibrary', label: '采购订单文件' },
   { tab: 'maintenanceFileLibrary', key: 'fileLibrary', label: '维度表文件库', sourceFile: 'file-library.html' }
 ];
 
@@ -165,6 +166,7 @@ const legacyPermissionMap = {
   'maintenanceLibrary.factLibrary': ['maintenanceLibrary', 'salesInventory', 'salesInventory.factLibrary'],
   'maintenanceLibrary.ageLibrary': ['maintenanceLibrary'],
   'maintenanceLibrary.salesLibrary': ['maintenanceLibrary', 'salesInventory', 'salesInventory.salesLibrary'],
+  'maintenanceLibrary.purchaseOrderLibrary': ['maintenanceLibrary'],
   'maintenanceLibrary.fileLibrary': ['maintenanceLibrary', 'salesInventory', 'salesInventory.fileLibrary'],
   'maintenanceLibrary.supplierManagement': ['maintenanceLibrary', 'supplierManagement', 'supplierPayment.supplierManagement'],
   'systemManagement.permissionManagement': ['permissionManagement'],
