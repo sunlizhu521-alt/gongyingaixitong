@@ -3159,6 +3159,78 @@ th {
   overflow-wrap: anywhere;
 }
 
+.kcfx-library-card .kcfx-library-parse-pending {
+  color: #1d4ed8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.kcfx-upload-feedback {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.kcfx-upload-feedback.success {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.kcfx-upload-feedback.error {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.kcfx-upload-progress {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.kcfx-upload-progress-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #1e3a8a;
+  font-size: 12px;
+}
+
+.kcfx-upload-progress-heading strong {
+  font-size: 14px;
+}
+
+.kcfx-upload-progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #dbeafe;
+}
+
+.kcfx-upload-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+  transition: width 0.15s ease;
+}
+
+.kcfx-upload-progress small {
+  overflow: hidden;
+  color: #475569;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .kcfx-library-card dl {
   display: grid;
   gap: 8px;
@@ -3202,6 +3274,15 @@ th {
   inset: 0;
   opacity: 0;
   cursor: pointer;
+}
+
+.kcfx-upload-button:has(input:disabled) {
+  cursor: wait;
+  opacity: 0.8;
+}
+
+.kcfx-upload-button input:disabled {
+  cursor: wait;
 }
 
 .system-file-meta {
