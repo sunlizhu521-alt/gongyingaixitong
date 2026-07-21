@@ -69,7 +69,7 @@ export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRe
   const totalQty = useMemo(() => sum(filteredRows, 'qty'), [filteredRows]);
   const status = recordsLoading
     ? '数据加载中...'
-    : pageError || `已读取 ${formatNumber(rows.length)} 行月度销售数据，筛选后 ${formatNumber(filteredRows.length)} 行，出库数量 ${formatNumber(totalQty, 2)}${lastLoadedAt ? `；读取时间：${lastLoadedAt}` : ''}`;
+    : pageError || `已读取 ${formatNumber(rows.length)} 行月度销售数据，筛选后 ${formatNumber(filteredRows.length)} 行，应收数量 ${formatNumber(totalQty, 2)}${lastLoadedAt ? `；读取时间：${lastLoadedAt}` : ''}`;
 
   const refresh = async () => {
     await Promise.all([reload({ force: true }), onRefresh?.()]);

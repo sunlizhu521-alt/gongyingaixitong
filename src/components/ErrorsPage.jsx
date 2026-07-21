@@ -789,7 +789,7 @@ function collectSalesStoreValues(rows) {
     const normalized = normalizeStoreName(store);
     if (!store || !normalized) continue;
     if (!map.has(normalized)) map.set(normalized, { raw: store, normalized, qty: 0 });
-    map.get(normalized).qty += getSalesOutboundQty(row);
+    map.get(normalized).qty += getSalesReceivableQty(row);
   }
   return [...map.values()].sort((a, b) => b.qty - a.qty || a.raw.localeCompare(b.raw, 'zh-CN'));
 }
@@ -817,7 +817,7 @@ function storeRecordSheetName(record) {
 function salesStoreDiagnosticLines(diagnostic = {}) {
   const lines = [
     '客户名称来源：销售数据文件 B 列（客户名称）',
-    '数量来源：销售数据文件的出库数量字段',
+    '数量来源：销售数据文件 I 列（应收数量）',
     '比对维表：月度维度表文件库 - 店铺名称汇总（金蝶&领星&简称）',
     '比对列：店铺名称汇总表 B 列（金蝶名称）',
     '缺失提示：销售数据文件 B 列客户名称有、维表 B 列金蝶名称没有的信息会列在下方',
@@ -838,7 +838,7 @@ function summarizeDetailStockMaterials(rows) {
 }
 
 function summarizeSalesMaterials(rows) {
-  return summarizeByMaterial(rows, getSalesMaterialCode, getSalesMaterialName, getSalesQty);
+  return summarizeByMaterial(rows, getSalesMaterialCode, getSalesMaterialName, getSalesReceivableQty);
 }
 
 function summarizeByMaterial(rows, materialGetter, nameGetter, qtyGetter) {
@@ -961,7 +961,7 @@ function summarizeSalesCustomerMaterialMissing(rows, customerMaterialKeys, produ
       });
     }
     const item = map.get(mapKey);
-    item.qty += getSalesOutboundQty(row);
+    item.qty += getSalesReceivableQty(row);
     if (!item.salesDepartment) item.salesDepartment = getSalesDepartmentName(row);
     if (!item.materialName) item.materialName = getSalesMaterialName(row);
   }
@@ -978,7 +978,7 @@ function summarizeSalesStoreMissing(rows, storeNames) {
     const normalized = normalizeStoreName(store);
     if (storeNames.has(normalized)) continue;
     if (!map.has(normalized)) map.set(normalized, { store, normalized, qty: 0 });
-    map.get(normalized).qty += getSalesOutboundQty(row);
+    map.get(normalized).qty += getSalesReceivableQty(row);
   }
   return [...map.values()].sort((a, b) => b.qty - a.qty || a.store.localeCompare(b.store, 'zh-CN'));
 }
@@ -1237,10 +1237,10 @@ function getSalesStoreNameForStoreSummary(row) {
   return normalizeText(nthValue(row, 2));
 }
 
-function getSalesOutboundQty(row) {
+function getSalesReceivableQty(row) {
   return firstNumber([
-    firstValue(row, ['出库数量']),
-    firstValueByHeaderIncludes(row, ['出库', '数量'])
+    firstValue(row, ['应收数量']),
+    firstValueByHeaderIncludes(row, ['应收', '数量'])
   ]);
 }
 

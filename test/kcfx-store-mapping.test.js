@@ -15,7 +15,7 @@ test('store mapping contract requires customer and daily short-name headers', ()
   assert.equal(pickStoreMappingSheetName(['销售订单', '店铺名称汇总', '库存调拨']), '店铺名称汇总');
 });
 
-test('sales rows obtain store short names and use outbound quantities', () => {
+test('sales rows obtain store short names and use receivable quantities', () => {
   const salesHeaders = ['销售日期', '客户名称', '物料编码', '应收数量', '出库数量'];
   const storeHeaders = ['序号', '客户名称', '领星名称', '日常汇报沟通简称'];
   const records = {
@@ -32,15 +32,15 @@ test('sales rows obtain store short names and use outbound quantities', () => {
 
   const rows = getSalesRows(records);
   assert.deepEqual(rows.map(({ customer, storeShortName, storeMatchStatus, qty }) => ({ customer, storeShortName, storeMatchStatus, qty })), [
-    { customer: '客户全称A', storeShortName: '日常简称A', storeMatchStatus: '已匹配', qty: 7 },
-    { customer: '未维护客户B', storeShortName: '', storeMatchStatus: '未匹配', qty: 4 }
+    { customer: '客户全称A', storeShortName: '日常简称A', storeMatchStatus: '已匹配', qty: 5 },
+    { customer: '未维护客户B', storeShortName: '', storeMatchStatus: '未匹配', qty: 3 }
   ]);
 });
 
-test('sales quantity does not fall back to receivable quantity', () => {
+test('sales quantity does not fall back to outbound quantity', () => {
   const records = {
     'sales-data': {
-      rows: [rowFrom(['销售日期', '客户名称', '物料编码', '应收数量'], ['2026-06-01', '客户A', '1001', 9])]
+      rows: [rowFrom(['销售日期', '客户名称', '物料编码', '出库数量'], ['2026-06-01', '客户A', '1001', 9])]
     }
   };
 
