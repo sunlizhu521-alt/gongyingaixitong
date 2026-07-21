@@ -36,9 +36,9 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
             set -e
 
-            APP_DIR=/home/ubuntu/zhuge-ai-lab/gongyingaixitong
-            RELEASE_DIR=/tmp/gongyingaixitong-release
-            BACKUP_DIR=/home/ubuntu/backups/gongyingaixitong
+            APP_DIR=/home/ubuntu/zhuge-ai-lab/gongyinglianaixitong
+            RELEASE_DIR=/tmp/gongyinglianaixitong-release
+            BACKUP_DIR=/home/ubuntu/backups/gongyinglianaixitong
 
             mkdir -p "$BACKUP_DIR"
             rm -rf "$RELEASE_DIR"
