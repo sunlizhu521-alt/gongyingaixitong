@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzip } from 'node:zlib';
 import { initDb } from './db.js';
+import { requestAuthSource } from './request-auth.js';
 import registerAuthRoutes from './routes/auth.js';
 import registerUserRoutes from './routes/users.js';
 import registerInvoiceRoutes from './routes/invoices.js';
@@ -693,7 +694,8 @@ function hasUserPermission(user, permission) {
 }
 
 function requirePermission(db, req, res, permission) {
-  const requestUser = resolveRequestUser(db, { ...req.query, ...req.body });
+  const source = requestAuthSource(req);
+  const requestUser = findValidSession(db, source, req)?.user || resolveRequestUser(db, source);
   if (!hasUserPermission(requestUser, permission)) {
     res.status(403).json({ error: 'permission denied' });
     return null;
