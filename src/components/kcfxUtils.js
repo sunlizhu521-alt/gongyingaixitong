@@ -458,7 +458,7 @@ export function getSalesRows(records) {
       productCategory: product.productCategory || '',
       productSeries: product.productSeries || '',
       model: product.model || '',
-      qty: getSalesReceivableQty(row),
+      qty: getSalesOutboundQty(row),
       storeMatchStatus: storeInfo ? '已匹配' : '未匹配'
     };
   }).filter((row) => (row.customer || row.materialCode || row.model || row.qty) && !isExcludedSalesRow(row));
@@ -565,10 +565,10 @@ function getSalesMaterialName(row) {
   ]));
 }
 
-function getSalesReceivableQty(row) {
+export function getSalesOutboundQty(row) {
   return firstNumber([
-    firstValue(row, ['应收数量', '销售数量', '数量', '出库数量']),
-    nthValue(row, 9)
+    firstValue(row, ['出库数量']),
+    firstValueByHeaderIncludes(row, ['出库', '数量'])
   ]);
 }
 

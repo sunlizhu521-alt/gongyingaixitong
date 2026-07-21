@@ -112,7 +112,7 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
   const totalQty = sum(filteredRows, 'qty');
   const status = pageLoading
     ? '数据加载中...'
-    : pageError || `已按销售数据日期列读取 ${formatNumber(trendRows.length)} 行，年份：${TREND_YEARS.join(' / ')}，应收数量合计 ${formatQuantity(sum(trendRows, 'qty'))}${lastLoadedAt ? `；读取时间：${lastLoadedAt}` : ''}`;
+    : pageError || `已按销售数据日期列读取 ${formatNumber(trendRows.length)} 行，年份：${TREND_YEARS.join(' / ')}，出库数量合计 ${formatQuantity(sum(trendRows, 'qty'))}${lastLoadedAt ? `；读取时间：${lastLoadedAt}` : ''}`;
 
   const refresh = async () => {
     await Promise.all([reload({ force: true }), onRefresh?.()]);

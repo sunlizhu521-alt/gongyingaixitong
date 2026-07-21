@@ -15,14 +15,14 @@ test('store mapping contract requires customer and daily short-name headers', ()
   assert.equal(pickStoreMappingSheetName(['销售订单', '店铺名称汇总', '库存调拨']), '店铺名称汇总');
 });
 
-test('sales rows obtain store short names only by matching customer names', () => {
-  const salesHeaders = ['销售日期', '客户名称', '物料编码', '应收数量'];
+test('sales rows obtain store short names and use outbound quantities', () => {
+  const salesHeaders = ['销售日期', '客户名称', '物料编码', '应收数量', '出库数量'];
   const storeHeaders = ['序号', '客户名称', '领星名称', '日常汇报沟通简称'];
   const records = {
     'sales-data': {
       rows: [
-        rowFrom(salesHeaders, ['2026-06-01', '客户全称A', '1001', 5]),
-        rowFrom(salesHeaders, ['2026-06-01', '未维护客户B', '1002', 3])
+        rowFrom(salesHeaders, ['2026-06-01', '客户全称A', '1001', 5, 7]),
+        rowFrom(salesHeaders, ['2026-06-01', '未维护客户B', '1002', 3, 4])
       ]
     },
     'dim-customer-material': {
@@ -31,8 +31,18 @@ test('sales rows obtain store short names only by matching customer names', () =
   };
 
   const rows = getSalesRows(records);
-  assert.deepEqual(rows.map(({ customer, storeShortName, storeMatchStatus }) => ({ customer, storeShortName, storeMatchStatus })), [
-    { customer: '客户全称A', storeShortName: '日常简称A', storeMatchStatus: '已匹配' },
-    { customer: '未维护客户B', storeShortName: '', storeMatchStatus: '未匹配' }
+  assert.deepEqual(rows.map(({ customer, storeShortName, storeMatchStatus, qty }) => ({ customer, storeShortName, storeMatchStatus, qty })), [
+    { customer: '客户全称A', storeShortName: '日常简称A', storeMatchStatus: '已匹配', qty: 7 },
+    { customer: '未维护客户B', storeShortName: '', storeMatchStatus: '未匹配', qty: 4 }
   ]);
+});
+
+test('sales quantity does not fall back to receivable quantity', () => {
+  const records = {
+    'sales-data': {
+      rows: [rowFrom(['销售日期', '客户名称', '物料编码', '应收数量'], ['2026-06-01', '客户A', '1001', 9])]
+    }
+  };
+
+  assert.equal(getSalesRows(records)[0].qty, 0);
 });
