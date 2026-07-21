@@ -3050,6 +3050,57 @@ th {
   background: #fff;
 }
 
+.inventory-summary-page {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.inventory-summary-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #d8e4f2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.inventory-summary-primary-switch {
+  margin-right: 4px;
+  border-color: #93b7e8;
+}
+
+.inventory-summary-table-panel {
+  min-width: 0;
+}
+
+.inventory-summary-table-panel .kcfx-table-wrap {
+  max-height: none;
+}
+
+.inventory-summary-table-panel th,
+.inventory-summary-table-panel td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+@media (max-width: 720px) {
+  .inventory-summary-controls {
+    align-items: stretch;
+  }
+
+  .inventory-summary-controls .age-mode-switch {
+    width: 100%;
+  }
+
+  .inventory-summary-controls .age-mode-switch button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 8px;
+  }
+}
+
 .kcfx-bars {
   display: grid;
   gap: 10px;

@@ -1,10 +1,26 @@
 import { randomUUID } from 'node:crypto';
 import xlsx from 'xlsx';
 import { getCachedSalesRows } from '../../src/components/kcfxUtils.js';
+import {
+  buildInventorySummaryCache,
+  exportInventorySummaryRows,
+  queryInventorySummary
+} from '../kcfx-inventory-summary.js';
 
 const crypto = { randomUUID };
 const SALES_ROW_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
 let salesRowsPayloadCache = { key: '', payload: null };
+const INVENTORY_SUMMARY_RECORD_IDS = [
+  'fact-inventory',
+  'purchase-order-data',
+  'sales-data',
+  'dim-product',
+  'dim-warehouse',
+  'dim-warehouse-material',
+  'dim-store-name',
+  'dim-customer-material'
+];
+let inventorySummaryPayloadCache = { key: '', payload: null };
 
 const KCFX_FEEDBACK_TYPES = {
   receipt: {
@@ -135,6 +151,33 @@ export default function registerKcfxRoutes(app, db) {
     resolveActiveInventoryMonthId,
     withKcfxLibraryMutation
   } = app.locals.gongying;
+
+async function getInventorySummaryCache(database, { force = false } = {}) {
+  const key = [
+    database.kcfxLibrary?.savedAt || '',
+    ...INVENTORY_SUMMARY_RECORD_IDS.map((id) => {
+      const record = database.kcfxLibrary?.records?.[id] || {};
+      return `${id}:${record.rowsSavedAt || record.serverSavedAt || record.savedAt || record.appliedAt || ''}:${record.rowCount || 0}`;
+    })
+  ].join('|');
+  if (!force && inventorySummaryPayloadCache.key === key && inventorySummaryPayloadCache.payload) {
+    return inventorySummaryPayloadCache.payload;
+  }
+
+  const records = {};
+  for (const id of INVENTORY_SUMMARY_RECORD_IDS) {
+    const source = database.kcfxLibrary.records[id] || await recoverKcfxRecordFromRowsFile(id);
+    if (!source) {
+      records[id] = { id, rows: [] };
+      continue;
+    }
+    const record = await ensureKcfxRecordRows(database, id, source);
+    records[id] = await attachKcfxRecordRows(record);
+  }
+  const payload = buildInventorySummaryCache(records, database.kcfxLibrary?.savedAt || '');
+  inventorySummaryPayloadCache = { key, payload };
+  return payload;
+}
 
 app.get('/api/kcfx-feedback/:type', async (req, res) => {
   const config = feedbackTypeConfig(req.params.type);
@@ -352,6 +395,84 @@ app.post('/api/kcfx-library/age-analysis/export', async (req, res) => {
     const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`库龄维度分析明细_${stamp}.xlsx`)}`);
+    res.send(buffer);
+  } catch (error) {
+    res.status(500).json({ error: error?.message || String(error) });
+  }
+});
+
+app.post('/api/kcfx-library/inventory-summary/query', async (req, res) => {
+  try {
+    const database = await initDb(dataDir);
+    const requestUser = requirePermission(database, req, res, 'salesInventory.inventorySummary');
+    if (!requestUser) return;
+    res.setHeader('Cache-Control', 'no-store');
+    const cache = await getInventorySummaryCache(database, { force: req.body?.refresh === true });
+    res.json(queryInventorySummary(cache, req.body || {}));
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      status: 'failed',
+      source: 'server-inventory-summary',
+      error: error?.message || String(error)
+    });
+  }
+});
+
+app.post('/api/kcfx-library/inventory-summary/export', async (req, res) => {
+  try {
+    const database = await initDb(dataDir);
+    const requestUser = requirePermission(database, req, res, 'salesInventory.inventorySummary');
+    if (!requestUser) return;
+    const cache = await getInventorySummaryCache(database);
+    const rows = exportInventorySummaryRows(cache, req.body || {});
+    const report = req.body?.report === 'sales' ? 'sales' : 'inventory';
+    const view = report === 'sales' ? 'sales' : String(req.body?.view || 'summary');
+    let data;
+    let sheetName;
+    if (report === 'sales') {
+      sheetName = '销售数据';
+      data = rows.map((row) => ({
+        日期: row.dateLabel,
+        事业部: row.department,
+        渠道: row.channel,
+        产品线: row.productLine,
+        物料编码数量: Number(row.materialCodeCount) || 0,
+        销售数量: Number(row.salesQty) || 0,
+        销售金额: Number(row.salesAmount) || 0
+      }));
+    } else if (view === 'summary') {
+      sheetName = '库存汇总';
+      data = rows.map((row) => ({
+        事业部: row.department,
+        产品线: row.productLine,
+        物料编码: row.materialCode,
+        SKU: row.sku,
+        在库数量: Number(row.onHandQty) || 0,
+        在途数量: Number(row.inTransitQty) || 0,
+        未交付总数量: Number(row.undeliveredQty) || 0,
+        合计: Number(row.totalQty) || 0
+      }));
+    } else {
+      const isUndelivered = view === 'undelivered';
+      sheetName = view === 'onHand' ? '在库数量' : view === 'inTransit' ? '在途数量' : '未交付总数量';
+      data = rows.map((row) => ({
+        ...(isUndelivered ? { 供应商: row.supplier } : {}),
+        事业部: row.department,
+        产品线: row.productLine,
+        物料编码: row.materialCode,
+        SKU: row.sku,
+        数量: Number(row.qty) || 0,
+        ...(view === 'onHand' ? { 库存所在地: row.inventoryLocation } : {})
+      }));
+    }
+    const worksheet = xlsx.utils.json_to_sheet(data.length ? data : [{ 提示: '暂无数据' }]);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, sheetName);
+    const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx', compression: true });
+    const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`${sheetName}_${stamp}.xlsx`)}`);
     res.send(buffer);
   } catch (error) {
     res.status(500).json({ error: error?.message || String(error) });

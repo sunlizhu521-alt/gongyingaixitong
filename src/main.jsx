@@ -53,6 +53,7 @@ import ErrorsPage from './components/ErrorsPage.jsx';
 import SalesTrendPage from './components/SalesTrendPage.jsx';
 import ReceiptSummaryPage from './components/ReceiptSummaryPage.jsx';
 import InventoryTrendPage from './components/InventoryTrendPage.jsx';
+import InventorySummaryPage from './components/InventorySummaryPage.jsx';
 import AgeAnalysisPage from './components/AgeAnalysisPage.jsx';
 import SalesAnalysisPage from './components/SalesAnalysisPage.jsx';
 import ComparisonPage from './components/ComparisonPage.jsx';
@@ -68,12 +69,12 @@ import './styles.css';
 
 const SALES_KCFX_TABS = new Set(['salesInventorySalesAnalysis', 'salesInventorySalesTrend']);
 function priorityKcfxRecordIdsForTab(tab) {
-  if (tab === 'salesInventoryReceiptSummary' || tab === 'salesInventoryAgeAnalysis') return [];
+  if (tab === 'salesInventoryReceiptSummary' || tab === 'salesInventoryAgeAnalysis' || tab === 'salesInventoryInventorySummary') return [];
   if (SALES_KCFX_TABS.has(tab)) return [];
   return KCFX_PRIORITY_PRELOAD_RECORD_IDS.filter((id) => id !== 'sales-data');
 }
 function deferredKcfxRecordIdsForTab(tab, priorityIds = []) {
-  if (tab === 'salesInventoryReceiptSummary' || tab === 'salesInventoryAgeAnalysis') return [];
+  if (tab === 'salesInventoryReceiptSummary' || tab === 'salesInventoryAgeAnalysis' || tab === 'salesInventoryInventorySummary') return [];
   const prioritySet = new Set(priorityIds);
   return KCFX_DASHBOARD_PRELOAD_RECORD_IDS.filter((id) => {
     if (prioritySet.has(id)) return false;
@@ -1894,6 +1895,16 @@ function App() {
               loading={false}
               error={kcfxCoreMessage}
               lastLoadedAt={kcfxCoreLoadedAt}
+              onRefresh={loadKcfxMetadata}
+            />
+          </div>
+        )}
+
+        {mountedReactKcfxTabs.has('salesInventoryInventorySummary') && canAccessTab('salesInventoryInventorySummary') && (
+          <div className={activeTab === 'salesInventoryInventorySummary' ? '' : 'kept-page-hidden'}>
+            <InventorySummaryPage
+              user={user}
+              kcfxData={kcfxData}
               onRefresh={loadKcfxMetadata}
             />
           </div>

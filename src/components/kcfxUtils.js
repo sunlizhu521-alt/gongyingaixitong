@@ -198,6 +198,7 @@ export function mapProducts(rows) {
     const materialCode = normalizeMaterialCode(firstText([firstValue(row, ['物料编码', '货品编码', '商品编码']), nthValue(row, 1)]));
     if (!materialCode || map.has(materialCode)) continue;
     map.set(materialCode, {
+      sku: firstText([firstValue(row, ['SKU', '领星SKU']), nthValue(row, 3)]),
       materialName: firstText([firstValue(row, ['金蝶名称', '物料名称', '货品名称', '商品名称']), nthValue(row, 4)]),
       productCategory: firstText([firstValue(row, ['销售产品分类', '产品分类', '销售产品类别', '产品类别', '品类'])]),
       productLine: firstText([firstValue(row, ['销售产品线', '产品线']), nthValue(row, 7)]),
@@ -459,6 +460,7 @@ export function getSalesRows(records) {
       productSeries: product.productSeries || '',
       model: product.model || '',
       qty: getSalesReceivableQty(row),
+      amount: getSalesTaxExcludedAmount(row),
       storeMatchStatus: storeInfo ? '已匹配' : '未匹配'
     };
   }).filter((row) => (row.customer || row.materialCode || row.model || row.qty) && !isExcludedSalesRow(row));
@@ -569,6 +571,13 @@ function getSalesReceivableQty(row) {
   return firstNumber([
     firstValue(row, ['应收数量']),
     firstValueByHeaderIncludes(row, ['应收', '数量'])
+  ]);
+}
+
+function getSalesTaxExcludedAmount(row) {
+  return firstNumber([
+    firstValue(row, ['销售额-不含税', '销售额（不含税）', '销售额(不含税)']),
+    firstValueByHeaderIncludes(row, ['销售额', '不含税'])
   ]);
 }
 
