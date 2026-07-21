@@ -64,14 +64,11 @@ const KCFX_INDEXED_DB_STORE = 'files';
 const SALES_INVENTORY_PAGES = [
   { tab: 'salesInventoryReceiptSummary', key: 'receiptSummary', label: '关账库存分析', sourceFile: 'receipt-summary.html' },
   { tab: 'salesInventoryAgeAnalysis', key: 'ageAnalysis', label: '库龄维度分析' },
-  { tab: 'salesInventoryReceiptFeedback', key: 'receiptFeedback', label: '关账库存反馈信息汇总' },
   { tab: 'salesInventoryInventoryTrend', key: 'inventoryTrend', label: '库存趋势分析', sourceFile: 'inventory-trend.html' },
   { tab: 'salesInventoryInventorySummary', key: 'inventorySummary', label: '库存汇总分析' },
   { tab: 'salesInventorySalesAnalysis', key: 'salesAnalysis', label: '月度销售数据', sourceFile: 'sales-analysis.html' },
-  { tab: 'salesInventorySalesFeedback', key: 'salesFeedback', label: '月销售数据反馈信息反馈' },
   { tab: 'salesInventorySalesTrend', key: 'salesTrend', label: '销售趋势变化', sourceFile: 'sales-trend.html' },
-  { tab: 'salesInventoryComparison', key: 'comparison', label: '表格对比分析', sourceFile: 'comparison.html' },
-  { tab: 'salesInventoryErrors', key: 'errors', label: '报错信息提示', sourceFile: 'errors.html' }
+  { tab: 'salesInventoryComparison', key: 'comparison', label: '表格对比分析', sourceFile: 'comparison.html' }
 ];
 
 const MAINTENANCE_LIBRARY_PAGES = [
@@ -104,6 +101,9 @@ const SYSTEM_FILE_LIBRARY_PAGES = [
 
 const MAINTENANCE_LIBRARY_MENU_PAGES = [
   ...MAINTENANCE_LIBRARY_PAGES,
+  { tab: 'salesInventoryReceiptFeedback', key: 'receiptFeedback', label: '关账库存反馈信息汇总' },
+  { tab: 'salesInventorySalesFeedback', key: 'salesFeedback', label: '月销售数据反馈信息反馈' },
+  { tab: 'salesInventoryErrors', key: 'errors', label: '报错信息提示', sourceFile: 'errors.html' },
   { tab: 'suppliers', key: 'supplierManagement', label: '供应商管理维度表' }
 ];
 const MAINTENANCE_LIBRARY_TABS = new Set(MAINTENANCE_LIBRARY_MENU_PAGES.map((page) => page.tab));
@@ -170,6 +170,9 @@ const legacyPermissionMap = {
   'maintenanceLibrary.salesLibrary': ['maintenanceLibrary', 'salesInventory', 'salesInventory.salesLibrary'],
   'maintenanceLibrary.purchaseOrderLibrary': ['maintenanceLibrary'],
   'maintenanceLibrary.fileLibrary': ['maintenanceLibrary', 'salesInventory', 'salesInventory.fileLibrary'],
+  'maintenanceLibrary.receiptFeedback': ['maintenanceLibrary', 'salesInventory', 'salesInventory.receiptFeedback'],
+  'maintenanceLibrary.salesFeedback': ['maintenanceLibrary', 'salesInventory', 'salesInventory.salesFeedback'],
+  'maintenanceLibrary.errors': ['maintenanceLibrary', 'salesInventory', 'salesInventory.errors'],
   'maintenanceLibrary.supplierManagement': ['maintenanceLibrary', 'supplierManagement', 'supplierPayment.supplierManagement'],
   'systemManagement.permissionManagement': ['permissionManagement'],
   'systemManagement.userLoginLogs': ['systemManagement'],

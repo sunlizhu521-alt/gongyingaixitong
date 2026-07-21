@@ -170,14 +170,11 @@ const USER_STATUS_PENDING = 'pending';
 const SALES_INVENTORY_PERMISSIONS = [
   'salesInventory.receiptSummary',
   'salesInventory.ageAnalysis',
-  'salesInventory.receiptFeedback',
   'salesInventory.inventoryTrend',
   'salesInventory.inventorySummary',
   'salesInventory.salesAnalysis',
-  'salesInventory.salesFeedback',
   'salesInventory.salesTrend',
-  'salesInventory.comparison',
-  'salesInventory.errors'
+  'salesInventory.comparison'
 ];
 const MAINTENANCE_LIBRARY_PERMISSIONS = [
   'maintenanceLibrary.factLibrary',
@@ -185,6 +182,9 @@ const MAINTENANCE_LIBRARY_PERMISSIONS = [
   'maintenanceLibrary.salesLibrary',
   'maintenanceLibrary.purchaseOrderLibrary',
   'maintenanceLibrary.fileLibrary',
+  'maintenanceLibrary.receiptFeedback',
+  'maintenanceLibrary.salesFeedback',
+  'maintenanceLibrary.errors',
   'maintenanceLibrary.supplierManagement'
 ];
 const SYSTEM_FILE_LIBRARY_PERMISSIONS = [
@@ -279,9 +279,18 @@ function expandPermissionKey(permission) {
   if (permission === 'supplierPayment.supplierManagement' || permission === 'supplierManagement') return ['maintenanceLibrary', 'maintenanceLibrary.supplierManagement'];
   if (permission === 'supplierPayment.reminders') return ['systemManagement', 'systemManagement.reminders'];
   if (permission === 'salesInventory') {
-    return ['salesInventory', ...SALES_INVENTORY_PERMISSIONS.filter((item) => item !== 'salesInventory.ageAnalysis')];
+    return [
+      'salesInventory',
+      ...SALES_INVENTORY_PERMISSIONS.filter((item) => item !== 'salesInventory.ageAnalysis'),
+      'maintenanceLibrary.receiptFeedback',
+      'maintenanceLibrary.salesFeedback',
+      'maintenanceLibrary.errors'
+    ];
   }
   if (permission === 'maintenanceLibrary') return ['maintenanceLibrary', ...MAINTENANCE_LIBRARY_PERMISSIONS];
+  if (permission === 'salesInventory.receiptFeedback') return ['maintenanceLibrary', 'maintenanceLibrary.receiptFeedback'];
+  if (permission === 'salesInventory.salesFeedback') return ['maintenanceLibrary', 'maintenanceLibrary.salesFeedback'];
+  if (permission === 'salesInventory.errors') return ['maintenanceLibrary', 'maintenanceLibrary.errors'];
   if (permission === 'salesInventory.factLibrary') return ['maintenanceLibrary', 'maintenanceLibrary.factLibrary'];
   if (permission === 'salesInventory.salesLibrary') return ['maintenanceLibrary', 'maintenanceLibrary.salesLibrary'];
   if (permission === 'salesInventory.fileLibrary') return ['maintenanceLibrary', 'maintenanceLibrary.fileLibrary'];
@@ -685,10 +694,11 @@ function canSeeAllRole(role) {
 
 const LEGACY_PERMISSION_ALIASES = {
   'salesInventory.receiptSummary': ['salesInventory'],
-  'salesInventory.receiptFeedback': ['salesInventory'],
   'salesInventory.inventorySummary': ['salesInventory'],
   'salesInventory.salesAnalysis': ['salesInventory'],
-  'salesInventory.salesFeedback': ['salesInventory'],
+  'maintenanceLibrary.receiptFeedback': ['maintenanceLibrary', 'salesInventory', 'salesInventory.receiptFeedback'],
+  'maintenanceLibrary.salesFeedback': ['maintenanceLibrary', 'salesInventory', 'salesInventory.salesFeedback'],
+  'maintenanceLibrary.errors': ['maintenanceLibrary', 'salesInventory', 'salesInventory.errors'],
   'systemFileLibrary.invoiceInventory': ['supplierPayment.invoiceInventory', 'invoiceInventory'],
   'maintenanceLibrary.supplierManagement': ['supplierPayment.supplierManagement', 'supplierManagement'],
   'systemManagement.reminders': ['supplierPayment.reminders']

@@ -25,12 +25,12 @@ let inventorySummaryPayloadCache = { key: '', payload: null };
 const KCFX_FEEDBACK_TYPES = {
   receipt: {
     submitPermission: 'salesInventory.receiptSummary',
-    viewPermission: 'salesInventory.receiptFeedback',
+    viewPermission: 'maintenanceLibrary.receiptFeedback',
     label: '关账库存反馈'
   },
   sales: {
     submitPermission: 'salesInventory.salesAnalysis',
-    viewPermission: 'salesInventory.salesFeedback',
+    viewPermission: 'maintenanceLibrary.salesFeedback',
     label: '月度销售数据反馈'
   }
 };
@@ -482,7 +482,7 @@ app.post('/api/kcfx-library/inventory-summary/export', async (req, res) => {
 app.get('/api/kcfx-library/age-analysis/department-missing', async (req, res) => {
   try {
     const database = await initDb(dataDir);
-    const requestUser = requirePermission(database, req, res, 'salesInventory.errors');
+    const requestUser = requirePermission(database, req, res, 'maintenanceLibrary.errors');
     if (!requestUser) return;
     res.setHeader('Cache-Control', 'no-store');
     res.json(await getKcfxAgeAnalysisDepartmentMissing());

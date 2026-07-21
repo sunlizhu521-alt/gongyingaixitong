@@ -341,5 +341,5 @@ test('age-analysis department-missing endpoint is protected by the error-page pe
   const source = await readFile(new URL('../server/routes/kcfx.js', import.meta.url), 'utf8');
   assert.match(source, /age-analysis\/department-missing/);
   assert.match(source, /getKcfxAgeAnalysisDepartmentMissing\(\)/);
-  assert.match(source, /salesInventory\.errors/);
+  assert.match(source, /maintenanceLibrary\.errors/);
 });
