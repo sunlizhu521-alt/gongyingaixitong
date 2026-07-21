@@ -12,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_SUMMARY_VERSION = 1;
+export const KCFX_INVENTORY_SUMMARY_VERSION = 2;
 
 const INVENTORY_VIEW_FIELDS = {
   summary: ['department', 'productLine'],
@@ -128,6 +128,7 @@ function buildInventoryRows(records, productMap) {
       productLine: normalizeDimension(product.productLine, '未匹配产品线'),
       materialCode,
       sku: normalizeDimension(product.sku, '未匹配SKU'),
+      kingdeeName: normalizeDimension(product.materialName, '未匹配金蝶名称'),
       inventoryLocation: normalizeDimension(warehouseInfo.location, '未匹配库存所在地'),
       qty
     };
@@ -152,6 +153,7 @@ function buildUndeliveredRows(records, productMap) {
       productLine: normalizeDimension(product.productLine, '未匹配产品线'),
       materialCode,
       sku: normalizeDimension(product.sku, '未匹配SKU'),
+      kingdeeName: normalizeDimension(product.materialName, '未匹配金蝶名称'),
       qty
     });
   }
@@ -159,7 +161,7 @@ function buildUndeliveredRows(records, productMap) {
 }
 
 function addInventoryMetric(map, row, field) {
-  const keyFields = ['department', 'productLine', 'materialCode', 'sku'];
+  const keyFields = ['department', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
   const key = keyFields.map((keyField) => row[keyField] || '').join('\u0001');
   let target = map.get(key);
   if (!target) {
@@ -168,6 +170,7 @@ function addInventoryMetric(map, row, field) {
       productLine: row.productLine,
       materialCode: row.materialCode,
       sku: row.sku,
+      kingdeeName: row.kingdeeName,
       onHandQty: 0,
       inTransitQty: 0,
       undeliveredQty: 0,
@@ -179,24 +182,32 @@ function addInventoryMetric(map, row, field) {
   target.totalQty = target.onHandQty + target.inTransitQty + target.undeliveredQty;
 }
 
-function buildSalesDetails(records) {
+function buildSalesDetails(records, productMap) {
   return getCachedSalesRows(records)
     .filter((row) => row.salesMonth)
-    .map((row) => ({
-      salesMonth: row.salesMonth,
-      salesYear: row.salesYear,
-      salesMonthNumber: row.salesMonthNumber,
-      department: normalizeDimension(row.salesOrg, '未匹配事业部'),
-      channel: normalizeDimension(row.storeShortName, '未匹配渠道'),
-      productLine: normalizeDimension(row.productLine, '未匹配产品线'),
-      materialCode: normalizeMaterialCode(row.materialCode),
-      qty: Number(row.qty) || 0,
-      amount: Number(row.amount) || 0,
-      searchText: [row.materialCode, row.materialName, row.customer, row.storeShortName, row.salesOrg, row.productLine]
-        .map(normalizeText)
-        .join('\u0001')
-        .toLowerCase()
-    }));
+    .map((row) => {
+      const materialCode = normalizeMaterialCode(row.materialCode);
+      const product = productMap.get(materialCode) || {};
+      const sku = normalizeDimension(product.sku, '未匹配SKU');
+      const kingdeeName = normalizeDimension(product.materialName, '未匹配金蝶名称');
+      return {
+        salesMonth: row.salesMonth,
+        salesYear: row.salesYear,
+        salesMonthNumber: row.salesMonthNumber,
+        department: normalizeDimension(row.salesOrg, '未匹配事业部'),
+        channel: normalizeDimension(row.storeShortName, '未匹配渠道'),
+        productLine: normalizeDimension(row.productLine, '未匹配产品线'),
+        materialCode,
+        sku,
+        kingdeeName,
+        qty: Number(row.qty) || 0,
+        amount: Number(row.amount) || 0,
+        searchText: [materialCode, sku, kingdeeName, row.customer, row.storeShortName, row.salesOrg, row.productLine]
+          .map(normalizeText)
+          .join('\u0001')
+          .toLowerCase()
+      };
+    });
 }
 
 export function buildInventorySummaryCache(records = {}, savedAt = '') {
@@ -216,11 +227,11 @@ export function buildInventorySummaryCache(records = {}, savedAt = '') {
     generatedAt: new Date().toISOString(),
     inventoryViews: {
       summary: [...summaryMap.values()].filter((row) => row.totalQty !== 0).sort(compareInventoryRows),
-      onHand: groupRows(inventory.onHand, ['department', 'productLine', 'materialCode', 'sku', 'inventoryLocation'], ['qty']).sort(compareInventoryRows),
-      inTransit: groupRows(inventory.inTransit, ['department', 'productLine', 'materialCode', 'sku'], ['qty']).sort(compareInventoryRows),
-      undelivered: groupRows(undelivered, ['supplier', 'department', 'productLine', 'materialCode', 'sku'], ['qty']).sort(compareInventoryRows)
+      onHand: groupRows(inventory.onHand, ['department', 'productLine', 'materialCode', 'sku', 'kingdeeName', 'inventoryLocation'], ['qty']).sort(compareInventoryRows),
+      inTransit: groupRows(inventory.inTransit, ['department', 'productLine', 'materialCode', 'sku', 'kingdeeName'], ['qty']).sort(compareInventoryRows),
+      undelivered: groupRows(undelivered, ['supplier', 'department', 'productLine', 'materialCode', 'sku', 'kingdeeName'], ['qty']).sort(compareInventoryRows)
     },
-    salesDetails: buildSalesDetails(records),
+    salesDetails: buildSalesDetails(records, productMap),
     sources: Object.fromEntries(Object.entries(records).map(([id, record]) => [id, {
       id,
       fileName: record?.fileName || '',
@@ -269,7 +280,7 @@ function buildOptions(rows, fields, selections, search, searchFields) {
 function groupSalesRows(rows) {
   const map = new Map();
   for (const row of rows) {
-    const fields = ['salesMonth', 'department', 'channel', 'productLine'];
+    const fields = ['salesMonth', 'department', 'channel', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
     const key = fields.map((field) => row[field] || '').join('\u0001');
     let target = map.get(key);
     if (!target) {
@@ -279,23 +290,23 @@ function groupSalesRows(rows) {
         department: row.department,
         channel: row.channel,
         productLine: row.productLine,
-        materialCodes: new Set(),
-        materialCodeCount: 0,
+        materialCode: row.materialCode,
+        sku: row.sku,
+        kingdeeName: row.kingdeeName,
         salesQty: 0,
         salesAmount: 0
       };
       map.set(key, target);
     }
-    if (row.materialCode) target.materialCodes.add(row.materialCode);
     target.salesQty += Number(row.qty) || 0;
     target.salesAmount += Number(row.amount) || 0;
   }
   return [...map.values()]
-    .map(({ materialCodes, ...row }) => ({ ...row, materialCodeCount: materialCodes.size }))
     .sort((a, b) => a.salesMonth.localeCompare(b.salesMonth)
       || a.department.localeCompare(b.department, 'zh-CN')
       || a.channel.localeCompare(b.channel, 'zh-CN')
-      || a.productLine.localeCompare(b.productLine, 'zh-CN'));
+      || a.productLine.localeCompare(b.productLine, 'zh-CN')
+      || a.materialCode.localeCompare(b.materialCode, 'zh-CN'));
 }
 
 function resolveRows(cache, request = {}) {
@@ -303,7 +314,7 @@ function resolveRows(cache, request = {}) {
   const selections = normalizedSelections(request.filters);
   const search = request.search || '';
   if (report === 'sales') {
-    const searchFields = ['searchText', 'department', 'channel', 'productLine'];
+    const searchFields = ['searchText', 'department', 'channel', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
     const baseRows = cache.salesDetails || [];
     const options = buildOptions(baseRows, SALES_FILTER_FIELDS, selections, search, searchFields);
     const filteredDetails = baseRows.filter((row) => (
@@ -315,14 +326,13 @@ function resolveRows(cache, request = {}) {
       view: 'sales',
       rows: groupSalesRows(filteredDetails),
       options,
-      defaultYear: sortedOptions(baseRows.map((row) => row.salesYear), 'salesYear').at(-1) || '',
-      materialCodeCount: new Set(filteredDetails.map((row) => row.materialCode).filter(Boolean)).size
+      defaultYear: sortedOptions(baseRows.map((row) => row.salesYear), 'salesYear').at(-1) || ''
     };
   }
 
   const view = Object.prototype.hasOwnProperty.call(INVENTORY_VIEW_FIELDS, request.view) ? request.view : 'summary';
   const fields = INVENTORY_VIEW_FIELDS[view];
-  const searchFields = ['materialCode', 'sku', 'department', 'productLine', 'supplier', 'inventoryLocation'];
+  const searchFields = ['materialCode', 'sku', 'kingdeeName', 'department', 'productLine', 'supplier', 'inventoryLocation'];
   const baseRows = cache.inventoryViews?.[view] || [];
   return {
     report,
@@ -333,10 +343,9 @@ function resolveRows(cache, request = {}) {
   };
 }
 
-function metricsForRows(report, view, rows, materialCodeCount = 0) {
+function metricsForRows(report, view, rows) {
   if (report === 'sales') return {
     rowCount: rows.length,
-    materialCodeCount,
     salesQty: rows.reduce((total, row) => total + (Number(row.salesQty) || 0), 0),
     salesAmount: rows.reduce((total, row) => total + (Number(row.salesAmount) || 0), 0)
   };
@@ -367,7 +376,7 @@ export function queryInventorySummary(cache, request = {}) {
     view: resolved.view,
     defaultYear: resolved.defaultYear,
     options: resolved.options,
-    metrics: metricsForRows(resolved.report, resolved.view, resolved.rows, resolved.materialCodeCount),
+    metrics: metricsForRows(resolved.report, resolved.view, resolved.rows),
     rows: resolved.rows.slice(start, start + pageSize),
     pagination: { page, pageSize, totalPages, totalRows },
     sources: cache.sources

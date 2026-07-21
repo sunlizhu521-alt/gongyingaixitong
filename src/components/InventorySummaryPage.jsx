@@ -17,6 +17,7 @@ const VIEW_CONFIG = {
       { key: 'productLine', label: '产品线' },
       { key: 'materialCode', label: '物料编码' },
       { key: 'sku', label: 'SKU' },
+      { key: 'kingdeeName', label: '金蝶名称' },
       { key: 'onHandQty', label: '在库数量', render: (row) => formatNumber(row.onHandQty, 2) },
       { key: 'inTransitQty', label: '在途数量', render: (row) => formatNumber(row.inTransitQty, 2) },
       { key: 'undeliveredQty', label: '未交付总数量', render: (row) => formatNumber(row.undeliveredQty, 2) },
@@ -35,6 +36,7 @@ const VIEW_CONFIG = {
       { key: 'productLine', label: '产品线' },
       { key: 'materialCode', label: '物料编码' },
       { key: 'sku', label: 'SKU' },
+      { key: 'kingdeeName', label: '金蝶名称' },
       { key: 'qty', label: '数量', render: (row) => formatNumber(row.qty, 2) },
       { key: 'inventoryLocation', label: '库存所在地' }
     ]
@@ -50,6 +52,7 @@ const VIEW_CONFIG = {
       { key: 'productLine', label: '产品线' },
       { key: 'materialCode', label: '物料编码' },
       { key: 'sku', label: 'SKU' },
+      { key: 'kingdeeName', label: '金蝶名称' },
       { key: 'qty', label: '数量', render: (row) => formatNumber(row.qty, 2) }
     ]
   },
@@ -66,6 +69,7 @@ const VIEW_CONFIG = {
       { key: 'productLine', label: '产品线' },
       { key: 'materialCode', label: '物料编码' },
       { key: 'sku', label: 'SKU' },
+      { key: 'kingdeeName', label: '金蝶名称' },
       { key: 'qty', label: '数量', render: (row) => formatNumber(row.qty, 2) }
     ]
   },
@@ -83,7 +87,9 @@ const VIEW_CONFIG = {
       { key: 'department', label: '事业部' },
       { key: 'channel', label: '渠道' },
       { key: 'productLine', label: '产品线' },
-      { key: 'materialCodeCount', label: '物料编码数量', render: (row) => formatNumber(row.materialCodeCount) },
+      { key: 'materialCode', label: '物料编码' },
+      { key: 'sku', label: 'SKU' },
+      { key: 'kingdeeName', label: '金蝶名称' },
       { key: 'salesQty', label: '销售数量', render: (row) => formatNumber(row.salesQty, 2) },
       { key: 'salesAmount', label: '销售金额', render: (row) => formatNumber(row.salesAmount, 2) }
     ]
@@ -246,7 +252,6 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
   const metricCards = activeView === 'sales'
     ? [
         { label: '汇总行数', value: formatNumber(metrics.rowCount) },
-        { label: '物料编码数量', value: formatNumber(metrics.materialCodeCount) },
         { label: '销售数量', value: formatNumber(metrics.salesQty, 2) },
         { label: '销售金额', value: `¥${formatNumber(metrics.salesAmount, 2)}` }
       ]
@@ -293,7 +298,7 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
         resetFilters={resetFilters}
         searchValue={tableState.search}
         setSearchValue={(value) => updateTableState(activeView, (current) => ({ ...current, search: value, page: 1 }))}
-        searchPlaceholder={activeView === 'sales' ? '搜索事业部、渠道、产品线、物料' : '搜索物料编码、SKU、事业部、产品线'}
+        searchPlaceholder={activeView === 'sales' ? '搜索事业部、渠道、产品线、物料编码、SKU、金蝶名称' : '搜索物料编码、SKU、金蝶名称、事业部、产品线'}
       />
 
       <MetricCards metrics={metricCards} />

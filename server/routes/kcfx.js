@@ -443,7 +443,9 @@ app.post('/api/kcfx-library/inventory-summary/export', async (req, res) => {
         事业部: row.department,
         渠道: row.channel,
         产品线: row.productLine,
-        物料编码数量: Number(row.materialCodeCount) || 0,
+        物料编码: row.materialCode,
+        SKU: row.sku,
+        金蝶名称: row.kingdeeName,
         销售数量: Number(row.salesQty) || 0,
         销售金额: Number(row.salesAmount) || 0
       }));
@@ -454,6 +456,7 @@ app.post('/api/kcfx-library/inventory-summary/export', async (req, res) => {
         产品线: row.productLine,
         物料编码: row.materialCode,
         SKU: row.sku,
+        金蝶名称: row.kingdeeName,
         在库数量: Number(row.onHandQty) || 0,
         在途数量: Number(row.inTransitQty) || 0,
         未交付总数量: Number(row.undeliveredQty) || 0,
@@ -468,6 +471,7 @@ app.post('/api/kcfx-library/inventory-summary/export', async (req, res) => {
         产品线: row.productLine,
         物料编码: row.materialCode,
         SKU: row.sku,
+        金蝶名称: row.kingdeeName,
         数量: Number(row.qty) || 0,
         ...(view === 'onHand' ? { 库存所在地: row.inventoryLocation } : {})
       }));
