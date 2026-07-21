@@ -517,11 +517,11 @@ function mapSalesDepartments(rows) {
   const map = new Map();
   for (const row of rows) {
     const key = normalizeSalesDepartmentKey(firstText([
-      firstValue(row, ['匹配键', '客户物料匹配键', '客户物料编码', '客户物料', '型号']),
+      firstValue(row, ['客户名称&物料编码', '客户名称+物料编码', '匹配键', '客户物料匹配键', '客户物料编码', '客户物料', '型号']),
       nthValue(row, 4)
     ]));
     const department = normalizeText(firstText([
-      firstValue(row, ['销售部门', '部门', '事业部', '销售组织']),
+      firstValue(row, ['销售部门名称', '销售部门', '部门', '事业部', '销售组织']),
       nthValue(row, 5)
     ]));
     if (key && department && !map.has(key)) map.set(key, department);
@@ -540,7 +540,9 @@ function getSalesMonth(row) {
 
 function getSalesDepartmentKey(row) {
   return normalizeSalesDepartmentKey(firstText([
-    firstValue(row, ['客户物料编码', '客户物料', '型号', '销售部门匹配键']),
+    firstValue(row, ['客户名称&物料编码', '客户名称+物料编码', '客户物料编码', '客户物料', '型号', '销售部门匹配键']),
+    [firstValue(row, ['客户名称', '客户']), firstValue(row, ['物料编码', '货品编码', '商品编码'])].join(''),
+    nthValue(row, 17),
     nthValue(row, 12)
   ]));
 }

@@ -46,3 +46,29 @@ test('sales quantity does not fall back to outbound quantity', () => {
 
   assert.equal(getSalesRows(records)[0].qty, 0);
 });
+
+test('sales department matches the current customer and material composite key', () => {
+  const salesHeaders = [
+    '销售组织', '客户名称', '物料', '物料编码', '物料名称', '销售部门名称', '仓库',
+    '出库数量', '币别', '出库单价', '出库价税合计', '应收数量', '应收价税合计',
+    '汇率', '销售额-不含税', '日期', '客户名称&物料编码'
+  ];
+  const departmentHeaders = ['客户名称', '物料编码', '物料名称', '客户名称&物料编码', '事业部', '备注'];
+  const records = {
+    'sales-data': {
+      rows: [rowFrom(salesHeaders, [
+        '杭州国源养老科技有限公司', '国源美国:US', '电动升降椅', '1002060033', '电动升降椅', '', '',
+        '', '人民币', '', '', 139, 330472.69, 1, 292453.708, '2025年1月', '国源美国:US1002060033'
+      ])]
+    },
+    'dim-store-name': {
+      rows: [rowFrom(departmentHeaders, [
+        '国源美国:US', '1002060033', '电动升降椅', '国源美国:US1002060033', '海外事业一部', ''
+      ])]
+    }
+  };
+
+  const [row] = getSalesRows(records);
+  assert.equal(row.salesDepartmentKey, '国源美国:US1002060033');
+  assert.equal(row.salesOrg, '海外事业一部');
+});

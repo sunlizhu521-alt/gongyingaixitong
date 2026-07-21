@@ -63,7 +63,7 @@ test('采购订单事业部只保留第一个星号前的内容', () => {
 
 test('库存汇总按海上在途精确分段并排除汇总行', () => {
   const cache = buildInventorySummaryCache(sampleRecords(), 'saved-at');
-  assert.equal(cache.version, 2);
+  assert.equal(cache.version, 3);
   assert.equal(cache.inventoryViews.onHand.length, 2);
   assert.equal(cache.inventoryViews.onHand.reduce((sum, row) => sum + row.qty, 0), 12);
   assert.equal(cache.inventoryViews.inTransit.length, 1);
