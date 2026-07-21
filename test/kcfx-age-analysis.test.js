@@ -13,6 +13,7 @@ import {
   ageAnalysisDepartmentMissingRows,
   buildAgeAnalysisCache,
   exportAgeAnalysisRows,
+  normalizeAgeAnalysisMaterialCode,
   queryAgeAnalysis
 } from '../server/kcfx-age-analysis.js';
 
@@ -201,6 +202,40 @@ test('uses fact-2 as the June analysis source until the June slot is uploaded', 
   assert.equal(cache.monthSummaries[0].month, '2026-06');
   assert.equal(cache.monthSummaries[0].sourceQty, 6);
   assert.equal(cache.monthSummaries[0].expandedQty, 6);
+});
+
+test('matches departments after numeric material-code normalization and a unique warehouse fallback', () => {
+  const headers = [...BASE_HEADERS, '(0天到30天)数量(库存)'];
+  const inventoryRow = rowFrom(headers, ['组织A', '00000011', '产品A', '仓库A', '可用', '', '', '', '个', 2, 2]);
+  const dimensionHeaders = ['库存组织', '仓库名称', '物料编码', 'SKU', '物料名称', '仓库名称&物料编码', '事业部'];
+  const dimensionRow = rowFrom(dimensionHeaders, ['', '仓库A', 11, '', '产品A', '仓库A11', '国内事业部']);
+  const cache = buildAgeAnalysisCache({
+    'inventory-age-2026-01': { id: 'inventory-age-2026-01', rows: [inventoryRow], rowCount: 1 },
+    'dim-warehouse-material': { id: 'dim-warehouse-material', rows: [dimensionRow], rowCount: 1 }
+  }, 'saved-at');
+
+  assert.equal(normalizeAgeAnalysisMaterialCode('00000011'), '11');
+  assert.equal(normalizeAgeAnalysisMaterialCode('1.1E+1'), '11');
+  assert.equal(cache.rows[0].materialCode, '11');
+  assert.equal(cache.rows[0].department, '国内事业部');
+  assert.equal(cache.diagnostics.missingDepartmentRows, 0);
+});
+
+test('does not use a warehouse-material fallback when departments conflict', () => {
+  const headers = [...BASE_HEADERS, '(0天到30天)数量(库存)'];
+  const inventoryRow = rowFrom(headers, ['组织A', '1001', '产品A', '仓库A', '可用', '', '', '', '个', 2, 2]);
+  const dimensionHeaders = ['库存组织', '仓库名称', '物料编码', 'SKU', '物料名称', '仓库名称&物料编码', '事业部'];
+  const dimensionRows = [
+    rowFrom(dimensionHeaders, ['', '仓库A', 1001, '', '产品A', '仓库A1001', '国内事业部']),
+    rowFrom(dimensionHeaders, ['', '仓库A', 1001, '', '产品A', '仓库A1001', '海外事业一部'])
+  ];
+  const cache = buildAgeAnalysisCache({
+    'inventory-age-2026-01': { id: 'inventory-age-2026-01', rows: [inventoryRow], rowCount: 1 },
+    'dim-warehouse-material': { id: 'dim-warehouse-material', rows: dimensionRows, rowCount: 2 }
+  }, 'saved-at');
+
+  assert.equal(cache.rows[0].department, '未匹配事业部');
+  assert.equal(cache.diagnostics.missingDepartmentRows, 1);
 });
 
 test('groups every unmatched age-analysis row for the error report without double counting age buckets', () => {

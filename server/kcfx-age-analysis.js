@@ -10,7 +10,7 @@ import {
   latestInventoryAgeSlotId
 } from '../shared/kcfxAgeMonths.js';
 
-export const KCFX_AGE_ANALYSIS_VERSION = 1;
+export const KCFX_AGE_ANALYSIS_VERSION = 2;
 
 export const AGE_ANALYSIS_FILTER_FIELDS = [
   'month',
@@ -62,12 +62,52 @@ function normalizeHeader(value) {
     .toLowerCase();
 }
 
+export function normalizeAgeAnalysisMaterialCode(value) {
+  const compact = normalizeText(value).normalize('NFKC').replace(/[\s,，]/g, '');
+  if (/^[+-]?\d+(?:\.0+)?$/.test(compact)) {
+    try {
+      return BigInt(compact.replace(/\.0+$/, '')).toString();
+    } catch {
+      return compact;
+    }
+  }
+  if (/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)[eE][+-]?\d+$/.test(compact)) {
+    const numeric = Number(compact);
+    if (Number.isSafeInteger(numeric)) return String(numeric);
+  }
+  return compact;
+}
+
 function normalizeMaterialCode(value) {
-  return normalizeText(value).replace(/\s+/g, '');
+  return normalizeAgeAnalysisMaterialCode(value);
 }
 
 function normalizeDepartmentKey(value) {
   return normalizeMaterialCode(value).replace(/&/g, '').toLowerCase();
+}
+
+function structuredDepartmentKey(organization, warehouse, materialCode) {
+  const material = normalizeMaterialCode(materialCode);
+  if (!material) return '';
+  return [organization, warehouse]
+    .map((value) => normalizeDepartmentKey(value))
+    .concat(material.toLowerCase())
+    .join('\u001f');
+}
+
+function addDepartmentCandidate(map, key, department) {
+  if (!key || !department) return;
+  const departments = map.get(key) || new Set();
+  departments.add(department);
+  map.set(key, departments);
+}
+
+function uniqueDepartmentMap(candidates) {
+  return new Map(
+    [...candidates.entries()]
+      .filter(([, departments]) => departments.size === 1)
+      .map(([key, departments]) => [key, departments.values().next().value])
+  );
 }
 
 function rowEntries(row) {
@@ -136,13 +176,37 @@ function buildMaps(records) {
     });
   }
 
-  const departments = new Map();
+  const departmentCandidates = new Map();
+  const warehouseMaterialCandidates = new Map();
+  const legacyDepartmentCandidates = new Map();
   for (const row of records['dim-warehouse-material']?.rows || []) {
-    const key = normalizeDepartmentKey(firstValue(row, ['F列', '匹配键', '三元组合', '三元联合键']) || nthValue(row, 6));
+    const organization = normalizeText(firstValue(row, ['库存组织', '使用组织', '组织']) || nthValue(row, 1));
+    const warehouse = normalizeText(firstValue(row, ['仓库名称', '仓库', '金蝶仓库']) || nthValue(row, 2));
+    const materialCode = normalizeMaterialCode(firstValue(row, ['物料编码', '商品编码', '货品编码']) || nthValue(row, 3));
     const department = normalizeText(firstValue(row, ['事业部', '部门', '仓库事业部']) || nthValue(row, 7));
-    if (key && department && !departments.has(key)) departments.set(key, department);
+    addDepartmentCandidate(
+      departmentCandidates,
+      structuredDepartmentKey(organization, warehouse, materialCode),
+      department
+    );
+    addDepartmentCandidate(
+      warehouseMaterialCandidates,
+      structuredDepartmentKey('', warehouse, materialCode),
+      department
+    );
+    addDepartmentCandidate(
+      legacyDepartmentCandidates,
+      normalizeDepartmentKey(firstValue(row, ['F列', '匹配键', '三元组合', '三元联合键']) || nthValue(row, 6)),
+      department
+    );
   }
-  return { products, warehouses, departments };
+  return {
+    products,
+    warehouses,
+    departments: uniqueDepartmentMap(departmentCandidates),
+    warehouseMaterialDepartments: uniqueDepartmentMap(warehouseMaterialCandidates),
+    legacyDepartments: uniqueDepartmentMap(legacyDepartmentCandidates)
+  };
 }
 
 function inventoryIdentity(row) {
@@ -357,8 +421,13 @@ export function buildAgeAnalysisCache(records = {}, savedAt = '') {
       if (!identity.materialCode || !identity.warehouse) continue;
       const product = maps.products.get(identity.materialCode) || {};
       const warehouse = maps.warehouses.get(identity.warehouse) || {};
-      const departmentKey = normalizeDepartmentKey(`${identity.organization}${identity.warehouse}${identity.materialCode}`);
-      const department = maps.departments.get(departmentKey) || '未匹配事业部';
+      const departmentKey = structuredDepartmentKey(identity.organization, identity.warehouse, identity.materialCode);
+      const warehouseMaterialKey = structuredDepartmentKey('', identity.warehouse, identity.materialCode);
+      const legacyDepartmentKey = normalizeDepartmentKey(`${identity.organization}${identity.warehouse}${identity.materialCode}`);
+      const department = maps.departments.get(departmentKey)
+        || maps.warehouseMaterialDepartments.get(warehouseMaterialKey)
+        || maps.legacyDepartments.get(legacyDepartmentKey)
+        || '未匹配事业部';
       const settlementPrice = Number(product.settlementPrice) || 0;
       const totalQty = toNumber(firstValue(sourceRow, ['数量(库存)', '数量（库存）', '合计库存数量', '合计数量', '合计']));
       sourceQty += totalQty;
