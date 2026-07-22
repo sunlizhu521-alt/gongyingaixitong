@@ -12,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_SUMMARY_VERSION = 7;
+export const KCFX_INVENTORY_SUMMARY_VERSION = 8;
 
 const INVENTORY_VIEW_FIELDS = {
   summary: ['department', 'productLine'],
@@ -236,6 +236,7 @@ function buildSalesDetails(records, productMap) {
         materialCode,
         sku,
         kingdeeName,
+        settlementPrice: Number(product.settlementPrice) || 0,
         qty: Number(row.qty) || 0,
         amount: Number(row.amount) || 0,
         productMissingFields: productMissingFields(product),
@@ -259,6 +260,7 @@ const INVENTORY_ERROR_KEY_FIELDS = [
   'materialCode',
   'sku',
   'kingdeeName',
+  'settlementPrice',
   'inventoryLocation',
   'reason'
 ];
@@ -272,6 +274,7 @@ const SALES_ERROR_KEY_FIELDS = [
   'materialCode',
   'sku',
   'kingdeeName',
+  'settlementPrice',
   'reason'
 ];
 
@@ -305,7 +308,12 @@ function buildInventorySummaryErrors(inventory, undelivered, salesDetails) {
       ),
       departmentMissing: inventoryIssueRows(inventoryRows, (row) => row.departmentMissing, '事业部未匹配'),
       warehouseMissing: inventoryIssueRows(inventoryRows, (row) => row.warehouseMissing, '库存所在地未匹配'),
-      supplierMissing: inventoryIssueRows(inventoryRows, (row) => row.supplierMissing, '供应商缺失')
+      supplierMissing: inventoryIssueRows(inventoryRows, (row) => row.supplierMissing, '供应商缺失'),
+      settlementMissing: inventoryIssueRows(
+        inventoryRows,
+        (row) => Number(row.qty) !== 0 && !(Number(row.settlementPrice) > 0),
+        '内部结算价为空或为0'
+      )
     },
     sales: {
       rowCount: salesDetails.length,
@@ -315,7 +323,12 @@ function buildInventorySummaryErrors(inventory, undelivered, salesDetails) {
         (row) => `${row.productMissingFields.join('、')}缺失`
       ),
       departmentMissing: salesIssueRows(salesDetails, (row) => row.departmentMissing, '事业部未匹配'),
-      channelMissing: salesIssueRows(salesDetails, (row) => row.channelMissing, '店铺简称未匹配')
+      channelMissing: salesIssueRows(salesDetails, (row) => row.channelMissing, '店铺简称未匹配'),
+      settlementMissing: salesIssueRows(
+        salesDetails,
+        (row) => Number(row.qty) !== 0 && !(Number(row.settlementPrice) > 0),
+        '内部结算价为空或为0'
+      )
     }
   };
 }

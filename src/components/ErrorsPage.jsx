@@ -43,6 +43,33 @@ const SALES_SUMMARY_ERROR_COLUMNS = [
   ['reason', '报错原因']
 ];
 
+const INVENTORY_SUMMARY_SETTLEMENT_ERROR_COLUMNS = [
+  ['sourceType', '报表分段'],
+  ['department', '事业部'],
+  ['productLine', '产品线'],
+  ['materialCode', '物料编码'],
+  ['sku', 'SKU'],
+  ['kingdeeName', '金蝶名称'],
+  ['settlementPrice', '内部结算价'],
+  ['qty', '数量'],
+  ['reason', '报错原因']
+];
+
+const SALES_SUMMARY_SETTLEMENT_ERROR_COLUMNS = [
+  ['salesMonth', '月份'],
+  ['customer', '客户名称'],
+  ['department', '事业部'],
+  ['channel', '渠道'],
+  ['productLine', '产品线'],
+  ['materialCode', '物料编码'],
+  ['sku', 'SKU'],
+  ['kingdeeName', '金蝶名称'],
+  ['settlementPrice', '内部结算价'],
+  ['qty', '销售数量'],
+  ['amount', '销售金额'],
+  ['reason', '报错原因']
+];
+
 const ERROR_DOWNLOAD_CONFIG = {
   productMissing: {
     sources: ['closed', 'detail', 'sales'],
@@ -153,6 +180,11 @@ const ERROR_DOWNLOAD_CONFIG = {
     name: '库存汇总供应商缺失表',
     columns: INVENTORY_SUMMARY_ERROR_COLUMNS
   },
+  inventorySummarySettlementMissing: {
+    sources: ['inventorySummary'],
+    name: '库存汇总内部结算价缺失表',
+    columns: INVENTORY_SUMMARY_SETTLEMENT_ERROR_COLUMNS
+  },
   salesSummaryProductMissing: {
     sources: ['salesSummary'],
     name: '销售汇总商品维度信息缺失表',
@@ -167,6 +199,11 @@ const ERROR_DOWNLOAD_CONFIG = {
     sources: ['salesSummary'],
     name: '销售汇总店铺简称匹配缺失表',
     columns: SALES_SUMMARY_ERROR_COLUMNS
+  },
+  salesSummarySettlementMissing: {
+    sources: ['salesSummary'],
+    name: '销售汇总内部结算价缺失表',
+    columns: SALES_SUMMARY_SETTLEMENT_ERROR_COLUMNS
   }
 };
 
@@ -204,12 +241,14 @@ const ERROR_TYPE_OPTIONS = {
     { value: 'inventorySummaryProductMissing', label: '商品维度信息缺失' },
     { value: 'inventorySummaryDepartmentMissing', label: '事业部匹配缺失' },
     { value: 'inventorySummaryWarehouseMissing', label: '库存所在地匹配缺失' },
-    { value: 'inventorySummarySupplierMissing', label: '供应商缺失' }
+    { value: 'inventorySummarySupplierMissing', label: '供应商缺失' },
+    { value: 'inventorySummarySettlementMissing', label: '内部结算价缺失' }
   ],
   salesSummary: [
     { value: 'salesSummaryProductMissing', label: '商品维度信息缺失' },
     { value: 'salesSummaryDepartmentMissing', label: '事业部匹配缺失' },
-    { value: 'salesSummaryChannelMissing', label: '店铺简称匹配缺失' }
+    { value: 'salesSummaryChannelMissing', label: '店铺简称匹配缺失' },
+    { value: 'salesSummarySettlementMissing', label: '内部结算价缺失' }
   ]
 };
 
@@ -694,13 +733,13 @@ function SummaryReportCheckGroup({ source, title, result, activeIssue, onDownloa
     ? [
         '来源：库存汇总报表使用的在库、在途和采购订单未交付记录。',
         '检查：沿用库存汇总报表的物料编码、仓库、库存组织和采购订单字段映射结果。',
-        '缺失提示：报表中显示为未匹配产品线、SKU、金蝶名称、事业部、库存所在地或供应商的记录。',
+        '缺失提示：报表中显示为未匹配产品线、SKU、金蝶名称、事业部、库存所在地、供应商，或内部结算价为空或为0的记录。',
         '需要维护：对应的商品分类维表、仓库维表、仓库物料事业部对照表或采购订单文件。'
       ]
     : [
         '来源：销售汇总报表使用的有效销售记录。',
         '检查：沿用销售汇总报表按客户名称 + 物料编码匹配事业部、按客户名称匹配店铺简称、按物料编码匹配商品维度的结果。',
-        '缺失提示：报表中显示为未匹配事业部、渠道、产品线、SKU或金蝶名称的记录。',
+        '缺失提示：报表中显示为未匹配事业部、渠道、产品线、SKU、金蝶名称，或内部结算价为空或为0的记录。',
         '需要维护：客户与物料对照表、店铺名称汇总维表或商品分类维表。'
       ];
 
@@ -718,7 +757,7 @@ function SummaryReportCheckGroup({ source, title, result, activeIssue, onDownloa
       </section>
       {selectedOption && downloadConfig && <ErrorTable
         title={selectedOption.label}
-        columns={downloadConfig.columns.map(([key, label]) => [key, label, ['qty', 'amount'].includes(key) ? 'num' : ''])}
+        columns={downloadConfig.columns.map(([key, label]) => [key, label, ['qty', 'amount', 'settlementPrice'].includes(key) ? 'num' : ''])}
         rows={result[activeIssue] || []}
         diagnostic={diagnostics}
         onDownload={() => onDownload(source, activeIssue)}
@@ -817,7 +856,8 @@ function emptySummaryErrorResult(message = '') {
     inventorySummaryProductMissing: [],
     inventorySummaryDepartmentMissing: [],
     inventorySummaryWarehouseMissing: [],
-    inventorySummarySupplierMissing: []
+    inventorySummarySupplierMissing: [],
+    inventorySummarySettlementMissing: []
   };
 }
 
@@ -857,7 +897,8 @@ function emptySalesSummaryErrorResult(message = '') {
     rowCount: 0,
     salesSummaryProductMissing: [],
     salesSummaryDepartmentMissing: [],
-    salesSummaryChannelMissing: []
+    salesSummaryChannelMissing: [],
+    salesSummarySettlementMissing: []
   };
 }
 
@@ -870,7 +911,8 @@ function buildSummaryReportChecks(payload, type) {
       inventorySummaryProductMissing: Array.isArray(payload.productMissing) ? payload.productMissing : [],
       inventorySummaryDepartmentMissing: Array.isArray(payload.departmentMissing) ? payload.departmentMissing : [],
       inventorySummaryWarehouseMissing: Array.isArray(payload.warehouseMissing) ? payload.warehouseMissing : [],
-      inventorySummarySupplierMissing: Array.isArray(payload.supplierMissing) ? payload.supplierMissing : []
+      inventorySummarySupplierMissing: Array.isArray(payload.supplierMissing) ? payload.supplierMissing : [],
+      inventorySummarySettlementMissing: Array.isArray(payload.settlementMissing) ? payload.settlementMissing : []
     };
   }
   return {
@@ -878,7 +920,8 @@ function buildSummaryReportChecks(payload, type) {
     rowCount: Number(payload.rowCount) || 0,
     salesSummaryProductMissing: Array.isArray(payload.productMissing) ? payload.productMissing : [],
     salesSummaryDepartmentMissing: Array.isArray(payload.departmentMissing) ? payload.departmentMissing : [],
-    salesSummaryChannelMissing: Array.isArray(payload.channelMissing) ? payload.channelMissing : []
+    salesSummaryChannelMissing: Array.isArray(payload.channelMissing) ? payload.channelMissing : [],
+    salesSummarySettlementMissing: Array.isArray(payload.settlementMissing) ? payload.settlementMissing : []
   };
 }
 
