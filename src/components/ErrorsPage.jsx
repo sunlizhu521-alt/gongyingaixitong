@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API } from '../constants.js';
-import { useKcfxRecordMap } from './kcfxRecordLoader.js';
 import { isStoreMappingRecordValid, STORE_MAPPING_CUSTOMER_HEADERS } from '../../shared/kcfxStoreMapping.js';
 import { TablePagination, useTablePagination } from './TablePagination.jsx';
 import { downloadErrorWorkbook } from './errorReportExport.js';
@@ -238,15 +237,13 @@ export default function ErrorsPage({
   const [ageSummary, setAgeSummary] = useState(null);
   const [ageLoading, setAgeLoading] = useState(false);
   const [ageError, setAgeError] = useState('');
-  const [summaryReportErrors, setSummaryReportErrors] = useState(null);
-  const [summaryReportLoading, setSummaryReportLoading] = useState(false);
-  const [summaryReportError, setSummaryReportError] = useState('');
+  const [errorsSummary, setErrorsSummary] = useState(null);
+  const [errorsSummaryLoading, setErrorsSummaryLoading] = useState(false);
+  const [errorsSummaryError, setErrorsSummaryError] = useState('');
   const [selectedSource, setSelectedSource] = useState('closed');
   const [selectedErrorType, setSelectedErrorType] = useState('productMissing');
-  const { records: loadedRecords, loading: recordsLoading, error: recordsError, reload } = useKcfxRecordMap(kcfxData, ERROR_RECORD_IDS);
-  const records = useMemo(() => ({ ...kcfxRecords, ...loadedRecords }), [kcfxRecords, loadedRecords]);
-  const pageLoading = loading || recordsLoading || trendLoading || ageLoading || summaryReportLoading;
-  const pageError = recordsError || trendError || ageError || summaryReportError || error;
+  const pageLoading = loading || trendLoading || ageLoading || errorsSummaryLoading;
+  const pageError = trendError || ageError || errorsSummaryError || error;
 
   const loadTrendSummary = useCallback(async () => {
     setTrendLoading(true);
@@ -279,22 +276,22 @@ export default function ErrorsPage({
     }
   }, [user]);
 
-  const loadSummaryReportErrors = useCallback(async () => {
-    setSummaryReportLoading(true);
-    setSummaryReportError('');
+  const loadErrorsSummary = useCallback(async ({ force = false } = {}) => {
+    setErrorsSummaryLoading(true);
+    setErrorsSummaryError('');
     try {
-      const response = await fetch(`${API}/api/kcfx-library/inventory-summary/errors`, {
+      const response = await fetch(`${API}/api/kcfx-library/errors-summary${force ? '?refresh=1' : ''}`, {
         cache: 'no-store',
         headers: userHeaders(user)
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const result = await response.json();
-      if (!result?.ok) throw new Error(result?.error || result?.message || '汇总报表检查失败');
-      setSummaryReportErrors(result);
+      if (!result?.ok) throw new Error(result?.error || result?.message || '报错信息检查失败');
+      setErrorsSummary(result);
     } catch (loadError) {
-      setSummaryReportError(loadError?.message || String(loadError));
+      setErrorsSummaryError(loadError?.message || String(loadError));
     } finally {
-      setSummaryReportLoading(false);
+      setErrorsSummaryLoading(false);
     }
   }, [user]);
 
@@ -307,8 +304,8 @@ export default function ErrorsPage({
   }, [loadAgeSummary, kcfxData?.savedAt]);
 
   useEffect(() => {
-    loadSummaryReportErrors();
-  }, [loadSummaryReportErrors, kcfxData?.savedAt]);
+    loadErrorsSummary();
+  }, [loadErrorsSummary, kcfxData?.savedAt]);
 
   useEffect(() => {
     if (!trendSummary?.refreshing) return undefined;
@@ -317,27 +314,24 @@ export default function ErrorsPage({
   }, [loadTrendSummary, trendSummary?.refreshing]);
 
   const checks = useMemo(() => {
-    if (!records || Object.keys(records).length === 0) return EMPTY_TABLES;
-    const maps = buildDimensionMaps(records);
     return {
-      closed: buildClosedInventoryChecks(records, maps),
-      detail: buildInventoryMonthChecks(records, maps),
-      sales: buildSalesDataChecks(records, maps),
+      closed: normalizeServerErrorResult(errorsSummary?.closed),
+      detail: normalizeServerErrorResult(errorsSummary?.detail),
+      sales: normalizeServerSalesErrorResult(errorsSummary?.sales),
       trend: buildTrendChecks(trendSummary),
       age: buildAgeAnalysisChecks(ageSummary),
-      inventorySummary: buildSummaryReportChecks(summaryReportErrors?.inventory, 'inventory'),
-      salesSummary: buildSummaryReportChecks(summaryReportErrors?.sales, 'sales')
+      inventorySummary: buildSummaryReportChecks(errorsSummary?.inventorySummary, 'inventory'),
+      salesSummary: buildSummaryReportChecks(errorsSummary?.salesSummary, 'sales')
     };
-  }, [ageSummary, records, summaryReportErrors, trendSummary]);
+  }, [ageSummary, errorsSummary, trendSummary]);
 
   const statusText = useMemo(() => {
     if (pageLoading) return '数据加载中...';
     if (pageError) return `读取失败：${pageError}`;
-    if (!records || Object.keys(records).length === 0) return '未读取到服务器文件库记录';
     const messages = [
-      checks.closed.message || `关账库存事实表：有库存物料 ${formatNumber(checks.closed.stockMaterials.length)} 个，缺失 ${formatNumber(totalMissingCount(checks.closed))} 项`,
-      checks.detail.message || `库存分析月份表：有库存物料 ${formatNumber(checks.detail.stockMaterials.length)} 个，缺失 ${formatNumber(totalMissingCount(checks.detail))} 项`,
-      checks.sales.message || `销售数据文件：销售物料 ${formatNumber(checks.sales.stockMaterials.length)} 个，缺失 ${formatNumber(totalMissingCount(checks.sales))} 项`,
+      checks.closed.message || `关账库存事实表：有库存物料 ${formatNumber(stockMaterialCount(checks.closed))} 个，缺失 ${formatNumber(totalMissingCount(checks.closed))} 项`,
+      checks.detail.message || `库存分析月份表：有库存物料 ${formatNumber(stockMaterialCount(checks.detail))} 个，缺失 ${formatNumber(totalMissingCount(checks.detail))} 项`,
+      checks.sales.message || `销售数据文件：销售物料 ${formatNumber(stockMaterialCount(checks.sales))} 个，缺失 ${formatNumber(totalMissingCount(checks.sales))} 项`,
       `库存趋势事实表：事业部对照缺失 ${formatNumber(checks.trend.trendDivisionMissing.length)} 项`,
       checks.age.message || `库龄维度分析：事业部对照缺失 ${formatNumber(checks.age.ageDivisionMissing.length)} 项`,
       `库存汇总报表：缺失 ${formatNumber(summaryReportMissingCount(checks.inventorySummary))} 项`,
@@ -345,9 +339,10 @@ export default function ErrorsPage({
     ];
     const loadedText = lastLoadedAt ? `；读取时间：${lastLoadedAt}` : '';
     return `检查完成：${messages.join('；')}${loadedText}`;
-  }, [checks, pageError, records, lastLoadedAt, pageLoading]);
+  }, [checks, pageError, lastLoadedAt, pageLoading]);
   const refresh = async () => {
-    await Promise.all([reload(), onRefresh?.(), loadTrendSummary(), loadAgeSummary(), loadSummaryReportErrors()]);
+    await onRefresh?.();
+    await Promise.all([loadErrorsSummary({ force: true }), loadTrendSummary(), loadAgeSummary()]);
   };
   const errorTypeOptions = ERROR_TYPE_OPTIONS[selectedSource] || [];
   const selectedRows = checks[selectedSource]?.[selectedErrorType] || [];
@@ -485,8 +480,6 @@ export default function ErrorsPage({
   );
 }
 
-const ERROR_RECORD_IDS = ['fact-inventory', 'fact-2', 'sales-data', 'dim-product', 'dim-warehouse', 'dim-warehouse-material', 'dim-store-name', 'dim-customer-material'];
-
 function CheckGroup({ source, title, description, result, activeIssue, onDownload }) {
   return (
     <section className="error-source-panel">
@@ -496,7 +489,7 @@ function CheckGroup({ source, title, description, result, activeIssue, onDownloa
       </section>
 
       <section className="metric-grid error-metrics">
-        <MetricCard label="有库存物料数" value={result.stockMaterials.length} />
+        <MetricCard label="有库存物料数" value={stockMaterialCount(result)} />
         <MetricCard label="商品分类缺失" value={result.productMissing.length} />
         <MetricCard label="事业部对照缺失" value={result.divisionMissing.length} />
         <MetricCard label="仓库对照缺失" value={result.warehouseMissing.length} />
@@ -584,8 +577,8 @@ function SalesCheckGroup({ result, activeIssue, onDownload }) {
       </section>
 
       <section className="metric-grid error-metrics sales-error-metrics">
-        <MetricCard label="销售记录数" value={result.salesRows.length} />
-        <MetricCard label="销售物料数" value={result.stockMaterials.length} />
+        <MetricCard label="销售记录数" value={salesRowCount(result)} />
+        <MetricCard label="销售物料数" value={stockMaterialCount(result)} />
         <MetricCard label="商品分类缺失" value={result.productMissing.length} />
         <MetricCard label="客户物料缺失" value={result.customerMaterialMissing.length} />
         <MetricCard label="店铺名称缺失" value={result.storeMissing.length} />
@@ -790,6 +783,7 @@ function ErrorTable({ title, rows, columns, diagnostic, onDownload }) {
 function emptyErrorResult(message = '') {
   return {
     message,
+    stockMaterialCount: 0,
     stockMaterials: [],
     productMissing: [],
     divisionMissing: [],
@@ -801,6 +795,7 @@ function emptyErrorResult(message = '') {
 function emptySalesErrorResult(message = '') {
   return {
     ...emptyErrorResult(message),
+    salesRowCount: 0,
     salesRows: [],
     customerMaterialMissing: [],
     storeMissing: []
@@ -824,6 +819,36 @@ function emptySummaryErrorResult(message = '') {
     inventorySummaryWarehouseMissing: [],
     inventorySummarySupplierMissing: []
   };
+}
+
+function normalizeServerErrorResult(payload) {
+  return {
+    ...emptyErrorResult(payload?.message || ''),
+    ...(payload || {}),
+    stockMaterialCount: Number(payload?.stockMaterialCount) || payload?.stockMaterials?.length || 0,
+    productMissing: Array.isArray(payload?.productMissing) ? payload.productMissing : [],
+    divisionMissing: Array.isArray(payload?.divisionMissing) ? payload.divisionMissing : [],
+    warehouseMissing: Array.isArray(payload?.warehouseMissing) ? payload.warehouseMissing : [],
+    settlementMissing: Array.isArray(payload?.settlementMissing) ? payload.settlementMissing : []
+  };
+}
+
+function normalizeServerSalesErrorResult(payload) {
+  return {
+    ...normalizeServerErrorResult(payload),
+    salesRowCount: Number(payload?.salesRowCount) || payload?.salesRows?.length || 0,
+    salesRows: [],
+    customerMaterialMissing: Array.isArray(payload?.customerMaterialMissing) ? payload.customerMaterialMissing : [],
+    storeMissing: Array.isArray(payload?.storeMissing) ? payload.storeMissing : []
+  };
+}
+
+function stockMaterialCount(result) {
+  return Number(result?.stockMaterialCount) || result?.stockMaterials?.length || 0;
+}
+
+function salesRowCount(result) {
+  return Number(result?.salesRowCount) || result?.salesRows?.length || 0;
 }
 
 function emptySalesSummaryErrorResult(message = '') {

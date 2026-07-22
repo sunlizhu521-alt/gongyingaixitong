@@ -6,6 +6,11 @@ import {
   exportInventorySummaryRows,
   queryInventorySummary
 } from '../kcfx-inventory-summary.js';
+import {
+  buildKcfxErrorsSummary,
+  KCFX_ERRORS_RECORD_IDS,
+  kcfxErrorsSummaryCacheKey
+} from '../kcfx-errors-summary.js';
 
 const crypto = { randomUUID };
 const SALES_ROW_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
@@ -21,6 +26,8 @@ const INVENTORY_SUMMARY_RECORD_IDS = [
   'dim-customer-material'
 ];
 let inventorySummaryPayloadCache = { key: '', payload: null };
+let errorsSummaryPayloadCache = { key: '', payload: null };
+let errorsSummaryPayloadPromise = { key: '', promise: null };
 
 const KCFX_FEEDBACK_TYPES = {
   receipt: {
@@ -183,6 +190,49 @@ async function getInventorySummaryCache(database, { force = false } = {}) {
   const payload = buildInventorySummaryCache(records, database.kcfxLibrary?.savedAt || '');
   inventorySummaryPayloadCache = { key, payload };
   return payload;
+}
+
+async function getErrorsSummaryCache(database, { force = false } = {}) {
+  const key = kcfxErrorsSummaryCacheKey(database);
+  if (!force && errorsSummaryPayloadCache.key === key && errorsSummaryPayloadCache.payload) {
+    return errorsSummaryPayloadCache.payload;
+  }
+  if (!force && errorsSummaryPayloadPromise.key === key && errorsSummaryPayloadPromise.promise) {
+    return errorsSummaryPayloadPromise.promise;
+  }
+
+  const promise = (async () => {
+    const records = {};
+    for (const id of KCFX_ERRORS_RECORD_IDS) {
+      const source = database.kcfxLibrary.records[id] || await recoverKcfxRecordFromRowsFile(id);
+      if (!source) {
+        records[id] = { id, rows: [] };
+        continue;
+      }
+      const record = await ensureKcfxRecordRows(database, id, source);
+      records[id] = await attachKcfxRecordRows(record);
+    }
+
+    const savedAt = database.kcfxLibrary?.savedAt || '';
+    const payload = buildKcfxErrorsSummary(records, savedAt);
+    const summaryCache = buildInventorySummaryCache(records, savedAt);
+    const result = {
+      ...payload,
+      inventorySummary: summaryCache.errors?.inventory || {},
+      salesSummary: summaryCache.errors?.sales || {}
+    };
+    errorsSummaryPayloadCache = { key, payload: result };
+    return result;
+  })();
+
+  errorsSummaryPayloadPromise = { key, promise };
+  try {
+    return await promise;
+  } finally {
+    if (errorsSummaryPayloadPromise.promise === promise) {
+      errorsSummaryPayloadPromise = { key: '', promise: null };
+    }
+  }
 }
 
 app.get('/api/kcfx-feedback/:type', async (req, res) => {
@@ -446,6 +496,23 @@ app.get('/api/kcfx-library/inventory-summary/errors', async (req, res) => {
       ok: false,
       status: 'failed',
       source: 'server-inventory-summary',
+      error: error?.message || String(error)
+    });
+  }
+});
+
+app.get('/api/kcfx-library/errors-summary', async (req, res) => {
+  try {
+    const database = await initDb(dataDir);
+    const requestUser = requirePermission(database, req, res, 'maintenanceLibrary.errors');
+    if (!requestUser) return;
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await getErrorsSummaryCache(database, { force: req.query.refresh === '1' }));
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      status: 'failed',
+      source: 'server-errors-summary',
       error: error?.message || String(error)
     });
   }
