@@ -56,6 +56,12 @@ function normalizedColumns(rows, columns) {
 
 function styleWorksheet(worksheet) {
   worksheet.views = [{ state: 'frozen', ySplit: 1, topLeftCell: 'A2', activeCell: 'A2' }];
+  if (worksheet.columnCount > 0) {
+    worksheet.autoFilter = {
+      from: 'A1',
+      to: worksheet.getCell(1, worksheet.columnCount).address
+    };
+  }
 
   worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
     row.eachCell({ includeEmpty: false }, (cell) => {
