@@ -584,9 +584,13 @@ h3 {
 }
 
 .table-pagination-pages .compact-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 30px;
   min-width: 30px;
   padding-inline: 0;
+  text-align: center;
 }
 
 .table-pagination-pages .compact-button.active {

@@ -12,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_SUMMARY_VERSION = 3;
+export const KCFX_INVENTORY_SUMMARY_VERSION = 4;
 
 const INVENTORY_VIEW_FIELDS = {
   summary: ['department', 'productLine'],
@@ -60,6 +60,14 @@ function splitPurchaseDepartment(value) {
 
 function normalizeDimension(value, fallback) {
   return normalizeText(value) || fallback;
+}
+
+function productMissingFields(product = {}) {
+  return [
+    !normalizeText(product.productLine) ? '产品线' : '',
+    !normalizeText(product.sku) ? 'SKU' : '',
+    !normalizeText(product.materialName) ? '金蝶名称' : ''
+  ].filter(Boolean);
 }
 
 function inventoryQuantity(row) {
@@ -123,16 +131,26 @@ function buildInventoryRows(records, productMap) {
     const product = productMap.get(materialCode) || {};
     const warehouseInfo = warehouseMap.get(warehouse) || {};
     const departmentKey = normalizeDepartmentKey(`${organization}${warehouse}${materialCode}`);
+    const department = normalizeText(departmentMap.get(departmentKey));
+    const inventoryLocation = normalizeText(warehouseInfo.location);
     const row = {
-      department: normalizeDimension(departmentMap.get(departmentKey), '未匹配事业部'),
+      sourceType: inventoryLocation === '海上在途' ? '在途数量' : '在库数量',
+      organization,
+      warehouse,
+      supplier: '',
+      department: normalizeDimension(department, '未匹配事业部'),
       productLine: normalizeDimension(product.productLine, '未匹配产品线'),
       materialCode,
       sku: normalizeDimension(product.sku, '未匹配SKU'),
       kingdeeName: normalizeDimension(product.materialName, '未匹配金蝶名称'),
-      inventoryLocation: normalizeDimension(warehouseInfo.location, '未匹配库存所在地'),
+      inventoryLocation: normalizeDimension(inventoryLocation, '未匹配库存所在地'),
+      productMissingFields: productMissingFields(product),
+      departmentMissing: !department,
+      warehouseMissing: !inventoryLocation,
+      supplierMissing: false,
       qty
     };
-    if (normalizeText(warehouseInfo.location) === '海上在途') inTransit.push(row);
+    if (inventoryLocation === '海上在途') inTransit.push(row);
     else onHand.push(row);
   }
   return { onHand, inTransit };
@@ -147,13 +165,23 @@ function buildUndeliveredRows(records, productMap) {
     const qty = numberByHeader(sourceRow, ['剩余入库数量']);
     if (!(qty > 0)) continue;
     const product = productMap.get(materialCode) || {};
+    const supplier = normalizeText(valueByHeader(sourceRow, ['供应商', '供应商名称']));
+    const departmentSource = normalizeText(valueByHeader(sourceRow, ['事业部']));
     rows.push({
-      supplier: normalizeDimension(valueByHeader(sourceRow, ['供应商', '供应商名称']), '未匹配供应商'),
-      department: splitPurchaseDepartment(valueByHeader(sourceRow, ['事业部'])),
+      sourceType: '未交付总数量',
+      organization: '',
+      warehouse: '',
+      supplier: normalizeDimension(supplier, '未匹配供应商'),
+      department: splitPurchaseDepartment(departmentSource),
       productLine: normalizeDimension(product.productLine, '未匹配产品线'),
       materialCode,
       sku: normalizeDimension(product.sku, '未匹配SKU'),
       kingdeeName: normalizeDimension(product.materialName, '未匹配金蝶名称'),
+      inventoryLocation: '',
+      productMissingFields: productMissingFields(product),
+      departmentMissing: splitPurchaseDepartment(departmentSource) === '未匹配事业部',
+      warehouseMissing: false,
+      supplierMissing: !supplier,
       qty
     });
   }
@@ -190,24 +218,101 @@ function buildSalesDetails(records, productMap) {
       const product = productMap.get(materialCode) || {};
       const sku = normalizeDimension(product.sku, '未匹配SKU');
       const kingdeeName = normalizeDimension(product.materialName, '未匹配金蝶名称');
+      const department = normalizeText(row.salesOrg);
+      const channel = normalizeText(row.storeShortName);
       return {
         salesMonth: row.salesMonth,
         salesYear: row.salesYear,
         salesMonthNumber: row.salesMonthNumber,
-        department: normalizeDimension(row.salesOrg, '未匹配事业部'),
-        channel: normalizeDimension(row.storeShortName, '未匹配渠道'),
+        customer: normalizeText(row.customer),
+        department: normalizeDimension(department, '未匹配事业部'),
+        channel: normalizeDimension(channel, '未匹配渠道'),
         productLine: normalizeDimension(row.productLine, '未匹配产品线'),
         materialCode,
         sku,
         kingdeeName,
         qty: Number(row.qty) || 0,
         amount: Number(row.amount) || 0,
+        productMissingFields: productMissingFields(product),
+        departmentMissing: !department,
+        channelMissing: !channel,
         searchText: [materialCode, sku, kingdeeName, row.customer, row.storeShortName, row.salesOrg, row.productLine]
           .map(normalizeText)
           .join('\u0001')
           .toLowerCase()
       };
     });
+}
+
+const INVENTORY_ERROR_KEY_FIELDS = [
+  'sourceType',
+  'organization',
+  'warehouse',
+  'supplier',
+  'department',
+  'productLine',
+  'materialCode',
+  'sku',
+  'kingdeeName',
+  'inventoryLocation',
+  'reason'
+];
+
+const SALES_ERROR_KEY_FIELDS = [
+  'salesMonth',
+  'customer',
+  'department',
+  'channel',
+  'productLine',
+  'materialCode',
+  'sku',
+  'kingdeeName',
+  'reason'
+];
+
+function inventoryIssueRows(rows, predicate, reason) {
+  return groupRows(rows.filter(predicate).map((row) => ({
+    ...row,
+    reason: typeof reason === 'function' ? reason(row) : reason
+  })), INVENTORY_ERROR_KEY_FIELDS, ['qty']).sort(compareInventoryRows);
+}
+
+function salesIssueRows(rows, predicate, reason) {
+  return groupRows(rows.filter(predicate).map((row) => ({
+    ...row,
+    reason: typeof reason === 'function' ? reason(row) : reason
+  })), SALES_ERROR_KEY_FIELDS, ['qty', 'amount']).sort((a, b) => (
+    String(a.salesMonth || '').localeCompare(String(b.salesMonth || ''))
+    || String(a.customer || '').localeCompare(String(b.customer || ''), 'zh-CN')
+    || String(a.materialCode || '').localeCompare(String(b.materialCode || ''), 'zh-CN')
+  ));
+}
+
+function buildInventorySummaryErrors(inventory, undelivered, salesDetails) {
+  const inventoryRows = [...inventory.onHand, ...inventory.inTransit, ...undelivered];
+  return {
+    inventory: {
+      rowCount: inventoryRows.length,
+      productMissing: inventoryIssueRows(
+        inventoryRows,
+        (row) => row.productMissingFields.length > 0,
+        (row) => `${row.productMissingFields.join('、')}缺失`
+      ),
+      departmentMissing: inventoryIssueRows(inventoryRows, (row) => row.departmentMissing, '事业部未匹配'),
+      warehouseMissing: inventoryIssueRows(inventoryRows, (row) => row.warehouseMissing, '库存所在地未匹配'),
+      supplierMissing: inventoryIssueRows(inventoryRows, (row) => row.supplierMissing, '供应商缺失')
+    },
+    sales: {
+      rowCount: salesDetails.length,
+      productMissing: salesIssueRows(
+        salesDetails,
+        (row) => row.productMissingFields.length > 0,
+        (row) => `${row.productMissingFields.join('、')}缺失`
+      ),
+      departmentMissing: salesIssueRows(salesDetails, (row) => row.departmentMissing, '事业部未匹配'),
+      channelMissing: salesIssueRows(salesDetails, (row) => row.channelMissing, '店铺简称未匹配')
+    }
+  };
 }
 
 export function buildInventorySummaryCache(records = {}, savedAt = '') {
@@ -218,6 +323,7 @@ export function buildInventorySummaryCache(records = {}, savedAt = '') {
   inventory.onHand.forEach((row) => addInventoryMetric(summaryMap, row, 'onHandQty'));
   inventory.inTransit.forEach((row) => addInventoryMetric(summaryMap, row, 'inTransitQty'));
   undelivered.forEach((row) => addInventoryMetric(summaryMap, row, 'undeliveredQty'));
+  const salesDetails = buildSalesDetails(records, productMap);
 
   return {
     ok: true,
@@ -231,7 +337,8 @@ export function buildInventorySummaryCache(records = {}, savedAt = '') {
       inTransit: groupRows(inventory.inTransit, ['department', 'productLine', 'materialCode', 'sku', 'kingdeeName'], ['qty']).sort(compareInventoryRows),
       undelivered: groupRows(undelivered, ['supplier', 'department', 'productLine', 'materialCode', 'sku', 'kingdeeName'], ['qty']).sort(compareInventoryRows)
     },
-    salesDetails: buildSalesDetails(records, productMap),
+    salesDetails,
+    errors: buildInventorySummaryErrors(inventory, undelivered, salesDetails),
     sources: Object.fromEntries(Object.entries(records).map(([id, record]) => [id, {
       id,
       fileName: record?.fileName || '',

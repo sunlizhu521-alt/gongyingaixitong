@@ -425,6 +425,32 @@ app.post('/api/kcfx-library/inventory-summary/query', async (req, res) => {
   }
 });
 
+app.get('/api/kcfx-library/inventory-summary/errors', async (req, res) => {
+  try {
+    const database = await initDb(dataDir);
+    const requestUser = requirePermission(database, req, res, 'maintenanceLibrary.errors');
+    if (!requestUser) return;
+    res.setHeader('Cache-Control', 'no-store');
+    const cache = await getInventorySummaryCache(database, { force: req.query.refresh === '1' });
+    res.json({
+      ok: true,
+      status: 'ready',
+      source: cache.source,
+      savedAt: cache.savedAt,
+      generatedAt: cache.generatedAt,
+      inventory: cache.errors?.inventory || {},
+      sales: cache.errors?.sales || {}
+    });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      status: 'failed',
+      source: 'server-inventory-summary',
+      error: error?.message || String(error)
+    });
+  }
+});
+
 app.post('/api/kcfx-library/inventory-summary/export', async (req, res) => {
   try {
     const database = await initDb(dataDir);

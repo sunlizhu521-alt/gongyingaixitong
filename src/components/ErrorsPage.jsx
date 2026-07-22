@@ -3,14 +3,46 @@ import { API } from '../constants.js';
 import { useKcfxRecordMap } from './kcfxRecordLoader.js';
 import { isStoreMappingRecordValid, STORE_MAPPING_CUSTOMER_HEADERS } from '../../shared/kcfxStoreMapping.js';
 import { TablePagination, useTablePagination } from './TablePagination.jsx';
+import { downloadErrorWorkbook } from './errorReportExport.js';
 
 const EMPTY_TABLES = {
   closed: emptyErrorResult(),
   detail: emptyErrorResult(),
   sales: emptySalesErrorResult(),
   trend: emptyTrendErrorResult(),
-  age: emptyAgeErrorResult()
+  age: emptyAgeErrorResult(),
+  inventorySummary: emptySummaryErrorResult(),
+  salesSummary: emptySalesSummaryErrorResult()
 };
+
+const INVENTORY_SUMMARY_ERROR_COLUMNS = [
+  ['sourceType', '报表分段'],
+  ['organization', '库存组织'],
+  ['warehouse', '仓库名称'],
+  ['supplier', '供应商'],
+  ['department', '事业部'],
+  ['productLine', '产品线'],
+  ['materialCode', '物料编码'],
+  ['sku', 'SKU'],
+  ['kingdeeName', '金蝶名称'],
+  ['inventoryLocation', '库存所在地'],
+  ['qty', '数量'],
+  ['reason', '报错原因']
+];
+
+const SALES_SUMMARY_ERROR_COLUMNS = [
+  ['salesMonth', '月份'],
+  ['customer', '客户名称'],
+  ['department', '事业部'],
+  ['channel', '渠道'],
+  ['productLine', '产品线'],
+  ['materialCode', '物料编码'],
+  ['sku', 'SKU'],
+  ['kingdeeName', '金蝶名称'],
+  ['qty', '销售数量'],
+  ['amount', '销售金额'],
+  ['reason', '报错原因']
+];
 
 const ERROR_DOWNLOAD_CONFIG = {
   productMissing: {
@@ -101,6 +133,41 @@ const ERROR_DOWNLOAD_CONFIG = {
       ['qty', '数量'],
       ['reason', '缺失原因']
     ]
+  },
+  inventorySummaryProductMissing: {
+    sources: ['inventorySummary'],
+    name: '库存汇总商品维度信息缺失表',
+    columns: INVENTORY_SUMMARY_ERROR_COLUMNS
+  },
+  inventorySummaryDepartmentMissing: {
+    sources: ['inventorySummary'],
+    name: '库存汇总事业部匹配缺失表',
+    columns: INVENTORY_SUMMARY_ERROR_COLUMNS
+  },
+  inventorySummaryWarehouseMissing: {
+    sources: ['inventorySummary'],
+    name: '库存汇总库存所在地匹配缺失表',
+    columns: INVENTORY_SUMMARY_ERROR_COLUMNS
+  },
+  inventorySummarySupplierMissing: {
+    sources: ['inventorySummary'],
+    name: '库存汇总供应商缺失表',
+    columns: INVENTORY_SUMMARY_ERROR_COLUMNS
+  },
+  salesSummaryProductMissing: {
+    sources: ['salesSummary'],
+    name: '销售汇总商品维度信息缺失表',
+    columns: SALES_SUMMARY_ERROR_COLUMNS
+  },
+  salesSummaryDepartmentMissing: {
+    sources: ['salesSummary'],
+    name: '销售汇总事业部匹配缺失表',
+    columns: SALES_SUMMARY_ERROR_COLUMNS
+  },
+  salesSummaryChannelMissing: {
+    sources: ['salesSummary'],
+    name: '销售汇总店铺简称匹配缺失表',
+    columns: SALES_SUMMARY_ERROR_COLUMNS
   }
 };
 
@@ -109,7 +176,9 @@ const ERROR_SOURCE_OPTIONS = [
   { value: 'detail', label: '库存分析月份表' },
   { value: 'sales', label: '销售数据文件' },
   { value: 'trend', label: '库存趋势事实表' },
-  { value: 'age', label: '库龄维度分析' }
+  { value: 'age', label: '库龄维度分析' },
+  { value: 'inventorySummary', label: '库存汇总报表' },
+  { value: 'salesSummary', label: '销售汇总报表' }
 ];
 
 const ERROR_TYPE_OPTIONS = {
@@ -131,7 +200,18 @@ const ERROR_TYPE_OPTIONS = {
     { value: 'storeMissing', label: '店铺名称缺失' }
   ],
   trend: [{ value: 'trendDivisionMissing', label: '事业部对照缺失' }],
-  age: [{ value: 'ageDivisionMissing', label: '事业部对照缺失' }]
+  age: [{ value: 'ageDivisionMissing', label: '事业部对照缺失' }],
+  inventorySummary: [
+    { value: 'inventorySummaryProductMissing', label: '商品维度信息缺失' },
+    { value: 'inventorySummaryDepartmentMissing', label: '事业部匹配缺失' },
+    { value: 'inventorySummaryWarehouseMissing', label: '库存所在地匹配缺失' },
+    { value: 'inventorySummarySupplierMissing', label: '供应商缺失' }
+  ],
+  salesSummary: [
+    { value: 'salesSummaryProductMissing', label: '商品维度信息缺失' },
+    { value: 'salesSummaryDepartmentMissing', label: '事业部匹配缺失' },
+    { value: 'salesSummaryChannelMissing', label: '店铺简称匹配缺失' }
+  ]
 };
 
 function userHeaders(user) {
@@ -158,12 +238,15 @@ export default function ErrorsPage({
   const [ageSummary, setAgeSummary] = useState(null);
   const [ageLoading, setAgeLoading] = useState(false);
   const [ageError, setAgeError] = useState('');
+  const [summaryReportErrors, setSummaryReportErrors] = useState(null);
+  const [summaryReportLoading, setSummaryReportLoading] = useState(false);
+  const [summaryReportError, setSummaryReportError] = useState('');
   const [selectedSource, setSelectedSource] = useState('closed');
   const [selectedErrorType, setSelectedErrorType] = useState('productMissing');
   const { records: loadedRecords, loading: recordsLoading, error: recordsError, reload } = useKcfxRecordMap(kcfxData, ERROR_RECORD_IDS);
   const records = useMemo(() => ({ ...kcfxRecords, ...loadedRecords }), [kcfxRecords, loadedRecords]);
-  const pageLoading = loading || recordsLoading || trendLoading || ageLoading;
-  const pageError = recordsError || trendError || ageError || error;
+  const pageLoading = loading || recordsLoading || trendLoading || ageLoading || summaryReportLoading;
+  const pageError = recordsError || trendError || ageError || summaryReportError || error;
 
   const loadTrendSummary = useCallback(async () => {
     setTrendLoading(true);
@@ -196,6 +279,25 @@ export default function ErrorsPage({
     }
   }, [user]);
 
+  const loadSummaryReportErrors = useCallback(async () => {
+    setSummaryReportLoading(true);
+    setSummaryReportError('');
+    try {
+      const response = await fetch(`${API}/api/kcfx-library/inventory-summary/errors`, {
+        cache: 'no-store',
+        headers: userHeaders(user)
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const result = await response.json();
+      if (!result?.ok) throw new Error(result?.error || result?.message || '汇总报表检查失败');
+      setSummaryReportErrors(result);
+    } catch (loadError) {
+      setSummaryReportError(loadError?.message || String(loadError));
+    } finally {
+      setSummaryReportLoading(false);
+    }
+  }, [user]);
+
   useEffect(() => {
     loadTrendSummary();
   }, [loadTrendSummary, kcfxData?.savedAt]);
@@ -203,6 +305,10 @@ export default function ErrorsPage({
   useEffect(() => {
     loadAgeSummary();
   }, [loadAgeSummary, kcfxData?.savedAt]);
+
+  useEffect(() => {
+    loadSummaryReportErrors();
+  }, [loadSummaryReportErrors, kcfxData?.savedAt]);
 
   useEffect(() => {
     if (!trendSummary?.refreshing) return undefined;
@@ -218,9 +324,11 @@ export default function ErrorsPage({
       detail: buildInventoryMonthChecks(records, maps),
       sales: buildSalesDataChecks(records, maps),
       trend: buildTrendChecks(trendSummary),
-      age: buildAgeAnalysisChecks(ageSummary)
+      age: buildAgeAnalysisChecks(ageSummary),
+      inventorySummary: buildSummaryReportChecks(summaryReportErrors?.inventory, 'inventory'),
+      salesSummary: buildSummaryReportChecks(summaryReportErrors?.sales, 'sales')
     };
-  }, [ageSummary, records, trendSummary]);
+  }, [ageSummary, records, summaryReportErrors, trendSummary]);
 
   const statusText = useMemo(() => {
     if (pageLoading) return '数据加载中...';
@@ -231,13 +339,15 @@ export default function ErrorsPage({
       checks.detail.message || `库存分析月份表：有库存物料 ${formatNumber(checks.detail.stockMaterials.length)} 个，缺失 ${formatNumber(totalMissingCount(checks.detail))} 项`,
       checks.sales.message || `销售数据文件：销售物料 ${formatNumber(checks.sales.stockMaterials.length)} 个，缺失 ${formatNumber(totalMissingCount(checks.sales))} 项`,
       `库存趋势事实表：事业部对照缺失 ${formatNumber(checks.trend.trendDivisionMissing.length)} 项`,
-      checks.age.message || `库龄维度分析：事业部对照缺失 ${formatNumber(checks.age.ageDivisionMissing.length)} 项`
+      checks.age.message || `库龄维度分析：事业部对照缺失 ${formatNumber(checks.age.ageDivisionMissing.length)} 项`,
+      `库存汇总报表：缺失 ${formatNumber(summaryReportMissingCount(checks.inventorySummary))} 项`,
+      `销售汇总报表：缺失 ${formatNumber(summaryReportMissingCount(checks.salesSummary))} 项`
     ];
     const loadedText = lastLoadedAt ? `；读取时间：${lastLoadedAt}` : '';
     return `检查完成：${messages.join('；')}${loadedText}`;
   }, [checks, pageError, records, lastLoadedAt, pageLoading]);
   const refresh = async () => {
-    await Promise.all([reload(), onRefresh?.(), loadTrendSummary(), loadAgeSummary()]);
+    await Promise.all([reload(), onRefresh?.(), loadTrendSummary(), loadAgeSummary(), loadSummaryReportErrors()]);
   };
   const errorTypeOptions = ERROR_TYPE_OPTIONS[selectedSource] || [];
   const selectedRows = checks[selectedSource]?.[selectedErrorType] || [];
@@ -255,21 +365,43 @@ export default function ErrorsPage({
       setDownloadMessage('未找到对应的报错明细。');
       return;
     }
-    const XLSX = await import('xlsx');
-    downloadRowsAsWorkbook(XLSX, `${errorSourceLabel(source)}-${config.name}`, downloadTimestamp(), result[tableName] || [], config.columns);
-    setDownloadMessage('下载已生成。');
+    setDownloadMessage('正在生成下载文件...');
+    try {
+      const XLSX = await import('xlsx');
+      const prefix = `${errorSourceLabel(source)}-${config.name}`;
+      downloadErrorWorkbook(XLSX, [{
+        sheetName: '报错明细',
+        rows: result[tableName] || [],
+        columns: config.columns
+      }], `${prefix}_${downloadTimestamp()}.xlsx`);
+      setDownloadMessage('下载已生成。');
+    } catch (downloadError) {
+      console.error('Failed to download error report', downloadError);
+      setDownloadMessage(`下载失败：${downloadError?.message || String(downloadError)}`);
+    }
   }
 
   async function downloadAll() {
-    const XLSX = await import('xlsx');
-    const stamp = downloadTimestamp();
-    for (const source of ['closed', 'detail', 'sales', 'trend', 'age']) {
-      for (const [tableName, config] of Object.entries(ERROR_DOWNLOAD_CONFIG)) {
-        if (!config.sources.includes(source)) continue;
-        downloadRowsAsWorkbook(XLSX, `${errorSourceLabel(source)}-${config.name}`, stamp, checks[source][tableName] || [], config.columns);
+    setDownloadMessage('正在生成全部报错明细...');
+    try {
+      const XLSX = await import('xlsx');
+      const reports = [];
+      for (const source of ['closed', 'detail', 'sales', 'trend', 'age', 'inventorySummary', 'salesSummary']) {
+        for (const [tableName, config] of Object.entries(ERROR_DOWNLOAD_CONFIG)) {
+          if (!config.sources.includes(source)) continue;
+          reports.push({
+            sheetName: `${errorSourceLabel(source)}-${config.name}`,
+            rows: checks[source][tableName] || [],
+            columns: config.columns
+          });
+        }
       }
+      downloadErrorWorkbook(XLSX, reports, `报错信息汇总_${downloadTimestamp()}.xlsx`);
+      setDownloadMessage('全部报错明细已生成。');
+    } catch (downloadError) {
+      console.error('Failed to download all error reports', downloadError);
+      setDownloadMessage(`下载失败：${downloadError?.message || String(downloadError)}`);
     }
-    setDownloadMessage('全部报错明细已生成。');
   }
 
   return (
@@ -288,7 +420,7 @@ export default function ErrorsPage({
           </button>
         </div>
       </header>
-      {downloadMessage && <div className="import-summary">{downloadMessage}</div>}
+      {downloadMessage && <div className="import-summary" role="status" aria-live="polite">{downloadMessage}</div>}
 
       <section className="errors-filter-panel" aria-label="报错信息筛选">
         <label className="errors-filter-field">
@@ -335,6 +467,20 @@ export default function ErrorsPage({
       {selectedSource === 'sales' && <SalesCheckGroup result={checks.sales} activeIssue={selectedErrorType} onDownload={downloadSingle} />}
       {selectedSource === 'trend' && <TrendCheckGroup result={checks.trend} activeIssue={selectedErrorType} onDownload={downloadSingle} />}
       {selectedSource === 'age' && <AgeAnalysisCheckGroup result={checks.age} activeIssue={selectedErrorType} onDownload={downloadSingle} />}
+      {selectedSource === 'inventorySummary' && <SummaryReportCheckGroup
+        source="inventorySummary"
+        title="根据库存汇总报表"
+        result={checks.inventorySummary}
+        activeIssue={selectedErrorType}
+        onDownload={downloadSingle}
+      />}
+      {selectedSource === 'salesSummary' && <SummaryReportCheckGroup
+        source="salesSummary"
+        title="根据销售汇总报表"
+        result={checks.salesSummary}
+        activeIssue={selectedErrorType}
+        onDownload={downloadSingle}
+      />}
     </section>
   );
 }
@@ -547,6 +693,47 @@ function AgeAnalysisCheckGroup({ result, activeIssue, onDownload }) {
   );
 }
 
+function SummaryReportCheckGroup({ source, title, result, activeIssue, onDownload }) {
+  const issueOptions = ERROR_TYPE_OPTIONS[source] || [];
+  const selectedOption = issueOptions.find((option) => option.value === activeIssue);
+  const downloadConfig = ERROR_DOWNLOAD_CONFIG[activeIssue];
+  const diagnostics = source === 'inventorySummary'
+    ? [
+        '来源：库存汇总报表使用的在库、在途和采购订单未交付记录。',
+        '检查：沿用库存汇总报表的物料编码、仓库、库存组织和采购订单字段映射结果。',
+        '缺失提示：报表中显示为未匹配产品线、SKU、金蝶名称、事业部、库存所在地或供应商的记录。',
+        '需要维护：对应的商品分类维表、仓库维表、仓库物料事业部对照表或采购订单文件。'
+      ]
+    : [
+        '来源：销售汇总报表使用的有效销售记录。',
+        '检查：沿用销售汇总报表按客户名称 + 物料编码匹配事业部、按客户名称匹配店铺简称、按物料编码匹配商品维度的结果。',
+        '缺失提示：报表中显示为未匹配事业部、渠道、产品线、SKU或金蝶名称的记录。',
+        '需要维护：客户与物料对照表、店铺名称汇总维表或商品分类维表。'
+      ];
+
+  return (
+    <section className="error-source-panel">
+      <section className="error-source-title">
+        <h2>{title}</h2>
+        <p>{diagnostics[1]}</p>
+      </section>
+      <section className="metric-grid error-metrics">
+        <MetricCard label="检查记录数" value={result.rowCount || 0} />
+        {issueOptions.map((option) => (
+          <MetricCard key={option.value} label={option.label} value={result[option.value]?.length || 0} />
+        ))}
+      </section>
+      {selectedOption && downloadConfig && <ErrorTable
+        title={selectedOption.label}
+        columns={downloadConfig.columns.map(([key, label]) => [key, label, ['qty', 'amount'].includes(key) ? 'num' : ''])}
+        rows={result[activeIssue] || []}
+        diagnostic={diagnostics}
+        onDownload={() => onDownload(source, activeIssue)}
+      />}
+    </section>
+  );
+}
+
 function MetricCard({ label, value }) {
   return (
     <div className="metric-card">
@@ -626,6 +813,48 @@ function emptyTrendErrorResult() {
 
 function emptyAgeErrorResult(message = '') {
   return { message, ageDivisionMissing: [] };
+}
+
+function emptySummaryErrorResult(message = '') {
+  return {
+    message,
+    rowCount: 0,
+    inventorySummaryProductMissing: [],
+    inventorySummaryDepartmentMissing: [],
+    inventorySummaryWarehouseMissing: [],
+    inventorySummarySupplierMissing: []
+  };
+}
+
+function emptySalesSummaryErrorResult(message = '') {
+  return {
+    message,
+    rowCount: 0,
+    salesSummaryProductMissing: [],
+    salesSummaryDepartmentMissing: [],
+    salesSummaryChannelMissing: []
+  };
+}
+
+function buildSummaryReportChecks(payload, type) {
+  if (!payload) return type === 'inventory' ? emptySummaryErrorResult() : emptySalesSummaryErrorResult();
+  if (type === 'inventory') {
+    return {
+      ...emptySummaryErrorResult(),
+      rowCount: Number(payload.rowCount) || 0,
+      inventorySummaryProductMissing: Array.isArray(payload.productMissing) ? payload.productMissing : [],
+      inventorySummaryDepartmentMissing: Array.isArray(payload.departmentMissing) ? payload.departmentMissing : [],
+      inventorySummaryWarehouseMissing: Array.isArray(payload.warehouseMissing) ? payload.warehouseMissing : [],
+      inventorySummarySupplierMissing: Array.isArray(payload.supplierMissing) ? payload.supplierMissing : []
+    };
+  }
+  return {
+    ...emptySalesSummaryErrorResult(),
+    rowCount: Number(payload.rowCount) || 0,
+    salesSummaryProductMissing: Array.isArray(payload.productMissing) ? payload.productMissing : [],
+    salesSummaryDepartmentMissing: Array.isArray(payload.departmentMissing) ? payload.departmentMissing : [],
+    salesSummaryChannelMissing: Array.isArray(payload.channelMissing) ? payload.channelMissing : []
+  };
 }
 
 function buildAgeAnalysisChecks(summary) {
@@ -1301,6 +1530,12 @@ function totalMissingCount(result) {
     + (result.trendDivisionMissing?.length || 0);
 }
 
+function summaryReportMissingCount(result) {
+  return Object.entries(result || {})
+    .filter(([key, value]) => key.endsWith('Missing') && Array.isArray(value))
+    .reduce((total, [, rows]) => total + rows.length, 0);
+}
+
 function formatNumber(value) {
   return Number(value || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
 }
@@ -1311,27 +1546,15 @@ function downloadTimestamp() {
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
-function downloadRowsAsWorkbook(XLSX, prefix, stamp, rows, columns) {
-  const data = rows.map((row) => {
-    const item = {};
-    for (const [key, label] of columns) {
-      item[label] = row[key] ?? '';
-    }
-    return item;
-  });
-  const worksheet = XLSX.utils.json_to_sheet(data.length ? data : [Object.fromEntries(columns.map(([, label]) => [label, '']))]);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, '报错明细');
-  XLSX.writeFile(workbook, `${prefix}_${stamp}.xlsx`);
-}
-
 function errorSourceLabel(source) {
   return {
     closed: '关账库存事实表',
     detail: '库存分析月份表',
     sales: '销售数据文件',
     trend: '库存趋势事实表',
-    age: '库龄维度分析'
+    age: '库龄维度分析',
+    inventorySummary: '库存汇总报表',
+    salesSummary: '销售汇总报表'
   }[source] || '报错信息';
 }
 
