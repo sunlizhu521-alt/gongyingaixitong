@@ -36,7 +36,6 @@ const SALES_SUMMARY_ERROR_COLUMNS = [
   ['department', '事业部'],
   ['country', '国家'],
   ['platform', '平台'],
-  ['channel', '渠道'],
   ['productLine', '产品线'],
   ['productSeries', '销售系列'],
   ['materialCode', '物料编码'],
@@ -66,7 +65,6 @@ const SALES_SUMMARY_SETTLEMENT_ERROR_COLUMNS = [
   ['department', '事业部'],
   ['country', '国家'],
   ['platform', '平台'],
-  ['channel', '渠道'],
   ['productLine', '产品线'],
   ['productSeries', '销售系列'],
   ['materialCode', '物料编码'],
@@ -204,11 +202,6 @@ const ERROR_DOWNLOAD_CONFIG = {
     name: '销售汇总事业部匹配缺失表',
     columns: SALES_SUMMARY_ERROR_COLUMNS
   },
-  salesSummaryChannelMissing: {
-    sources: ['salesSummary'],
-    name: '销售汇总店铺简称匹配缺失表',
-    columns: SALES_SUMMARY_ERROR_COLUMNS
-  },
   salesSummaryCountryMissing: {
     sources: ['salesSummary'],
     name: '销售汇总国家信息缺失表',
@@ -266,7 +259,6 @@ const ERROR_TYPE_OPTIONS = {
   salesSummary: [
     { value: 'salesSummaryProductMissing', label: '商品维度信息缺失' },
     { value: 'salesSummaryDepartmentMissing', label: '事业部匹配缺失' },
-    { value: 'salesSummaryChannelMissing', label: '店铺简称匹配缺失' },
     { value: 'salesSummaryCountryMissing', label: '国家信息缺失' },
     { value: 'salesSummaryPlatformMissing', label: '平台信息缺失' },
     { value: 'salesSummarySettlementMissing', label: '内部结算价缺失' }
@@ -763,8 +755,8 @@ function SummaryReportCheckGroup({ source, title, result, activeIssue, onDownloa
       ]
     : [
         '来源：销售汇总报表使用的有效销售记录。',
-        '检查：沿用销售汇总报表按客户名称 + 物料编码匹配事业部、按客户名称匹配店铺简称、按物料编码匹配商品维度的结果。',
-        '缺失提示：报表中显示为未匹配事业部、国家、平台、渠道、产品线、SKU、金蝶名称，或内部结算价为空或为0的记录。',
+        '检查：沿用销售汇总报表按客户名称 + 物料编码匹配事业部、按客户名称匹配国家和平台、按物料编码匹配商品维度的结果。',
+        '缺失提示：报表中显示为未匹配事业部、国家、平台、产品线、SKU、金蝶名称，或内部结算价为空或为0的记录。',
         '需要维护：客户与物料对照表、店铺名称汇总维表或商品分类维表。'
       ];
 
@@ -922,7 +914,6 @@ function emptySalesSummaryErrorResult(message = '') {
     rowCount: 0,
     salesSummaryProductMissing: [],
     salesSummaryDepartmentMissing: [],
-    salesSummaryChannelMissing: [],
     salesSummaryCountryMissing: [],
     salesSummaryPlatformMissing: [],
     salesSummarySettlementMissing: []
@@ -947,7 +938,6 @@ function buildSummaryReportChecks(payload, type) {
     rowCount: Number(payload.rowCount) || 0,
     salesSummaryProductMissing: Array.isArray(payload.productMissing) ? payload.productMissing : [],
     salesSummaryDepartmentMissing: Array.isArray(payload.departmentMissing) ? payload.departmentMissing : [],
-    salesSummaryChannelMissing: Array.isArray(payload.channelMissing) ? payload.channelMissing : [],
     salesSummaryCountryMissing: Array.isArray(payload.countryMissing) ? payload.countryMissing : [],
     salesSummaryPlatformMissing: Array.isArray(payload.platformMissing) ? payload.platformMissing : [],
     salesSummarySettlementMissing: Array.isArray(payload.settlementMissing) ? payload.settlementMissing : []

@@ -12,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_SUMMARY_VERSION = 11;
+export const KCFX_INVENTORY_SUMMARY_VERSION = 12;
 
 const INVENTORY_VIEW_FIELDS = {
   summary: ['department', 'productLine'],
@@ -20,7 +20,7 @@ const INVENTORY_VIEW_FIELDS = {
   inTransit: ['department', 'productLine'],
   undelivered: ['supplier', 'department', 'productLine']
 };
-const SALES_FILTER_FIELDS = ['salesYear', 'salesMonthNumber', 'department', 'channel', 'productLine'];
+const SALES_FILTER_FIELDS = ['salesYear', 'salesMonthNumber', 'department', 'productLine'];
 
 function normalizeHeader(value) {
   return normalizeText(value)
@@ -226,7 +226,6 @@ function buildSalesDetails(records, productMap) {
       const sku = normalizeDimension(product.sku, '未匹配SKU');
       const kingdeeName = normalizeDimension(product.materialName, '未匹配金蝶名称');
       const department = normalizeText(row.salesOrg);
-      const channel = normalizeText(row.storeShortName);
       const country = normalizeText(row.country);
       const platform = normalizeText(row.platform);
       return {
@@ -237,7 +236,6 @@ function buildSalesDetails(records, productMap) {
         department: normalizeDimension(department, '未匹配事业部'),
         country: normalizeDimension(country, '未匹配国家'),
         platform: normalizeDimension(platform, '未匹配平台'),
-        channel: normalizeDimension(channel, '未匹配渠道'),
         productLine: normalizeDimension(row.productLine, '未匹配产品线'),
         productSeries: normalizeDimension(product.productSeries, '未匹配销售系列'),
         materialCode,
@@ -250,8 +248,7 @@ function buildSalesDetails(records, productMap) {
         departmentMissing: !department,
         countryMissing: !country,
         platformMissing: !platform,
-        channelMissing: !channel,
-        searchText: [materialCode, sku, kingdeeName, row.customer, row.storeShortName, row.salesOrg, country, platform, row.productLine]
+        searchText: [materialCode, sku, kingdeeName, row.customer, row.salesOrg, country, platform, row.productLine]
           .map(normalizeText)
           .join('\u0001')
           .toLowerCase()
@@ -281,7 +278,6 @@ const SALES_ERROR_KEY_FIELDS = [
   'department',
   'country',
   'platform',
-  'channel',
   'productLine',
   'productSeries',
   'materialCode',
@@ -338,7 +334,6 @@ function buildInventorySummaryErrors(inventory, undelivered, salesDetails) {
       departmentMissing: salesIssueRows(salesDetails, (row) => row.departmentMissing, '事业部未匹配'),
       countryMissing: salesIssueRows(salesDetails, (row) => row.countryMissing, '店铺简称维表国家缺失'),
       platformMissing: salesIssueRows(salesDetails, (row) => row.platformMissing, '店铺简称维表平台缺失'),
-      channelMissing: salesIssueRows(salesDetails, (row) => row.channelMissing, '店铺简称未匹配'),
       settlementMissing: salesIssueRows(
         salesDetails,
         (row) => Number(row.qty) !== 0 && !(Number(row.settlementPrice) > 0),
@@ -420,7 +415,7 @@ function buildOptions(rows, fields, selections, search, searchFields) {
 function groupSalesRows(rows) {
   const map = new Map();
   for (const row of rows) {
-    const fields = ['salesMonth', 'department', 'country', 'platform', 'channel', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
+    const fields = ['salesMonth', 'department', 'country', 'platform', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
     const key = fields.map((field) => row[field] || '').join('\u0001');
     let target = map.get(key);
     if (!target) {
@@ -430,7 +425,6 @@ function groupSalesRows(rows) {
         department: row.department,
         country: row.country,
         platform: row.platform,
-        channel: row.channel,
         productLine: row.productLine,
         materialCode: row.materialCode,
         sku: row.sku,
@@ -446,7 +440,6 @@ function groupSalesRows(rows) {
   return [...map.values()]
     .sort((a, b) => a.salesMonth.localeCompare(b.salesMonth)
       || a.department.localeCompare(b.department, 'zh-CN')
-      || a.channel.localeCompare(b.channel, 'zh-CN')
       || a.productLine.localeCompare(b.productLine, 'zh-CN')
       || a.materialCode.localeCompare(b.materialCode, 'zh-CN'));
 }
@@ -456,7 +449,7 @@ function resolveRows(cache, request = {}) {
   const selections = normalizedSelections(request.filters);
   const search = request.search || '';
   if (report === 'sales') {
-    const searchFields = ['searchText', 'department', 'country', 'platform', 'channel', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
+    const searchFields = ['searchText', 'department', 'country', 'platform', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
     const baseRows = cache.salesDetails || [];
     const options = buildOptions(baseRows, SALES_FILTER_FIELDS, selections, search, searchFields);
     const filteredDetails = baseRows.filter((row) => (

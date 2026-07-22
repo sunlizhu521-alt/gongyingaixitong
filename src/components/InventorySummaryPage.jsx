@@ -81,7 +81,6 @@ const VIEW_CONFIG = {
       { id: 'salesYear', field: 'salesYear', allLabel: '全部年份' },
       { id: 'salesMonthNumber', field: 'salesMonthNumber', allLabel: '全部月份' },
       { id: 'department', field: 'department', allLabel: '全部事业部' },
-      { id: 'channel', field: 'channel', allLabel: '全部渠道' },
       { id: 'productLine', field: 'productLine', allLabel: '全部产品线' }
     ],
     columns: [
@@ -89,7 +88,6 @@ const VIEW_CONFIG = {
       { key: 'department', label: '事业部' },
       { key: 'country', label: '国家' },
       { key: 'platform', label: '平台' },
-      { key: 'channel', label: '渠道' },
       { key: 'productLine', label: '产品线' },
       { key: 'materialCode', label: '物料编码' },
       { key: 'sku', label: 'SKU' },
@@ -304,7 +302,7 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
         resetFilters={resetFilters}
         searchValue={tableState.search}
         setSearchValue={(value) => updateTableState(activeView, (current) => ({ ...current, search: value, page: 1 }))}
-        searchPlaceholder={activeView === 'sales' ? '搜索事业部、国家、平台、渠道、产品线、物料编码、SKU、金蝶名称' : '搜索物料编码、SKU、金蝶名称、事业部、产品线'}
+        searchPlaceholder={activeView === 'sales' ? '搜索事业部、国家、平台、产品线、物料编码、SKU、金蝶名称' : '搜索物料编码、SKU、金蝶名称、事业部、产品线'}
       />
 
       <MetricCards metrics={metricCards} />

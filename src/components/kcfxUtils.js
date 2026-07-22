@@ -544,12 +544,13 @@ function mapStoreInfo(rows) {
       firstValue(row, STORE_MAPPING_PLATFORM_HEADERS),
       firstValueByHeaderIncludes(row, ['平台'])
     ]);
-    if (!normalized || !normalizeText(shortName) || map.has(normalized)) continue;
+    if (!normalized) continue;
+    const current = map.get(normalized) || {};
     map.set(normalized, {
-      rawName,
-      shortName: normalizeText(shortName),
-      country: normalizeText(country),
-      platform: normalizeText(platform)
+      rawName: current.rawName || rawName,
+      shortName: current.shortName || normalizeText(shortName),
+      country: current.country || normalizeText(country),
+      platform: current.platform || normalizeText(platform)
     });
   }
   return map;
