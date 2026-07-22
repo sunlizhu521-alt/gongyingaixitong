@@ -12,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_SUMMARY_VERSION = 14;
+export const KCFX_INVENTORY_SUMMARY_VERSION = 15;
 
 const INVENTORY_VIEW_FIELDS = {
   summary: ['department', 'productLine'],
@@ -21,6 +21,11 @@ const INVENTORY_VIEW_FIELDS = {
   undelivered: ['supplier', 'department', 'productLine']
 };
 const SALES_STATUS_FIELDS = ['realTransactionStatus', 'nonInternalTransactionStatus', 'finishedGoodsStatus'];
+const SALES_STATUS_OPTIONS = {
+  realTransactionStatus: ['真实交易', '非真实交易', '未匹配'],
+  nonInternalTransactionStatus: ['非内部交易', '内部交易', '未匹配'],
+  finishedGoodsStatus: ['成品', '非成品', '未匹配']
+};
 const SALES_FILTER_FIELDS = ['salesMonth', 'department', 'productLine', ...SALES_STATUS_FIELDS];
 
 function normalizeHeader(value) {
@@ -402,7 +407,7 @@ function matchesSearch(row, search, fields) {
 }
 
 function sortedOptions(values, field) {
-  if (SALES_STATUS_FIELDS.includes(field)) return ['是', '否', '未匹配'];
+  if (SALES_STATUS_FIELDS.includes(field)) return SALES_STATUS_OPTIONS[field];
   const unique = [...new Set(values.map(normalizeText).filter(Boolean))];
   if (field === 'salesMonth') return unique.sort((a, b) => a.localeCompare(b));
   return unique.sort((a, b) => a.localeCompare(b, 'zh-CN'));

@@ -660,22 +660,22 @@ function getSalesTaxExcludedAmount(row) {
 function classifyRealTransaction(warehouse, warehouseInfo) {
   if (!normalizeText(warehouse) || !warehouseInfo || !normalizeText(warehouseInfo.type)) return '未匹配';
   const warehouseType = normalizeText(warehouseInfo.type);
-  return warehouseType === '系统集成仓库' || warehouseType === '系统集成仓' ? '否' : '是';
+  return warehouseType === '系统集成仓库' || warehouseType === '系统集成仓' ? '非真实交易' : '真实交易';
 }
 
 function classifyNonInternalTransaction(salesOrg) {
   const department = normalizeText(salesOrg);
   if (!department) return '未匹配';
-  return isInternalTransactionText(department) ? '否' : '是';
+  return isInternalTransactionText(department) ? '内部交易' : '非内部交易';
 }
 
 function classifyFinishedGoods(product, productMatched) {
   if (!productMatched) return '未匹配';
   const productLine = normalizeSalesExclusionText(product.productLine);
-  const primaryCategory = normalizeSalesExclusionText(product.primaryCategory);
-  if (productLine === '其他/配件' || productLine === '健康办公') return '否';
+  const primaryCategory = normalizeSalesExclusionText(product.primaryCategory || product.productCategory);
+  if (productLine === '其他/配件' || productLine === '健康办公') return '非成品';
   if (!productLine || !primaryCategory) return '未匹配';
-  return primaryCategory === '配件' || primaryCategory === '护理床附件' ? '否' : '是';
+  return primaryCategory === '配件' || primaryCategory === '护理床附件' ? '非成品' : '成品';
 }
 
 function isExcludedSalesRow(row) {
