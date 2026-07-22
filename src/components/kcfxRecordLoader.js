@@ -9,7 +9,7 @@ let salesRowsPayloadCache = null;
 let inflightSalesRowsRequest = null;
 let recordCacheVersion = '';
 const salesRowsCacheVersion = 'v5';
-const recordRowsCacheVersion = 'v3';
+const recordRowsCacheVersion = 'v4';
 
 function uniqueRecordIds(ids = []) {
   return [...new Set((ids || []).map((id) => String(id || '').trim()).filter(Boolean))];

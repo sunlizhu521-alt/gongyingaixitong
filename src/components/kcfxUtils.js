@@ -1,4 +1,5 @@
 import { INVENTORY_TREND_MONTHS } from '../../shared/kcfxTrendMonths.js';
+import { coerceKcfxMaterialCodeText, materialCodeMatchKey } from '../../shared/kcfxMaterialCodeText.js';
 import { STORE_MAPPING_CUSTOMER_HEADERS, STORE_MAPPING_SHORT_NAME_HEADERS } from '../../shared/kcfxStoreMapping.js';
 import { selectInventoryTrendPrice } from '../../shared/kcfxTrendPrice.js';
 
@@ -37,10 +38,7 @@ export function normalizeHeaderName(value) {
 }
 
 export function normalizeMaterialCode(value) {
-  return normalizeText(value)
-    .normalize('NFKC')
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .replace(/\s+/g, '');
+  return coerceKcfxMaterialCodeText(value).replace(/\s+/g, '');
 }
 
 export function toNumber(value) {
@@ -193,11 +191,11 @@ let salesRowsCache = {
 };
 
 export function mapProducts(rows) {
-  const map = new Map();
+  const map = new MaterialCodeLookupMap();
   for (const row of rows) {
     const materialCode = normalizeMaterialCode(firstText([firstValue(row, ['物料编码', '货品编码', '商品编码']), nthValue(row, 1)]));
-    if (!materialCode || map.has(materialCode)) continue;
-    map.set(materialCode, {
+    if (!materialCode) continue;
+    const candidate = {
       sku: firstText([firstValue(row, ['SKU', '领星SKU']), nthValue(row, 3)]),
       materialName: firstText([firstValue(row, ['金蝶名称', '物料名称', '货品名称', '商品名称']), nthValue(row, 4)]),
       productCategory: firstText([firstValue(row, ['销售产品分类', '产品分类', '销售产品类别', '产品类别', '品类'])]),
@@ -210,9 +208,30 @@ export function mapProducts(rows) {
         firstValueByHeaderIncludes(row, ['结算价']),
         nthValue(row, 10)
       ])
-    });
+    };
+    const current = map.get(materialCode);
+    if (!current || productDimensionScore(candidate) > productDimensionScore(current)) map.set(materialCode, candidate);
   }
   return map;
+}
+
+class MaterialCodeLookupMap extends Map {
+  get(materialCode) {
+    return super.get(materialCodeMatchKey(materialCode));
+  }
+
+  has(materialCode) {
+    return super.has(materialCodeMatchKey(materialCode));
+  }
+
+  set(materialCode, value) {
+    return super.set(materialCodeMatchKey(materialCode), value);
+  }
+}
+
+function productDimensionScore(product = {}) {
+  return ['sku', 'materialName', 'productCategory', 'productLine', 'productSeries', 'model', 'department']
+    .reduce((score, field) => score + (normalizeText(product[field]) ? 1 : 0), Number(product.settlementPrice) !== 0 ? 1 : 0);
 }
 
 export function mapWarehouses(rows) {

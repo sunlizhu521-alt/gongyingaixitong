@@ -1,9 +1,33 @@
-export const KCFX_MATERIAL_CODE_TEXT_FORMAT_VERSION = 1;
+export const KCFX_MATERIAL_CODE_TEXT_FORMAT_VERSION = 2;
 
 export function coerceKcfxMaterialCodeText(value) {
   if (value === null || value === undefined) return '';
   if (typeof value === 'number') return Number.isFinite(value) ? numberToPlainText(value) : '';
-  return String(value).trim();
+  const text = String(value)
+    .trim()
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '');
+  const compactNumeric = text.replace(/[,，\s]/g, '');
+  if (/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)[eE][+-]?\d+$/.test(compactNumeric)) {
+    return scientificTextToPlainText(compactNumeric);
+  }
+  if (/^[+-]?\d+\.0+$/.test(compactNumeric)) return compactNumeric.replace(/\.0+$/, '');
+  if (/^[+-]?\d+$/.test(compactNumeric) && compactNumeric !== text) return compactNumeric;
+  return text;
+}
+
+export function materialCodeMatchKey(value) {
+  const text = coerceKcfxMaterialCodeText(value)
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF\s]/g, '');
+  if (/^[+-]?\d+$/.test(text)) {
+    try {
+      return BigInt(text).toString();
+    } catch {
+      return text;
+    }
+  }
+  return text;
 }
 
 export function normalizeKcfxMaterialCodeRows(recordId, sourceRows = []) {
@@ -58,8 +82,10 @@ function normalizeHeader(value) {
 
 function numberToPlainText(value) {
   const source = String(value);
-  if (!/[eE]/.test(source)) return source;
+  return /[eE]/.test(source) ? scientificTextToPlainText(source) : source;
+}
 
+function scientificTextToPlainText(source) {
   const [coefficient, exponentText] = source.toLowerCase().split('e');
   const exponent = Number(exponentText);
   const sign = coefficient.startsWith('-') ? '-' : '';

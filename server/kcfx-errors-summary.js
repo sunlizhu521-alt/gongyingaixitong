@@ -3,13 +3,14 @@ import {
   firstText,
   firstValue,
   firstValueByHeaderIncludes,
+  mapProducts,
   normalizeMaterialCode,
   normalizeText,
   nthValue,
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_ERRORS_SUMMARY_VERSION = 3;
+export const KCFX_ERRORS_SUMMARY_VERSION = 4;
 
 export const KCFX_ERRORS_RECORD_IDS = [
   'fact-inventory',
@@ -324,22 +325,7 @@ function buildSalesStoreDiagnostic(values, storeNames, samples, valid, record) {
 }
 
 function mapProduct(rows) {
-  const map = new Map();
-  for (const row of rows) {
-    const materialCode = normalizeMaterialCode(firstText([firstValue(row, ['物料编码']), nthValue(row, 1)]));
-    if (!materialCode || map.has(materialCode)) continue;
-    map.set(materialCode, {
-      sku: normalizeText(firstText([firstValue(row, ['SKU']), nthValue(row, 3)])),
-      materialName: normalizeText(firstText([firstValue(row, ['金蝶名称', '物料名称', '货品名称']), nthValue(row, 4)])),
-      productLine: normalizeText(firstText([firstValue(row, ['销售产品线', '产品线']), nthValue(row, 7)])),
-      settlementPrice: firstNumber([
-        firstValue(row, ['结算价（含税）', '结算价(含税)', '结算价含税', '结算价', '内部结算价', '26年内部结算价', '2026年内部结算价']),
-        firstValueByHeaderIncludes(row, ['结算价']),
-        nthValue(row, 9)
-      ])
-    });
-  }
-  return map;
+  return mapProducts(rows);
 }
 
 function mapDivisionMaterialCodes(rows) {

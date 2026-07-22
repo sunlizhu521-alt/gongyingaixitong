@@ -63,7 +63,7 @@ test('采购订单事业部只保留第一个星号前的内容', () => {
 
 test('库存汇总按海上在途精确分段并排除汇总行', () => {
   const cache = buildInventorySummaryCache(sampleRecords(), 'saved-at');
-  assert.equal(cache.version, 6);
+  assert.equal(cache.version, 7);
   assert.equal(cache.inventoryViews.onHand.length, 2);
   assert.equal(cache.inventoryViews.onHand.reduce((sum, row) => sum + row.qty, 0), 12);
   assert.equal(cache.inventoryViews.inTransit.length, 1);
@@ -93,6 +93,38 @@ test('库存汇总按海上在途精确分段并排除汇总行', () => {
   assert.equal(cache.errors.inventory.departmentMissing.length, 0);
   assert.equal(cache.errors.inventory.warehouseMissing.length, 0);
   assert.equal(cache.errors.inventory.supplierMissing.length, 0);
+});
+
+test('库存汇总按文本关联前导零和科学计数法物料编码', () => {
+  const cache = buildInventorySummaryCache({
+    'dim-product': record([
+      { 物料编码: '00000011', SKU: '', 金蝶名称: '', 销售产品线: '其他/配件', 结算价: '0' },
+      { 物料编码: '11', SKU: 'SKU-11', 金蝶名称: '拆卸报废虚拟料号', 销售产品线: '其他/配件', 结算价: '12' },
+      { 物料编码: '1007010385', SKU: 'G01-A-BK-1-X', 金蝶名称: '黑色可折叠拐杖 美国G01', 销售产品线: '其他/成品', 结算价: '33' }
+    ]),
+    'dim-warehouse': record([{ 仓库名称: '正常仓', 二级仓库分类: '华南仓' }]),
+    'dim-warehouse-material': record([]),
+    'fact-inventory': record([
+      { 库存组织: '组织A', 仓库名称: '正常仓', 物料编码: '00000011', '(结存)数量（库存）': '2' },
+      { 库存组织: '组织A', 仓库名称: '正常仓', 物料编码: '1.007010385E+9', '(结存)数量（库存）': '3' }
+    ]),
+    'purchase-order-data': record([]),
+    'sales-data': record([]),
+    'dim-store-name': record([]),
+    'dim-customer-material': record([])
+  }, 'saved-at');
+
+  const padded = cache.inventoryViews.summary.find((row) => row.materialCode === '00000011');
+  assert.equal(padded.kingdeeName, '拆卸报废虚拟料号');
+  assert.equal(padded.settlementPrice, 12);
+  assert.equal(padded.inventoryValue, 24);
+
+  const scientific = cache.inventoryViews.summary.find((row) => row.materialCode === '1007010385');
+  assert.equal(scientific.sku, 'G01-A-BK-1-X');
+  assert.equal(scientific.kingdeeName, '黑色可折叠拐杖 美国G01');
+  assert.equal(scientific.settlementPrice, 33);
+  assert.equal(scientific.inventoryValue, 99);
+  assert.equal(cache.errors.inventory.productMissing.length, 0);
 });
 
 test('销售按年月和物料维度汇总应收数量与不含税金额', () => {
