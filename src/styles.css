@@ -736,6 +736,38 @@ h3 {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
+.month-filter-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  max-height: 264px;
+  overflow-y: auto;
+}
+
+.month-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 6px;
+  color: #1f2937;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.month-filter-option:hover {
+  background: #eef6ff;
+}
+
+.month-filter-option input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  accent-color: #2563eb;
+}
+
 .month-filter-all {
   height: 32px;
   padding: 0 10px;

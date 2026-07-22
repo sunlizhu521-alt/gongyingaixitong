@@ -87,6 +87,7 @@ export function FilterToolbar({ filters, optionsById, selections, openFilter, se
               allLabel={filter.monthAllLabel || filter.allLabel}
               options={optionsById[filter.id] || []}
               selected={selections[filter.id] || []}
+              multiple={Boolean(filter.multiple)}
               onChange={(value) => setFilterValue(filter.id, value)}
               openFilter={openFilter}
               setOpenFilter={setOpenFilter}

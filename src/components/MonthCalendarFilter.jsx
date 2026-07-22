@@ -6,6 +6,7 @@ export default function MonthCalendarFilter({
   allLabel,
   options = [],
   selected = [],
+  multiple = false,
   onChange,
   openFilter,
   setOpenFilter
@@ -14,14 +15,26 @@ export default function MonthCalendarFilter({
   const rootRef = useRef(null);
   const optionValues = options.map((option) => option.value).filter(Boolean).sort();
   const value = selected[0] || '';
-  const selectedLabel = options.find((option) => option.value === value)?.label || value;
-  const buttonText = value ? selectedLabel : allLabel;
+  const selectedLabels = selected
+    .map((selectedValue) => options.find((option) => option.value === selectedValue)?.label || selectedValue)
+    .filter(Boolean);
+  const buttonText = selectedLabels.length === 0
+    ? allLabel
+    : selectedLabels.length <= 2
+      ? selectedLabels.join('、')
+      : `已选${selectedLabels.length}个月`;
   const min = optionValues[0] || '';
   const max = optionValues[optionValues.length - 1] || '';
 
   function changeMonth(nextValue) {
     onChange(nextValue ? [nextValue] : []);
     setOpenFilter('');
+  }
+
+  function toggleMonth(nextValue) {
+    onChange(selected.includes(nextValue)
+      ? selected.filter((item) => item !== nextValue)
+      : [...selected, nextValue].sort());
   }
 
   useEffect(() => {
@@ -52,14 +65,29 @@ export default function MonthCalendarFilter({
       {isOpen && (
         <div className="month-filter-menu" role="dialog" aria-label={label || allLabel}>
           <div className="month-filter-menu-title">{label}</div>
-          <input
-            type="month"
-            value={value}
-            min={min}
-            max={max}
-            onChange={(event) => changeMonth(event.target.value)}
-          />
-          <button type="button" className="month-filter-all" onClick={() => changeMonth('')}>
+          {multiple ? (
+            <div className="month-filter-options" role="listbox" aria-multiselectable="true">
+              {options.map((option) => (
+                <label key={option.value} className="month-filter-option">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(option.value)}
+                    onChange={() => toggleMonth(option.value)}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <input
+              type="month"
+              value={value}
+              min={min}
+              max={max}
+              onChange={(event) => changeMonth(event.target.value)}
+            />
+          )}
+          <button type="button" className="month-filter-all" onClick={() => multiple ? onChange([]) : changeMonth('')}>
             {allLabel}
           </button>
         </div>

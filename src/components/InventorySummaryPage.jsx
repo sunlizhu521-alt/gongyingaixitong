@@ -78,7 +78,7 @@ const VIEW_CONFIG = {
   sales: {
     label: '销售数据',
     filters: [
-      { id: 'salesMonth', field: 'salesMonth', type: 'month', allLabel: '全部销售月份', monthAllLabel: '全部数据月份' },
+      { id: 'salesMonth', field: 'salesMonth', type: 'month', multiple: true, allLabel: '全部销售月份', monthAllLabel: '全部数据月份' },
       { id: 'department', field: 'department', allLabel: '全部事业部' },
       { id: 'productLine', field: 'productLine', allLabel: '全部产品线' }
     ],
