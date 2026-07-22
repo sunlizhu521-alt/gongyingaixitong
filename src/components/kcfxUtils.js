@@ -250,13 +250,19 @@ export function mapWarehouses(rows) {
 export function mapDepartments(rows) {
   const map = new Map();
   for (const row of rows) {
-    const key = normalizeDepartmentKey(firstText([
+    const explicitKey = normalizeDepartmentKey(firstText([
       firstValue(row, ['F列', '匹配键', '三元组合', '三元联合键']),
-      nthValue(row, 6),
-      [firstValue(row, ['使用组织', '库存组织', '组织']), firstValue(row, ['仓库名称', '仓库', '金蝶仓库', '库存仓库']), firstValue(row, ['物料编码'])].join('')
+      nthValue(row, 6)
     ]));
+    const rebuiltKey = normalizeDepartmentKey([
+      firstText([firstValue(row, ['使用组织', '库存组织', '组织']), nthValue(row, 1)]),
+      firstText([firstValue(row, ['仓库名称', '仓库', '金蝶仓库', '库存仓库']), nthValue(row, 2)]),
+      normalizeMaterialCode(firstText([firstValue(row, ['物料编码']), nthValue(row, 3)]))
+    ].join(''));
     const department = firstText([firstValue(row, ['事业部', '部门', '仓库事业部', '所属事业部']), nthValue(row, 7)]);
-    if (key && department && !map.has(key)) map.set(key, department);
+    if (!department) continue;
+    if (rebuiltKey && !map.has(rebuiltKey)) map.set(rebuiltKey, department);
+    if (explicitKey && !map.has(explicitKey)) map.set(explicitKey, department);
   }
   return map;
 }

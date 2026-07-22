@@ -122,9 +122,14 @@ function toNumber(value) {
 function buildDimensionMaps(records) {
   const departmentByKey = new Map();
   for (const row of records['dim-warehouse-material']?.rows || []) {
-    const key = normalizeDepartmentKey(nthValue(row, 6));
     const department = normalizeText(nthValue(row, 7));
-    if (key && department && !departmentByKey.has(key)) departmentByKey.set(key, department);
+    const keys = [
+      makeDepartmentKey(nthValue(row, 1), nthValue(row, 2), nthValue(row, 3)),
+      normalizeDepartmentKey(nthValue(row, 6))
+    ].filter(Boolean);
+    for (const key of keys) {
+      if (department && !departmentByKey.has(key)) departmentByKey.set(key, department);
+    }
   }
 
   const warehouseTypeByName = new Map();

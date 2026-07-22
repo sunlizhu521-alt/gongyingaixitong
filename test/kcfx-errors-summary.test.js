@@ -85,4 +85,38 @@ test('报错页面使用服务端汇总并在手动刷新时强制重算', async
   assert.match(routeSource, /kcfxErrorsSummaryCacheKey\(database\)/);
   assert.match(routeSource, /req\.query\.refresh === '1'/);
   assert.match(routeSource, /requirePermission\(database, req, res, 'maintenanceLibrary\.errors'\)/);
+  assert.match(pageSource, /trendLoading && !trendSummary/);
+  assert.match(pageSource, /ageLoading && !ageSummary/);
+  assert.match(pageSource, /errorsSummaryLoading && !errorsSummary/);
+});
+
+test('事业部对照按标准化字段重建组合键并兼容旧科学计数法匹配键', () => {
+  const records = {
+    'fact-inventory': record([
+      { 库存组织: '组织A', 仓库名称: '正常仓', 物料编码: '1.007010385E+9', '(结存)数量（库存）': '3' }
+    ]),
+    'fact-2': record([
+      { 库存组织: '组织A', 仓库: '正常仓', 物料编码: '1.007010385E+9', 合计库存数量: '3' }
+    ]),
+    'sales-data': record([]),
+    'dim-product': record([
+      { 物料编码: '1007010385', SKU: 'G01-A-BK-1-X', 金蝶名称: '黑色可折叠拐杖 美国G01' }
+    ]),
+    'dim-warehouse': record([{ 仓库名称: '正常仓' }]),
+    'dim-warehouse-material': record([
+      {
+        库存组织: '组织A',
+        仓库名称: '正常仓',
+        物料编码: '1007010385',
+        匹配键: '组织A正常仓1.007010385E+9',
+        事业部: '海外事业一部'
+      }
+    ]),
+    'dim-store-name': record([]),
+    'dim-customer-material': record([])
+  };
+
+  const summary = buildKcfxErrorsSummary(records, 'saved-at');
+  assert.equal(summary.closed.divisionMissing.length, 0);
+  assert.equal(summary.detail.divisionMissing.length, 0);
 });

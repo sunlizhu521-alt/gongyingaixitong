@@ -1,4 +1,5 @@
 import { isStoreMappingRecordValid, STORE_MAPPING_CUSTOMER_HEADERS } from '../shared/kcfxStoreMapping.js';
+import { materialCodeMatchKey } from '../shared/kcfxMaterialCodeText.js';
 import {
   firstText,
   firstValue,
@@ -10,7 +11,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_ERRORS_SUMMARY_VERSION = 5;
+export const KCFX_ERRORS_SUMMARY_VERSION = 6;
 
 export const KCFX_ERRORS_RECORD_IDS = [
   'fact-inventory',
@@ -107,7 +108,7 @@ function buildClosedInventoryChecks(records, maps) {
     materialNameGetter: getClosedMaterialName,
     organizationGetter: getClosedOrganization,
     warehouseGetter: getClosedWarehouse,
-    isMissing: (row, materialCode) => !maps.divisionMaterialCodes.has(materialCode)
+    isMissing: (row, materialCode) => !maps.divisionMaterialCodes.has(materialCodeMatchKey(materialCode))
   });
   const warehouseSet = maps.warehouseNames.size ? maps.warehouseNames : maps.divisionWarehouses;
   const settlementMissing = stockMaterials.filter((item) => {
@@ -329,19 +330,26 @@ function mapProduct(rows) {
 }
 
 function mapDivisionMaterialCodes(rows) {
-  return new Set(rows.map((row) => normalizeMaterialCode(firstText([firstValue(row, ['物料编码']), nthValue(row, 3)]))).filter(Boolean));
+  return new Set(rows
+    .map((row) => materialCodeMatchKey(firstText([firstValue(row, ['物料编码']), nthValue(row, 3)])))
+    .filter(Boolean));
 }
 
 function mapDivisionDepartmentKeys(rows) {
-  return new Set(rows.map((row) => normalizeDepartmentKey(firstText([
-    firstValue(row, ['F列', '匹配键', '三元组合', '三元联合键']),
-    nthValue(row, 6),
-    [
-      firstValue(row, ['使用组织', '库存组织', '组织']),
-      firstValue(row, ['仓库名称', '仓库', '金蝶仓库', '库存仓库']),
-      firstValue(row, ['物料编码'])
-    ].join('')
-  ]))).filter(Boolean));
+  const keys = new Set();
+  for (const row of rows) {
+    const organization = firstText([firstValue(row, ['使用组织', '库存组织', '组织']), nthValue(row, 1)]);
+    const warehouse = firstText([firstValue(row, ['仓库名称', '仓库', '金蝶仓库', '库存仓库']), nthValue(row, 2)]);
+    const materialCode = normalizeMaterialCode(firstText([firstValue(row, ['物料编码']), nthValue(row, 3)]));
+    const rebuiltKey = normalizeDepartmentKey(`${organization}${warehouse}${materialCode}`);
+    const explicitKey = normalizeDepartmentKey(firstText([
+      firstValue(row, ['F列', '匹配键', '三元组合', '三元联合键']),
+      nthValue(row, 6)
+    ]));
+    if (rebuiltKey) keys.add(rebuiltKey);
+    if (explicitKey) keys.add(explicitKey);
+  }
+  return keys;
 }
 
 function mapDivisionWarehouses(rows) {

@@ -2215,9 +2215,14 @@ function mapKcfxReceiptWarehousesByName(rows) {
 function mapKcfxReceiptWarehouseMaterialDimensions(rows) {
   const departmentByFactKey = new Map();
   for (const row of rows) {
-    const factStyleKey = normalizeKcfxReceiptDepartmentKey(kcfxNthValue(row, 6));
     const department = normalizeKcfxText(kcfxNthValue(row, 7) || kcfxReceiptFirstValue(row, ['事业部']));
-    if (factStyleKey && department && !departmentByFactKey.has(factStyleKey)) departmentByFactKey.set(factStyleKey, department);
+    const keys = [
+      [kcfxNthValue(row, 1), kcfxNthValue(row, 2), normalizeKcfxMaterialCode(kcfxNthValue(row, 3))].join(''),
+      kcfxNthValue(row, 6)
+    ].map(normalizeKcfxReceiptDepartmentKey).filter(Boolean);
+    for (const key of keys) {
+      if (department && !departmentByFactKey.has(key)) departmentByFactKey.set(key, department);
+    }
   }
   return { departmentByFactKey };
 }
@@ -2533,9 +2538,14 @@ function summarizeKcfxTrendMonth(month, record, maps) {
 function buildKcfxTrendDimensionMaps(records) {
   const departmentByKey = new Map();
   for (const row of records['dim-warehouse-material']?.rows || []) {
-    const key = normalizeKcfxTrendDepartmentKey(kcfxNthValue(row, 6));
     const department = normalizeKcfxText(kcfxNthValue(row, 7));
-    if (key && department && !departmentByKey.has(key)) departmentByKey.set(key, department);
+    const keys = [
+      makeKcfxTrendDepartmentKey(kcfxNthValue(row, 1), kcfxNthValue(row, 2), kcfxNthValue(row, 3)),
+      normalizeKcfxTrendDepartmentKey(kcfxNthValue(row, 6))
+    ].filter(Boolean);
+    for (const key of keys) {
+      if (department && !departmentByKey.has(key)) departmentByKey.set(key, department);
+    }
   }
 
   const warehouseTypeByName = new Map();

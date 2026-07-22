@@ -281,7 +281,10 @@ export default function ErrorsPage({
   const [errorsSummaryError, setErrorsSummaryError] = useState('');
   const [selectedSource, setSelectedSource] = useState('closed');
   const [selectedErrorType, setSelectedErrorType] = useState('productMissing');
-  const pageLoading = loading || trendLoading || ageLoading || errorsSummaryLoading;
+  const pageLoading = (loading && !errorsSummary)
+    || (trendLoading && !trendSummary)
+    || (ageLoading && !ageSummary)
+    || (errorsSummaryLoading && !errorsSummary);
   const pageError = trendError || ageError || errorsSummaryError || error;
 
   const loadTrendSummary = useCallback(async () => {
