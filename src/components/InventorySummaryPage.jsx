@@ -5,6 +5,14 @@ import { FilterToolbar } from './KcfxFilters.jsx';
 import { formatNumber } from './kcfxUtils.js';
 import { TablePagination } from './TablePagination.jsx';
 
+const SALES_SUMMARY_NOTE = [
+  '统计口径：',
+  '销售数量取“应收数量”，销售金额取“销售额-不含税”。三个条件默认选择“是”。',
+  '1、是否真实交易按销售仓库匹配一级仓库分类，系统集成仓库为“否”；',
+  '2、是否非内部交易按客户名称+物料编码匹配销售部门，内部交易为“否”；',
+  '3、是否成品按商品维表判断，销售产品线为“其他/配件”或“健康办公”，或一级分类为“配件”或“护理床附件”时为“否”；无法匹配均显示“未匹配”。'
+].join('\n');
+
 const VIEW_CONFIG = {
   summary: {
     label: '库存汇总',
@@ -278,7 +286,7 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
       className="inventory-summary-page"
       title={pageTitle}
       status={status}
-      note={isSalesReport ? '统计口径：销售数量取“应收数量”，销售金额取“销售额-不含税”。三个条件默认选择“是”。真实交易按销售仓库匹配一级仓库分类，系统集成仓库为“否”；非内部交易按客户名称+物料编码匹配销售部门，内部交易为“否”；成品按商品维表判断，销售产品线为“其他/配件”或“健康办公”，或一级分类为“配件”或“护理床附件”时为“否”；无法匹配均显示“未匹配”。' : ''}
+      note={isSalesReport ? SALES_SUMMARY_NOTE : ''}
       loading={loading}
       onRefresh={refresh}
     >

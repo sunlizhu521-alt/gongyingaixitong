@@ -3050,6 +3050,7 @@ th {
   color: #475569;
   font-size: 13px;
   line-height: 1.6;
+  white-space: pre-line;
 }
 
 .kcfx-metric-grid {
