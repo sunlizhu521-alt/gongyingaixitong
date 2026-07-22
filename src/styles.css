@@ -717,37 +717,38 @@ h3 {
 }
 
 .month-filter-menu-multiple {
-  width: min(420px, calc(100vw - 32px));
-  gap: 14px;
-  padding: 18px;
+  width: min(252px, calc(100vw - 20px));
+  gap: 8px;
+  padding: 11px;
+  border-radius: 7px;
   border-color: #314158;
   background: #1e2939;
-  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.32);
+  box-shadow: 0 12px 29px rgba(15, 23, 42, 0.32);
   color: #f8fafc;
 }
 
 .month-filter-year-row {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) 46px;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
   align-items: center;
-  gap: 12px;
+  gap: 7px;
 }
 
 .month-filter-year-row strong {
   text-align: center;
-  font-size: 23px;
+  font-size: 15px;
   letter-spacing: 0;
 }
 
 .month-filter-year-button {
-  width: 46px;
-  height: 42px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 1px solid #3b4d67;
-  border-radius: 8px;
+  border-radius: 5px;
   background: #29384e;
   color: #dbeafe;
-  font-size: 25px;
+  font-size: 15px;
   line-height: 1;
 }
 
@@ -762,27 +763,27 @@ h3 {
 }
 
 .month-filter-hint {
-  margin: -4px 0 0;
+  margin: -2px 0 0;
   color: #93c5fd;
-  font-size: 12px;
+  font-size: 10px;
   text-align: center;
 }
 
 .month-filter-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px 14px;
+  gap: 7px 8px;
 }
 
 .month-filter-month {
   min-width: 0;
-  height: 52px;
-  padding: 0 8px;
+  height: 31px;
+  padding: 0 5px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 4px;
   background: transparent;
   color: #f8fafc;
-  font-size: 20px;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: 0;
   text-align: center;
@@ -803,18 +804,18 @@ h3 {
 .month-filter-footer {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 2px;
+  gap: 6px;
+  margin-top: 1px;
 }
 
 .month-filter-menu-multiple .month-filter-all,
 .month-filter-confirm {
-  height: 42px;
+  height: 28px;
   border: 1px solid #3b4d67;
-  border-radius: 8px;
+  border-radius: 5px;
   background: #29384e;
   color: #f8fafc;
-  font-size: 15px;
+  font-size: 11px;
   font-weight: 700;
 }
 
