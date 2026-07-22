@@ -360,9 +360,11 @@ test('库存和销售汇总报表已分别接入菜单、页面、权限和受�
   assert.match(inventoryPageSource, /isSalesReport \? '销售汇总报表' : '库存汇总报表'/);
   assert.match(inventoryPageSource, /id: 'salesMonth', field: 'salesMonth', type: 'month', multiple: true, allLabel: '全部销售月份', monthAllLabel: '全部数据月份'/);
   assert.match(filtersSource, /multiple=\{Boolean\(filter\.multiple\)\}/);
+  assert.match(monthFilterSource, /selectedLabels\.length === 1[\s\S]*`已选\$\{selectedLabels\.length\}个月`/);
   assert.match(monthFilterSource, /multiple = false[\s\S]*aria-multiselectable="true"[\s\S]*toggleMonth/);
   assert.doesNotMatch(inventoryPageSource, /全部年份|id: 'salesYear'|id: 'salesMonthNumber'/);
-  assert.match(inventoryPageSource, /label: '销售金额（亿元）'[\s\S]*100000000[\s\S]*亿元/);
+  assert.match(inventoryPageSource, /label: '销售金额（元）'[\s\S]*formatNumber\(row\.salesAmount, 2\)[\s\S]*元/);
+  assert.doesNotMatch(inventoryPageSource, /销售金额（亿元）/);
   assert.match(inventoryPageSource, /label: '销售金额', value: `[\s\S]*100000000[\s\S]*亿元/);
   assert.match(inventoryPageSource, /key: 'department', label: '事业部'[\s\S]*key: 'country', label: '国家'[\s\S]*key: 'platform', label: '平台'[\s\S]*key: 'productLine', label: '产品线'/);
   assert.doesNotMatch(inventoryPageSource, /key: 'channel'|label: '渠道'|全部渠道|、渠道/);

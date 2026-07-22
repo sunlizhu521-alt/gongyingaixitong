@@ -92,7 +92,7 @@ const VIEW_CONFIG = {
       { key: 'sku', label: 'SKU' },
       { key: 'kingdeeName', label: '金蝶名称' },
       { key: 'salesQty', label: '销售数量', render: (row) => formatNumber(row.salesQty, 2) },
-      { key: 'salesAmount', label: '销售金额（亿元）', render: (row) => `${formatNumber((Number(row.salesAmount) || 0) / 100000000, 4)}亿元` }
+      { key: 'salesAmount', label: '销售金额（元）', render: (row) => `${formatNumber(row.salesAmount, 2)}元` }
     ]
   }
 };

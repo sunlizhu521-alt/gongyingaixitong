@@ -20,8 +20,8 @@ export default function MonthCalendarFilter({
     .filter(Boolean);
   const buttonText = selectedLabels.length === 0
     ? allLabel
-    : selectedLabels.length <= 2
-      ? selectedLabels.join('、')
+    : selectedLabels.length === 1
+      ? selectedLabels[0]
       : `已选${selectedLabels.length}个月`;
   const min = optionValues[0] || '';
   const max = optionValues[optionValues.length - 1] || '';
