@@ -716,6 +716,116 @@ h3 {
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
 }
 
+.month-filter-menu-multiple {
+  width: min(420px, calc(100vw - 32px));
+  gap: 14px;
+  padding: 18px;
+  border-color: #314158;
+  background: #1e2939;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.32);
+  color: #f8fafc;
+}
+
+.month-filter-year-row {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 46px;
+  align-items: center;
+  gap: 12px;
+}
+
+.month-filter-year-row strong {
+  text-align: center;
+  font-size: 23px;
+  letter-spacing: 0;
+}
+
+.month-filter-year-button {
+  width: 46px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid #3b4d67;
+  border-radius: 8px;
+  background: #29384e;
+  color: #dbeafe;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.month-filter-year-button:hover:not(:disabled) {
+  border-color: #60a5fa;
+  background: #334866;
+}
+
+.month-filter-year-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.month-filter-hint {
+  margin: -4px 0 0;
+  color: #93c5fd;
+  font-size: 12px;
+  text-align: center;
+}
+
+.month-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.month-filter-month {
+  min-width: 0;
+  height: 52px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #f8fafc;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.month-filter-month:hover {
+  border-color: #4b6384;
+  background: #27364b;
+}
+
+.month-filter-month.selected {
+  border-color: #60a5fa;
+  background: #1d4f91;
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.28);
+}
+
+.month-filter-footer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.month-filter-menu-multiple .month-filter-all,
+.month-filter-confirm {
+  height: 42px;
+  border: 1px solid #3b4d67;
+  border-radius: 8px;
+  background: #29384e;
+  color: #f8fafc;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.month-filter-menu-multiple .month-filter-all:hover,
+.month-filter-menu-multiple .month-filter-all.active,
+.month-filter-confirm:hover {
+  border-color: #60a5fa;
+  background: #31517b;
+  color: #ffffff;
+}
+
 .month-filter-menu-title {
   color: #52667b;
   font-size: 12px;

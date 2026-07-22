@@ -446,7 +446,11 @@ test('库存和销售汇总报表已分别接入菜单、页面、权限和受�
   assert.match(inventoryPageSource, /'3、是否成品按商品维表判断/);
   assert.match(filtersSource, /multiple=\{Boolean\(filter\.multiple\)\}/);
   assert.match(monthFilterSource, /selectedLabels\.length === 1[\s\S]*`已选\$\{selectedLabels\.length\}个月`/);
-  assert.match(monthFilterSource, /multiple = false[\s\S]*aria-multiselectable="true"[\s\S]*toggleMonth/);
+  assert.match(monthFilterSource, /multiple = false[\s\S]*按住 Ctrl 可多选月份/);
+  assert.match(monthFilterSource, /event\.ctrlKey \|\| event\.metaKey/);
+  assert.match(monthFilterSource, /className="month-filter-grid"[\s\S]*Number\(option\.value\.slice\(5, 7\)\)\}月/);
+  assert.doesNotMatch(monthFilterSource, /有数据/);
+  assert.match(monthFilterSource, />[\s\S]*全部月份[\s\S]*<\/button>[\s\S]*month-filter-confirm[\s\S]*确定/);
   assert.doesNotMatch(inventoryPageSource, /全部年份|id: 'salesYear'|id: 'salesMonthNumber'/);
   assert.match(inventoryPageSource, /label: '销售金额（元）'[\s\S]*formatNumber\(row\.salesAmount, 2\)[\s\S]*元/);
   assert.doesNotMatch(inventoryPageSource, /销售金额（亿元）/);
