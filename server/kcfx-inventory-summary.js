@@ -12,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_SUMMARY_VERSION = 10;
+export const KCFX_INVENTORY_SUMMARY_VERSION = 11;
 
 const INVENTORY_VIEW_FIELDS = {
   summary: ['department', 'productLine'],
@@ -248,6 +248,8 @@ function buildSalesDetails(records, productMap) {
         amount: Number(row.amount) || 0,
         productMissingFields: productMissingFields(product),
         departmentMissing: !department,
+        countryMissing: !country,
+        platformMissing: !platform,
         channelMissing: !channel,
         searchText: [materialCode, sku, kingdeeName, row.customer, row.storeShortName, row.salesOrg, country, platform, row.productLine]
           .map(normalizeText)
@@ -334,6 +336,8 @@ function buildInventorySummaryErrors(inventory, undelivered, salesDetails) {
         (row) => `${row.productMissingFields.join('、')}缺失`
       ),
       departmentMissing: salesIssueRows(salesDetails, (row) => row.departmentMissing, '事业部未匹配'),
+      countryMissing: salesIssueRows(salesDetails, (row) => row.countryMissing, '店铺简称维表国家缺失'),
+      platformMissing: salesIssueRows(salesDetails, (row) => row.platformMissing, '店铺简称维表平台缺失'),
       channelMissing: salesIssueRows(salesDetails, (row) => row.channelMissing, '店铺简称未匹配'),
       settlementMissing: salesIssueRows(
         salesDetails,
