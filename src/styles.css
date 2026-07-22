@@ -772,20 +772,30 @@ h3 {
 .month-filter-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px 8px;
+  gap: 5px;
 }
 
 .month-filter-month {
   min-width: 0;
-  height: 31px;
+  height: 34px;
   padding: 0 5px;
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
   color: #f8fafc;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   letter-spacing: 0;
+  text-align: center;
+}
+
+.month-filter-empty {
+  grid-column: 1 / -1;
+  min-height: 34px;
+  margin: 0;
+  color: #93c5fd;
+  font-size: 11px;
+  line-height: 34px;
   text-align: center;
 }
 

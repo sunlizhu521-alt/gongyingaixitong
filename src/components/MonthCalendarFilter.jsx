@@ -79,6 +79,12 @@ export default function MonthCalendarFilter({
     return () => document.removeEventListener('pointerdown', closeOnOutsidePointer);
   }, [isOpen, setOpenFilter]);
 
+  useEffect(() => {
+    if (!isOpen || !availableYears.length || availableYears.includes(displayYear)) return;
+    const selectedYear = [...selected].sort().at(-1)?.slice(0, 4);
+    setDisplayYear(availableYears.includes(selectedYear) ? selectedYear : availableYears.at(-1));
+  }, [availableYears, displayYear, isOpen, selected]);
+
   return (
     <div className="month-calendar-filter" ref={rootRef}>
       <button
@@ -120,7 +126,7 @@ export default function MonthCalendarFilter({
               </div>
               <p className="month-filter-hint">按住 Ctrl 可多选月份</p>
               <div className="month-filter-grid" role="listbox" aria-multiselectable="true">
-                {visibleMonths.map((option) => (
+                {visibleMonths.length ? visibleMonths.map((option) => (
                   <button
                     type="button"
                     role="option"
@@ -131,7 +137,7 @@ export default function MonthCalendarFilter({
                   >
                     {Number(option.value.slice(5, 7))}月
                   </button>
-                ))}
+                )) : <p className="month-filter-empty">月份加载中...</p>}
               </div>
               <div className="month-filter-footer">
                 <button

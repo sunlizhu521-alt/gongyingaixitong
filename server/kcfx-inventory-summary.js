@@ -462,6 +462,7 @@ function resolveRows(cache, request = {}) {
     const searchFields = ['searchText', 'department', 'country', 'platform', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
     const baseRows = cache.salesDetails || [];
     const options = buildOptions(baseRows, SALES_FILTER_FIELDS, selections, search, searchFields);
+    options.salesMonth = sortedOptions(baseRows.map((row) => row.salesMonth), 'salesMonth');
     const filteredDetails = baseRows.filter((row) => (
       matchesSelections(row, SALES_FILTER_FIELDS, selections)
       && matchesSearch(row, search, searchFields)
