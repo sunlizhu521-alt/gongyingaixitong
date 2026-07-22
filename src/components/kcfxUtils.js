@@ -1,6 +1,11 @@
 import { INVENTORY_TREND_MONTHS } from '../../shared/kcfxTrendMonths.js';
 import { coerceKcfxMaterialCodeText, materialCodeMatchKey } from '../../shared/kcfxMaterialCodeText.js';
-import { STORE_MAPPING_CUSTOMER_HEADERS, STORE_MAPPING_SHORT_NAME_HEADERS } from '../../shared/kcfxStoreMapping.js';
+import {
+  STORE_MAPPING_COUNTRY_HEADERS,
+  STORE_MAPPING_CUSTOMER_HEADERS,
+  STORE_MAPPING_PLATFORM_HEADERS,
+  STORE_MAPPING_SHORT_NAME_HEADERS
+} from '../../shared/kcfxStoreMapping.js';
 import { selectInventoryTrendPrice } from '../../shared/kcfxTrendPrice.js';
 
 export { INVENTORY_TREND_MONTHS };
@@ -477,6 +482,8 @@ export function getSalesRows(records) {
       salesOrg: departmentMap.get(departmentKey) || '',
       customer,
       storeShortName: storeInfo?.shortName || '',
+      country: storeInfo?.country || '',
+      platform: storeInfo?.platform || '',
       salesDepartmentKey: departmentKey,
       materialCode,
       materialName: getSalesMaterialName(row) || product.materialName || '',
@@ -529,10 +536,20 @@ function mapStoreInfo(rows) {
       firstValueByHeaderIncludes(row, ['日常', '简称']),
       firstValueByHeaderIncludes(row, ['汇报', '简称'])
     ]);
+    const country = firstText([
+      firstValue(row, STORE_MAPPING_COUNTRY_HEADERS),
+      firstValueByHeaderIncludes(row, ['国家'])
+    ]);
+    const platform = firstText([
+      firstValue(row, STORE_MAPPING_PLATFORM_HEADERS),
+      firstValueByHeaderIncludes(row, ['平台'])
+    ]);
     if (!normalized || !normalizeText(shortName) || map.has(normalized)) continue;
     map.set(normalized, {
       rawName,
-      shortName: normalizeText(shortName)
+      shortName: normalizeText(shortName),
+      country: normalizeText(country),
+      platform: normalizeText(platform)
     });
   }
   return map;

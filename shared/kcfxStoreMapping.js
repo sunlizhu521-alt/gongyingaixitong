@@ -15,6 +15,21 @@ export const STORE_MAPPING_SHORT_NAME_HEADERS = [
   '店铺简称'
 ];
 
+export const STORE_MAPPING_COUNTRY_HEADERS = [
+  '国家',
+  '国家/地区',
+  '国家地区',
+  '站点国家',
+  '销售国家'
+];
+
+export const STORE_MAPPING_PLATFORM_HEADERS = [
+  '平台',
+  '销售平台',
+  '电商平台',
+  '渠道平台'
+];
+
 function normalizeHeader(value) {
   return String(value ?? '')
     .trim()

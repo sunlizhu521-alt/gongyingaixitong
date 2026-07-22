@@ -45,7 +45,7 @@ function sampleRecords() {
       { 匹配键: '客户A1002', 销售部门: '海外事业一部' }
     ]),
     'dim-customer-material': record([
-      { 客户名称: '客户A', 店铺简称: '渠道A' }
+      { 客户名称: '客户A', 店铺简称: '渠道A', 国家: '美国', 平台: 'Amazon' }
     ]),
     'sales-data': record([
       { 日期: '2026-01-10', 客户名称: '客户A', 物料编码: '1001', 物料名称: '产品A', 客户物料编码: '客户A1001', 应收数量: '2', '销售额-不含税': '100' },
@@ -63,7 +63,7 @@ test('采购订单事业部只保留第一个星号前的内容', () => {
 
 test('库存汇总按海上在途精确分段并排除汇总行', () => {
   const cache = buildInventorySummaryCache(sampleRecords(), 'saved-at');
-  assert.equal(cache.version, 9);
+  assert.equal(cache.version, 10);
   assert.equal(cache.inventoryViews.onHand.length, 2);
   assert.equal(cache.inventoryViews.onHand.reduce((sum, row) => sum + row.qty, 0), 12);
   assert.equal(cache.inventoryViews.inTransit.length, 1);
@@ -141,6 +141,8 @@ test('销售按年月和物料维度汇总应收数量与不含税金额', () =>
   const material1002 = result.rows.find((row) => row.materialCode === '1002');
   assert.equal(material1001.dateLabel, '2026年1月');
   assert.equal(material1001.department, '海外事业一部');
+  assert.equal(material1001.country, '美国');
+  assert.equal(material1001.platform, 'Amazon');
   assert.equal(material1001.channel, '渠道A');
   assert.equal(material1001.sku, 'SKU-A');
   assert.equal(material1001.kingdeeName, '产品A');
@@ -289,6 +291,7 @@ test('库存和销售汇总报表已分别接入菜单、页面、权限和受�
   assert.match(mainSource, /<SalesSummaryPage/);
   assert.match(inventoryPageSource, /reportType = 'inventory'/);
   assert.match(inventoryPageSource, /isSalesReport \? '销售汇总报表' : '库存汇总报表'/);
+  assert.match(inventoryPageSource, /key: 'department', label: '事业部'[\s\S]*key: 'country', label: '国家'[\s\S]*key: 'platform', label: '平台'[\s\S]*key: 'channel', label: '渠道'/);
   assert.match(inventoryPageSource, /key: 'sku', label: 'SKU'[\s\S]*key: 'kingdeeName', label: '金蝶名称'[\s\S]*key: 'settlementPrice', label: '内部结算价'/);
   assert.match(inventoryPageSource, /key: 'totalQty', label: '合计'[\s\S]*key: 'inventoryValue', label: '货值'/);
   assert.match(inventoryPageSource, /label: '货值', value: `¥\$\{formatNumber\(metrics\.inventoryValue, 2\)\}`/);
@@ -302,6 +305,7 @@ test('库存和销售汇总报表已分别接入菜单、页面、权限和受�
   assert.match(routeSource, /function inventorySummaryPermission\(body = \{\}\)[\s\S]*body\.report === 'sales'[\s\S]*'salesInventory\.salesSummary'[\s\S]*'salesInventory\.inventorySummary'/);
   assert.equal((routeSource.match(/requirePermission\(database, req, res, inventorySummaryPermission\(req\.body\)\)/g) || []).length, 2);
   assert.match(routeSource, /物料编码: row\.materialCode,[\s\S]*SKU: row\.sku,[\s\S]*金蝶名称: row\.kingdeeName,[\s\S]*内部结算价: Number\(row\.settlementPrice\)[\s\S]*合计: Number\(row\.totalQty\)[\s\S]*货值: Number\(row\.inventoryValue\)/);
+  assert.match(routeSource, /事业部: row\.department,[\s\S]*国家: row\.country,[\s\S]*平台: row\.platform,[\s\S]*渠道: row\.channel/);
   assert.doesNotMatch(routeSource, /物料编码数量|materialCodeCount/);
   assert.match(errorsPageSource, /value: 'inventorySummary', label: '库存汇总报表'/);
   assert.match(errorsPageSource, /value: 'salesSummary', label: '销售汇总报表'/);

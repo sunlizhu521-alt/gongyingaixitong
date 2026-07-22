@@ -17,7 +17,7 @@ test('store mapping contract requires customer and daily short-name headers', ()
 
 test('sales rows obtain store short names and use receivable quantities', () => {
   const salesHeaders = ['销售日期', '客户名称', '物料编码', '应收数量', '出库数量'];
-  const storeHeaders = ['序号', '客户名称', '领星名称', '日常汇报沟通简称'];
+  const storeHeaders = ['序号', '客户名称', '领星名称', '日常汇报沟通简称', '国家', '平台'];
   const records = {
     'sales-data': {
       rows: [
@@ -26,14 +26,14 @@ test('sales rows obtain store short names and use receivable quantities', () => 
       ]
     },
     'dim-customer-material': {
-      rows: [rowFrom(storeHeaders, [1, '客户全称A', '领星店铺A', '日常简称A'])]
+      rows: [rowFrom(storeHeaders, [1, '客户全称A', '领星店铺A', '日常简称A', '美国', 'Amazon'])]
     }
   };
 
   const rows = getSalesRows(records);
-  assert.deepEqual(rows.map(({ customer, storeShortName, storeMatchStatus, qty }) => ({ customer, storeShortName, storeMatchStatus, qty })), [
-    { customer: '客户全称A', storeShortName: '日常简称A', storeMatchStatus: '已匹配', qty: 5 },
-    { customer: '未维护客户B', storeShortName: '', storeMatchStatus: '未匹配', qty: 3 }
+  assert.deepEqual(rows.map(({ customer, storeShortName, country, platform, storeMatchStatus, qty }) => ({ customer, storeShortName, country, platform, storeMatchStatus, qty })), [
+    { customer: '客户全称A', storeShortName: '日常简称A', country: '美国', platform: 'Amazon', storeMatchStatus: '已匹配', qty: 5 },
+    { customer: '未维护客户B', storeShortName: '', country: '', platform: '', storeMatchStatus: '未匹配', qty: 3 }
   ]);
 });
 

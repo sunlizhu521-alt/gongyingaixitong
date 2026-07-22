@@ -87,6 +87,8 @@ const VIEW_CONFIG = {
     columns: [
       { key: 'dateLabel', label: '日期' },
       { key: 'department', label: '事业部' },
+      { key: 'country', label: '国家' },
+      { key: 'platform', label: '平台' },
       { key: 'channel', label: '渠道' },
       { key: 'productLine', label: '产品线' },
       { key: 'materialCode', label: '物料编码' },
@@ -302,7 +304,7 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
         resetFilters={resetFilters}
         searchValue={tableState.search}
         setSearchValue={(value) => updateTableState(activeView, (current) => ({ ...current, search: value, page: 1 }))}
-        searchPlaceholder={activeView === 'sales' ? '搜索事业部、渠道、产品线、物料编码、SKU、金蝶名称' : '搜索物料编码、SKU、金蝶名称、事业部、产品线'}
+        searchPlaceholder={activeView === 'sales' ? '搜索事业部、国家、平台、渠道、产品线、物料编码、SKU、金蝶名称' : '搜索物料编码、SKU、金蝶名称、事业部、产品线'}
       />
 
       <MetricCards metrics={metricCards} />

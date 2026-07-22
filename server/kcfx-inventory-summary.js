@@ -12,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_SUMMARY_VERSION = 9;
+export const KCFX_INVENTORY_SUMMARY_VERSION = 10;
 
 const INVENTORY_VIEW_FIELDS = {
   summary: ['department', 'productLine'],
@@ -227,12 +227,16 @@ function buildSalesDetails(records, productMap) {
       const kingdeeName = normalizeDimension(product.materialName, '未匹配金蝶名称');
       const department = normalizeText(row.salesOrg);
       const channel = normalizeText(row.storeShortName);
+      const country = normalizeText(row.country);
+      const platform = normalizeText(row.platform);
       return {
         salesMonth: row.salesMonth,
         salesYear: row.salesYear,
         salesMonthNumber: row.salesMonthNumber,
         customer: normalizeText(row.customer),
         department: normalizeDimension(department, '未匹配事业部'),
+        country: normalizeDimension(country, '未匹配国家'),
+        platform: normalizeDimension(platform, '未匹配平台'),
         channel: normalizeDimension(channel, '未匹配渠道'),
         productLine: normalizeDimension(row.productLine, '未匹配产品线'),
         productSeries: normalizeDimension(product.productSeries, '未匹配销售系列'),
@@ -245,7 +249,7 @@ function buildSalesDetails(records, productMap) {
         productMissingFields: productMissingFields(product),
         departmentMissing: !department,
         channelMissing: !channel,
-        searchText: [materialCode, sku, kingdeeName, row.customer, row.storeShortName, row.salesOrg, row.productLine]
+        searchText: [materialCode, sku, kingdeeName, row.customer, row.storeShortName, row.salesOrg, country, platform, row.productLine]
           .map(normalizeText)
           .join('\u0001')
           .toLowerCase()
@@ -273,6 +277,8 @@ const SALES_ERROR_KEY_FIELDS = [
   'salesMonth',
   'customer',
   'department',
+  'country',
+  'platform',
   'channel',
   'productLine',
   'productSeries',
@@ -410,7 +416,7 @@ function buildOptions(rows, fields, selections, search, searchFields) {
 function groupSalesRows(rows) {
   const map = new Map();
   for (const row of rows) {
-    const fields = ['salesMonth', 'department', 'channel', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
+    const fields = ['salesMonth', 'department', 'country', 'platform', 'channel', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
     const key = fields.map((field) => row[field] || '').join('\u0001');
     let target = map.get(key);
     if (!target) {
@@ -418,6 +424,8 @@ function groupSalesRows(rows) {
         salesMonth: row.salesMonth,
         dateLabel: `${Number(row.salesYear)}年${Number(row.salesMonthNumber)}月`,
         department: row.department,
+        country: row.country,
+        platform: row.platform,
         channel: row.channel,
         productLine: row.productLine,
         materialCode: row.materialCode,
@@ -444,7 +452,7 @@ function resolveRows(cache, request = {}) {
   const selections = normalizedSelections(request.filters);
   const search = request.search || '';
   if (report === 'sales') {
-    const searchFields = ['searchText', 'department', 'channel', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
+    const searchFields = ['searchText', 'department', 'country', 'platform', 'channel', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
     const baseRows = cache.salesDetails || [];
     const options = buildOptions(baseRows, SALES_FILTER_FIELDS, selections, search, searchFields);
     const filteredDetails = baseRows.filter((row) => (

@@ -537,6 +537,8 @@ app.post('/api/kcfx-library/inventory-summary/export', async (req, res) => {
       data = rows.map((row) => ({
         日期: row.dateLabel,
         事业部: row.department,
+        国家: row.country,
+        平台: row.platform,
         渠道: row.channel,
         产品线: row.productLine,
         物料编码: row.materialCode,
