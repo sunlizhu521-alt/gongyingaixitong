@@ -78,8 +78,7 @@ const VIEW_CONFIG = {
   sales: {
     label: '销售数据',
     filters: [
-      { id: 'salesYear', field: 'salesYear', allLabel: '全部年份' },
-      { id: 'salesMonthNumber', field: 'salesMonthNumber', allLabel: '全部月份' },
+      { id: 'salesMonth', field: 'salesMonth', type: 'month', allLabel: '全部销售月份', monthAllLabel: '全部数据月份' },
       { id: 'department', field: 'department', allLabel: '全部事业部' },
       { id: 'productLine', field: 'productLine', allLabel: '全部产品线' }
     ],
@@ -93,7 +92,7 @@ const VIEW_CONFIG = {
       { key: 'sku', label: 'SKU' },
       { key: 'kingdeeName', label: '金蝶名称' },
       { key: 'salesQty', label: '销售数量', render: (row) => formatNumber(row.salesQty, 2) },
-      { key: 'salesAmount', label: '销售金额', render: (row) => formatNumber(row.salesAmount, 2) }
+      { key: 'salesAmount', label: '销售金额（亿元）', render: (row) => `${formatNumber((Number(row.salesAmount) || 0) / 100000000, 4)}亿元` }
     ]
   }
 };
@@ -172,13 +171,6 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
         if (!result?.ok) throw new Error(result?.message || result?.error || `${pageTitle}读取失败`);
         if (cancelled) return;
         setPayloads((current) => ({ ...current, [activeView]: result }));
-        if (activeView === 'sales' && result.defaultYear && !tableState.filters.salesYear.length) {
-          updateTableState('sales', (current) => ({
-            ...current,
-            filters: { ...current.filters, salesYear: [result.defaultYear] },
-            page: 1
-          }));
-        }
       } catch (loadError) {
         if (!cancelled) setError(loadError?.message || String(loadError));
       } finally {
@@ -195,11 +187,9 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
     filter.id,
     (payload?.options?.[filter.id] || []).map((value) => ({
       value,
-      label: filter.id === 'salesYear'
-        ? `${value}年`
-        : filter.id === 'salesMonthNumber'
-          ? `${Number(value)}月`
-          : value
+      label: filter.id === 'salesMonth'
+        ? `${value.slice(0, 4)}年${Number(value.slice(5, 7))}月`
+        : value
     }))
   ])), [config.filters, payload?.options]);
 
@@ -255,7 +245,7 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
     ? [
         { label: '汇总行数', value: formatNumber(metrics.rowCount) },
         { label: '销售数量', value: formatNumber(metrics.salesQty, 2) },
-        { label: '销售金额', value: `¥${formatNumber(metrics.salesAmount, 2)}` }
+        { label: '销售金额', value: `${formatNumber((Number(metrics.salesAmount) || 0) / 100000000, 4)}亿元` }
       ]
     : activeView === 'summary'
       ? [

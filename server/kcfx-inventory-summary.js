@@ -12,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_SUMMARY_VERSION = 12;
+export const KCFX_INVENTORY_SUMMARY_VERSION = 13;
 
 const INVENTORY_VIEW_FIELDS = {
   summary: ['department', 'productLine'],
@@ -20,7 +20,7 @@ const INVENTORY_VIEW_FIELDS = {
   inTransit: ['department', 'productLine'],
   undelivered: ['supplier', 'department', 'productLine']
 };
-const SALES_FILTER_FIELDS = ['salesYear', 'salesMonthNumber', 'department', 'productLine'];
+const SALES_FILTER_FIELDS = ['salesMonth', 'department', 'productLine'];
 
 function normalizeHeader(value) {
   return normalizeText(value)
@@ -399,7 +399,7 @@ function matchesSearch(row, search, fields) {
 
 function sortedOptions(values, field) {
   const unique = [...new Set(values.map(normalizeText).filter(Boolean))];
-  if (field === 'salesYear' || field === 'salesMonthNumber') return unique.sort((a, b) => a.localeCompare(b));
+  if (field === 'salesMonth') return unique.sort((a, b) => a.localeCompare(b));
   return unique.sort((a, b) => a.localeCompare(b, 'zh-CN'));
 }
 
@@ -460,8 +460,7 @@ function resolveRows(cache, request = {}) {
       report,
       view: 'sales',
       rows: groupSalesRows(filteredDetails),
-      options,
-      defaultYear: sortedOptions(baseRows.map((row) => row.salesYear), 'salesYear').at(-1) || ''
+      options
     };
   }
 
@@ -473,8 +472,7 @@ function resolveRows(cache, request = {}) {
     report,
     view,
     rows: baseRows.filter((row) => matchesSelections(row, fields, selections) && matchesSearch(row, search, searchFields)),
-    options: buildOptions(baseRows, fields, selections, search, searchFields),
-    defaultYear: ''
+    options: buildOptions(baseRows, fields, selections, search, searchFields)
   };
 }
 
@@ -514,7 +512,6 @@ export function queryInventorySummary(cache, request = {}) {
     generatedAt: cache.generatedAt,
     report: resolved.report,
     view: resolved.view,
-    defaultYear: resolved.defaultYear,
     options: resolved.options,
     metrics: metricsForRows(resolved.report, resolved.view, resolved.rows),
     rows: resolved.rows.slice(start, start + pageSize),
