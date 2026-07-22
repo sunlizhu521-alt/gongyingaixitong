@@ -5,6 +5,7 @@ import { INVENTORY_TREND_MONTHS, KCFX_TREND_SCHEMA_VERSION } from '../shared/kcf
 import { allocateInventoryTrendAge, buildInventoryTrendAgeLookup, inventoryMonthTrendIdentity, UNMATCHED_INVENTORY_AGE_BUCKET } from '../shared/kcfxTrendAge.js';
 import { latestInventoryAgeSlotId } from '../shared/kcfxAgeMonths.js';
 import { selectInventoryTrendPrice } from '../shared/kcfxTrendPrice.js';
+import { normalizeKcfxDimensionMaterialCodeRows } from '../shared/kcfxDimensionMaterialCode.js';
 
 const [dataDirArg, outputPathArg] = process.argv.slice(2);
 const dataDir = path.resolve(dataDirArg || 'data');
@@ -35,7 +36,8 @@ async function loadRecord(db, id) {
     ? path.join(dataDir, record.rowsPath)
     : rowsPathFor(id);
   const payload = await readJson(rowsPath, null);
-  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const sourceRows = Array.isArray(payload?.rows) ? payload.rows : [];
+  const rows = normalizeKcfxDimensionMaterialCodeRows(id, sourceRows).rows;
   if (!rows.length) return null;
   return {
     ...record,

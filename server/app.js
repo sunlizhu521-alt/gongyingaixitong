@@ -50,6 +50,7 @@ import {
   queryAgeAnalysis
 } from './kcfx-age-analysis.js';
 import { isStoreMappingHeaderSet, isStoreMappingRecordValid, pickStoreMappingSheetName, STORE_MAPPING_SHEET_HINT } from '../shared/kcfxStoreMapping.js';
+import { isKcfxDimensionRecordId, normalizeKcfxDimensionMaterialCodeRows } from '../shared/kcfxDimensionMaterialCode.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -1233,15 +1234,17 @@ async function writeKcfxRecordRows(id, rows) {
   const fullPath = path.join(dataDir, relativePath);
   const tempPath = `${fullPath}.${randomUUID()}.tmp`;
   const savedAt = new Date().toISOString();
+  const materialCodeNormalization = normalizeKcfxDimensionMaterialCodeRows(id, rows);
+  const normalizedRows = materialCodeNormalization.rows;
   try {
     await writeFile(tempPath, JSON.stringify({
       id,
       savedAt,
-      rowCount: rows.length,
-      rows
+      rowCount: normalizedRows.length,
+      rows: normalizedRows
     }), 'utf8');
     const validated = JSON.parse(await readFile(tempPath, 'utf8'));
-    if (validated.id !== id || validated.rowCount !== rows.length || !Array.isArray(validated.rows)) {
+    if (validated.id !== id || validated.rowCount !== normalizedRows.length || !Array.isArray(validated.rows)) {
       throw new Error('invalid kcfx rows temporary file');
     }
     await rename(tempPath, fullPath);
@@ -1252,15 +1255,21 @@ async function writeKcfxRecordRows(id, rows) {
   return {
     rowsPath: relativePath,
     rowsSavedAt: savedAt,
-    rowCount: rows.length
+    rowCount: normalizedRows.length,
+    ...(isKcfxDimensionRecordId(id)
+      ? { materialCodeNormalization: materialCodeNormalization.diagnostics }
+      : {})
   };
 }
 
 async function readKcfxRecordRows(record = {}) {
-  if (Array.isArray(record.rows)) return record.rows;
-  if (!record.rowsPath) return [];
-  const payload = JSON.parse(await readFile(kcfxRecordRowsFullPath(record), 'utf8'));
-  return Array.isArray(payload?.rows) ? payload.rows : [];
+  let rows = [];
+  if (Array.isArray(record.rows)) rows = record.rows;
+  else if (record.rowsPath) {
+    const payload = JSON.parse(await readFile(kcfxRecordRowsFullPath(record), 'utf8'));
+    rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  }
+  return normalizeKcfxDimensionMaterialCodeRows(record.id, rows).rows;
 }
 
 async function readKcfxRecordRowsPayload(id) {
@@ -1511,7 +1520,7 @@ const KCFX_RECEIPT_UNINSPECTED_RETURN_CATEGORIES = new Set(['全新品', '其他
 const KCFX_RECEIPT_OTHER_UNSALEABLE_RETURN_CATEGORIES = new Set(['健康办公', '其他/配件']);
 let kcfxReceiptSummaryCache = null;
 let kcfxReceiptSummaryPromise = null;
-const KCFX_RECEIPT_SUMMARY_CACHE_VERSION = 4;
+const KCFX_RECEIPT_SUMMARY_CACHE_VERSION = 5;
 let kcfxAgeAnalysisCache = null;
 let kcfxAgeAnalysisPromise = null;
 const KCFX_RECEIPT_SUMMARY_ROW_FIELDS = [
@@ -2818,6 +2827,7 @@ function parseKcfxWorkbookRows(workbook, slot) {
   const filtered = isInventoryMonthSlotId(slot.id)
     ? filterInventoryMonthSummaryRows(selected.rows)
     : { rows: selected.rows, removed: 0 };
+  const materialCodeNormalization = normalizeKcfxDimensionMaterialCodeRows(slot.id, filtered.rows);
   return {
     sheetName,
     originalSheetRange: sheetRange.originalRef,
@@ -2832,7 +2842,8 @@ function parseKcfxWorkbookRows(workbook, slot) {
       headerFirst6: candidate.headers.slice(0, 6)
     })),
     headers: selected.headers,
-    rows: filtered.rows
+    rows: materialCodeNormalization.rows,
+    materialCodeNormalization: materialCodeNormalization.diagnostics
   };
 }
 
@@ -2859,6 +2870,7 @@ function buildKcfxParseDiagnostics(parsed) {
     gHeader: headers[6] || '',
     hHeader: headers[7] || '',
     adHeader: headers[29] || '',
+    materialCodeNormalization: parsed.materialCodeNormalization || null,
     gSamples: rows.slice(0, 3).map((row) => kcfxNthValue(row, 7)),
     hSamples: rows.slice(0, 3).map((row) => kcfxNthValue(row, 8)),
     adSamples: rows.slice(0, 3).map((row) => kcfxNthValue(row, 30))
@@ -2980,6 +2992,7 @@ function buildKcfxClientParsedFileRecord(file, storedFile, slot, clientRecord) {
   const completedAt = new Date().toISOString();
   const diagnostics = clientRecord.parseDiagnostics || {};
   const fileName = normalizeUploadedFileName(file.originalname);
+  const materialCodeNormalization = normalizeKcfxDimensionMaterialCodeRows(slot.id, clientRecord.rows);
   return {
     id: slot.id,
     type: slot.type,
@@ -3001,9 +3014,10 @@ function buildKcfxClientParsedFileRecord(file, storedFile, slot, clientRecord) {
     parseDiagnostics: {
       ...diagnostics,
       readMode: diagnostics.readMode || 'browser',
-      fallbackAttempts: Array.isArray(diagnostics.fallbackAttempts) ? diagnostics.fallbackAttempts : []
+      fallbackAttempts: Array.isArray(diagnostics.fallbackAttempts) ? diagnostics.fallbackAttempts : [],
+      materialCodeNormalization: materialCodeNormalization.diagnostics
     },
-    rows: clientRecord.rows
+    rows: materialCodeNormalization.rows
   };
 }
 

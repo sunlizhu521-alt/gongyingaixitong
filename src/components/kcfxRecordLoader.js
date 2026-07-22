@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { API } from '../constants.js';
 import { getCache, setCache } from '../indexedDbCache.js';
+import { isKcfxDimensionRecordId, normalizeKcfxDimensionMaterialCodeRows } from '../../shared/kcfxDimensionMaterialCode.js';
 
 const recordCache = new Map();
 const inflightRecordRequests = new Map();
@@ -8,6 +9,7 @@ let salesRowsPayloadCache = null;
 let inflightSalesRowsRequest = null;
 let recordCacheVersion = '';
 const salesRowsCacheVersion = 'v4';
+const recordRowsCacheVersion = 'v2';
 
 function uniqueRecordIds(ids = []) {
   return [...new Set((ids || []).map((id) => String(id || '').trim()).filter(Boolean))];
@@ -30,12 +32,13 @@ export async function fetchKcfxRecord(id, { force = false } = {}) {
   if (!force && recordCache.has(id)) return recordCache.get(id);
   if (!force && inflightRecordRequests.has(id)) return inflightRecordRequests.get(id);
 
-  const cacheKey = `kcfx:${recordCacheVersion}:${id}`;
+  const cacheKey = `kcfx:${recordRowsCacheVersion}:${recordCacheVersion}:${id}`;
   if (!force) {
     const cached = await getCache(cacheKey);
     if (cached) {
-      recordCache.set(id, cached);
-      return cached;
+      const normalizedRecord = normalizeDimensionRecord(cached, id);
+      recordCache.set(id, normalizedRecord);
+      return normalizedRecord;
     }
   }
 
@@ -45,7 +48,7 @@ export async function fetchKcfxRecord(id, { force = false } = {}) {
       return response.json();
     })
     .then((payload) => {
-      const record = payload.record || { id, rows: [] };
+      const record = normalizeDimensionRecord(payload.record || { id, rows: [] }, id);
       recordCache.set(record.id || id, record);
       void setCache(cacheKey, record, 10 * 60 * 1000);
       return record;
@@ -95,9 +98,22 @@ export async function prefetchKcfxRecords(ids, { force = false, batchSize = 3, d
 
 export function kcfxRecordsArrayToMap(records) {
   if (Array.isArray(records)) {
-    return Object.fromEntries(records.map((record) => [record.id, record]).filter(([id]) => id));
+    return Object.fromEntries(records
+      .map((record) => [record.id, normalizeDimensionRecord(record, record.id)])
+      .filter(([id]) => id));
   }
-  return records || {};
+  return Object.fromEntries(Object.entries(records || {}).map(([id, record]) => [id, normalizeDimensionRecord(record, id)]));
+}
+
+function normalizeDimensionRecord(record, fallbackId = '') {
+  const id = record?.id || fallbackId;
+  if (!isKcfxDimensionRecordId(id) || !Array.isArray(record?.rows)) return record;
+  const normalized = normalizeKcfxDimensionMaterialCodeRows(id, record.rows);
+  return {
+    ...record,
+    rows: normalized.rows,
+    materialCodeNormalization: normalized.diagnostics
+  };
 }
 
 function salesRowsCacheKey(savedAt = '') {

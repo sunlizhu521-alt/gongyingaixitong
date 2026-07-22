@@ -10,7 +10,7 @@ import {
   latestInventoryAgeSlotId
 } from '../shared/kcfxAgeMonths.js';
 
-export const KCFX_AGE_ANALYSIS_VERSION = 2;
+export const KCFX_AGE_ANALYSIS_VERSION = 3;
 
 export const AGE_ANALYSIS_FILTER_FIELDS = [
   'month',
