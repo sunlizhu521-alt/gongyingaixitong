@@ -12,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_SUMMARY_VERSION = 8;
+export const KCFX_INVENTORY_SUMMARY_VERSION = 9;
 
 const INVENTORY_VIEW_FIELDS = {
   summary: ['department', 'productLine'],
@@ -140,6 +140,7 @@ function buildInventoryRows(records, productMap) {
       supplier: '',
       department: normalizeDimension(department, '未匹配事业部'),
       productLine: normalizeDimension(product.productLine, '未匹配产品线'),
+      productSeries: normalizeDimension(product.productSeries, '未匹配销售系列'),
       materialCode,
       sku: normalizeDimension(product.sku, '未匹配SKU'),
       kingdeeName: normalizeDimension(product.materialName, '未匹配金蝶名称'),
@@ -175,6 +176,7 @@ function buildUndeliveredRows(records, productMap) {
       supplier: normalizeDimension(supplier, '未匹配供应商'),
       department: splitPurchaseDepartment(departmentSource),
       productLine: normalizeDimension(product.productLine, '未匹配产品线'),
+      productSeries: normalizeDimension(product.productSeries, '未匹配销售系列'),
       materialCode,
       sku: normalizeDimension(product.sku, '未匹配SKU'),
       kingdeeName: normalizeDimension(product.materialName, '未匹配金蝶名称'),
@@ -233,6 +235,7 @@ function buildSalesDetails(records, productMap) {
         department: normalizeDimension(department, '未匹配事业部'),
         channel: normalizeDimension(channel, '未匹配渠道'),
         productLine: normalizeDimension(row.productLine, '未匹配产品线'),
+        productSeries: normalizeDimension(product.productSeries, '未匹配销售系列'),
         materialCode,
         sku,
         kingdeeName,
@@ -257,6 +260,7 @@ const INVENTORY_ERROR_KEY_FIELDS = [
   'supplier',
   'department',
   'productLine',
+  'productSeries',
   'materialCode',
   'sku',
   'kingdeeName',
@@ -271,6 +275,7 @@ const SALES_ERROR_KEY_FIELDS = [
   'department',
   'channel',
   'productLine',
+  'productSeries',
   'materialCode',
   'sku',
   'kingdeeName',

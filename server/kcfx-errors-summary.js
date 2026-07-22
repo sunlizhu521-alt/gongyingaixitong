@@ -11,7 +11,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_ERRORS_SUMMARY_VERSION = 6;
+export const KCFX_ERRORS_SUMMARY_VERSION = 7;
 
 export const KCFX_ERRORS_RECORD_IDS = [
   'fact-inventory',
@@ -408,6 +408,7 @@ function enrichMissingRow(item, productMap) {
     sku: item.sku || product.sku || '',
     materialName: item.materialName || product.materialName || '',
     productLine: product.productLine || '',
+    productSeries: product.productSeries || '',
     qty: item.qty
   };
 }

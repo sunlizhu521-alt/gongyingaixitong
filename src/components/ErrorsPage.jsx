@@ -21,6 +21,7 @@ const INVENTORY_SUMMARY_ERROR_COLUMNS = [
   ['supplier', '供应商'],
   ['department', '事业部'],
   ['productLine', '产品线'],
+  ['productSeries', '销售系列'],
   ['materialCode', '物料编码'],
   ['sku', 'SKU'],
   ['kingdeeName', '金蝶名称'],
@@ -35,6 +36,7 @@ const SALES_SUMMARY_ERROR_COLUMNS = [
   ['department', '事业部'],
   ['channel', '渠道'],
   ['productLine', '产品线'],
+  ['productSeries', '销售系列'],
   ['materialCode', '物料编码'],
   ['sku', 'SKU'],
   ['kingdeeName', '金蝶名称'],
@@ -47,6 +49,7 @@ const INVENTORY_SUMMARY_SETTLEMENT_ERROR_COLUMNS = [
   ['sourceType', '报表分段'],
   ['department', '事业部'],
   ['productLine', '产品线'],
+  ['productSeries', '销售系列'],
   ['materialCode', '物料编码'],
   ['sku', 'SKU'],
   ['kingdeeName', '金蝶名称'],
@@ -61,6 +64,7 @@ const SALES_SUMMARY_SETTLEMENT_ERROR_COLUMNS = [
   ['department', '事业部'],
   ['channel', '渠道'],
   ['productLine', '产品线'],
+  ['productSeries', '销售系列'],
   ['materialCode', '物料编码'],
   ['sku', 'SKU'],
   ['kingdeeName', '金蝶名称'],
@@ -108,6 +112,7 @@ const ERROR_DOWNLOAD_CONFIG = {
       ['materialCode', '物料编码'],
       ['materialName', '物料名称'],
       ['productLine', '销售产品线'],
+      ['productSeries', '销售系列'],
       ['qty', '数量']
     ]
   },
@@ -595,6 +600,7 @@ function CheckGroup({ source, title, description, result, activeIssue, onDownloa
           ['materialCode', '物料编码'],
           ['materialName', '物料名称'],
           ['productLine', '销售产品线'],
+          ['productSeries', '销售系列'],
           ['qty', '数量', 'num']
         ]}
         rows={result.settlementMissing}
@@ -1295,6 +1301,7 @@ function mapProduct(rows) {
       sku: normalizeText(firstText([firstValue(row, ['SKU']), nthValue(row, 3)])),
       materialName: normalizeText(firstText([firstValue(row, ['金蝶名称', '物料名称', '货品名称']), nthValue(row, 4)])),
       productLine: normalizeText(firstText([firstValue(row, ['销售产品线', '产品线']), nthValue(row, 7)])),
+      productSeries: normalizeText(firstText([firstValue(row, ['销售系列', '产品系列', '系列']), nthValue(row, 8)])),
       materialGroup: normalizeText(firstValue(row, ['物料分组'])),
       category1: normalizeText(firstValue(row, ['一级品类'])),
       productStatus: normalizeText(firstValue(row, ['产品状态（Dim）', '产品状态'])),
@@ -1415,6 +1422,7 @@ function enrichMissingRow(item, productMap) {
     sku: item.sku || product.sku || '',
     materialName: item.materialName || product.materialName || '',
     productLine: product.productLine || '',
+    productSeries: product.productSeries || '',
     qty: item.qty
   };
 }
