@@ -1,3 +1,5 @@
+import { createStyledWorkbook, downloadStyledWorkbook } from '../../shared/excelExport.js';
+
 function exportTimestamp() {
   const now = new Date();
   const pad = (value) => String(value).padStart(2, '0');
@@ -11,7 +13,7 @@ function cellValue(row, column) {
 }
 
 export async function downloadKcfxRowsAsXlsx(filePrefix, rows, columns, sheetName = '数据明细') {
-  const XLSX = await import('xlsx');
+  const ExcelJS = await import('exceljs');
   const exportColumns = columns.map((column) => ({
     ...column,
     label: column.exportLabel || column.label || column.key
@@ -19,13 +21,10 @@ export async function downloadKcfxRowsAsXlsx(filePrefix, rows, columns, sheetNam
   const data = rows.map((row) => {
     const item = {};
     for (const column of exportColumns) {
-      item[column.label] = cellValue(row, column);
+      item[column.key] = cellValue(row, column);
     }
     return item;
   });
-  const emptyRow = Object.fromEntries(exportColumns.map((column) => [column.label, '']));
-  const worksheet = XLSX.utils.json_to_sheet(data.length ? data : [emptyRow]);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-  XLSX.writeFile(workbook, `${filePrefix}_${exportTimestamp()}.xlsx`);
+  const workbook = createStyledWorkbook(ExcelJS, [{ name: sheetName, rows: data, columns: exportColumns }]);
+  await downloadStyledWorkbook(workbook, `${filePrefix}_${exportTimestamp()}.xlsx`);
 }

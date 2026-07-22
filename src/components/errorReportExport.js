@@ -1,13 +1,4 @@
-const XLSX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-function worksheetRows(rows, columns) {
-  const data = rows.map((row) => {
-    const item = {};
-    for (const [key, label] of columns) item[label] = row[key] ?? '';
-    return item;
-  });
-  return data.length ? data : [Object.fromEntries(columns.map(([, label]) => [label, '']))];
-}
+import { createStyledWorkbook, downloadStyledWorkbook } from '../../shared/excelExport.js';
 
 function safeSheetName(name, usedNames) {
   const base = String(name || '报错明细').replace(/[\\/?*\[\]:]/g, '-').slice(0, 31) || '报错明细';
@@ -22,27 +13,16 @@ function safeSheetName(name, usedNames) {
   return candidate;
 }
 
-export function buildErrorWorkbook(XLSX, reports) {
-  const workbook = XLSX.utils.book_new();
+export function buildErrorWorkbook(ExcelJS, reports) {
   const usedNames = new Set();
-  for (const report of reports) {
-    const worksheet = XLSX.utils.json_to_sheet(worksheetRows(report.rows || [], report.columns || []));
-    XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName(report.sheetName, usedNames));
-  }
-  return workbook;
+  return createStyledWorkbook(ExcelJS, reports.map((report) => ({
+    name: safeSheetName(report.sheetName, usedNames),
+    rows: report.rows || [],
+    columns: report.columns || []
+  })));
 }
 
-export function downloadErrorWorkbook(XLSX, reports, fileName, browser = globalThis) {
-  const workbook = buildErrorWorkbook(XLSX, reports);
-  const bytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', compression: true });
-  const blob = new browser.Blob([bytes], { type: XLSX_MIME_TYPE });
-  const url = browser.URL.createObjectURL(blob);
-  const anchor = browser.document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.style.display = 'none';
-  browser.document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  browser.setTimeout(() => browser.URL.revokeObjectURL(url), 0);
+export async function downloadErrorWorkbook(ExcelJS, reports, fileName, browser = globalThis) {
+  const workbook = buildErrorWorkbook(ExcelJS, reports);
+  await downloadStyledWorkbook(workbook, fileName, browser);
 }

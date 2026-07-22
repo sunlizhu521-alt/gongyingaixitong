@@ -66,6 +66,7 @@ import FileLibraryPage from './components/FileLibraryPage.jsx';
 import KcfxFeedbackPage from './components/KcfxFeedbackPage.jsx';
 import { prefetchKcfxRecords } from './components/kcfxRecordLoader.js';
 import { getCache, setCache } from './indexedDbCache.js';
+import { createStyledWorkbook, downloadStyledWorkbook } from '../shared/excelExport.js';
 import './styles.css';
 
 const SALES_KCFX_TABS = new Set(['salesInventorySalesAnalysis', 'salesInventorySalesTrend']);
@@ -1358,8 +1359,7 @@ function App() {
 
   async function downloadImportResult(type, result) {
     if (!result) return;
-    const XLSX = await import('xlsx');
-    const workbook = XLSX.utils.book_new();
+    const ExcelJS = await import('exceljs');
     const isSupplier = type === 'supplier';
     const successRows = isSupplier
       ? result.imported.map((item) => ({
@@ -1385,10 +1385,19 @@ function App() {
       账期原文: item.termText || '',
       错误原因: item.reason
     }));
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(successRows), '识别成功');
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(failedRows), '识别失败');
+    const successColumns = isSupplier
+      ? ['行号', '供应商', '供应商简称', '是否有年框', '账期天数', '备注信息']
+      : ['行号', '采购人', '供应商', '邮箱'];
+    const workbook = createStyledWorkbook(ExcelJS, [
+      { name: '识别成功', rows: successRows, columns: successColumns },
+      {
+        name: '识别失败',
+        rows: failedRows,
+        columns: ['行号', '采购人', '供应商', '邮箱', '供应商简称', '账期原文', '错误原因']
+      }
+    ]);
     const fileName = `${isSupplier ? '供应商账期维度表' : '采购负责人维度表'}_读取识别结果.xlsx`;
-    XLSX.writeFile(workbook, fileName);
+    await downloadStyledWorkbook(workbook, fileName);
   }
 
   async function downloadAppliedPreview() {
@@ -1400,10 +1409,13 @@ function App() {
       账期: row.termDays ? `${row.termDays} 天` : '',
       备注信息: row.remark
     }));
-    const XLSX = await import('xlsx');
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), '应用的表预览');
-    XLSX.writeFile(workbook, '供应商管理维度表_应用的表预览.xlsx');
+    const ExcelJS = await import('exceljs');
+    const workbook = createStyledWorkbook(ExcelJS, [{
+      name: '应用的表预览',
+      rows,
+      columns: ['供应商', '供应商简称', '采购员', '是否有年框', '账期', '备注信息']
+    }]);
+    await downloadStyledWorkbook(workbook, '供应商管理维度表_应用的表预览.xlsx');
   }
 
   async function addOwner(event) {

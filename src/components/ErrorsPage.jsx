@@ -409,9 +409,9 @@ export default function ErrorsPage({
     }
     setDownloadMessage('正在生成下载文件...');
     try {
-      const XLSX = await import('xlsx');
+      const ExcelJS = await import('exceljs');
       const prefix = `${errorSourceLabel(source)}-${config.name}`;
-      downloadErrorWorkbook(XLSX, [{
+      await downloadErrorWorkbook(ExcelJS, [{
         sheetName: '报错明细',
         rows: result[tableName] || [],
         columns: config.columns
@@ -426,7 +426,7 @@ export default function ErrorsPage({
   async function downloadAll() {
     setDownloadMessage('正在生成全部报错明细...');
     try {
-      const XLSX = await import('xlsx');
+      const ExcelJS = await import('exceljs');
       const reports = [];
       for (const source of ['closed', 'detail', 'sales', 'trend', 'age', 'inventorySummary', 'salesSummary']) {
         for (const [tableName, config] of Object.entries(ERROR_DOWNLOAD_CONFIG)) {
@@ -438,7 +438,7 @@ export default function ErrorsPage({
           });
         }
       }
-      downloadErrorWorkbook(XLSX, reports, `报错信息汇总_${downloadTimestamp()}.xlsx`);
+      await downloadErrorWorkbook(ExcelJS, reports, `报错信息汇总_${downloadTimestamp()}.xlsx`);
       setDownloadMessage('全部报错明细已生成。');
     } catch (downloadError) {
       console.error('Failed to download all error reports', downloadError);

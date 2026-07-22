@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import xlsx from 'xlsx';
+import ExcelJS from 'exceljs';
 import { buildErrorWorkbook, downloadErrorWorkbook } from '../src/components/errorReportExport.js';
 
 const reports = [
@@ -17,16 +17,15 @@ const reports = [
 ];
 
 test('报错信息导出生成单个多工作表文件并处理重复表名', () => {
-  const workbook = buildErrorWorkbook(xlsx, reports);
-  assert.equal(workbook.SheetNames.length, 2);
-  assert.equal(workbook.SheetNames[0].length <= 31, true);
-  assert.notEqual(workbook.SheetNames[0], workbook.SheetNames[1]);
-  assert.deepEqual(xlsx.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]), [
-    { 物料编码: '1001', 数量: 12 }
-  ]);
+  const workbook = buildErrorWorkbook(ExcelJS, reports);
+  assert.equal(workbook.worksheets.length, 2);
+  assert.equal(workbook.worksheets[0].name.length <= 31, true);
+  assert.notEqual(workbook.worksheets[0].name, workbook.worksheets[1].name);
+  assert.deepEqual(workbook.worksheets[0].getRow(1).values.slice(1), ['物料编码', '数量']);
+  assert.deepEqual(workbook.worksheets[0].getRow(2).values.slice(1), ['1001', 12]);
 });
 
-test('报错信息下载通过Blob链接触发一次浏览器下载', () => {
+test('报错信息下载通过Blob链接触发一次浏览器下载', async () => {
   const events = [];
   const anchor = {
     style: {},
@@ -46,7 +45,7 @@ test('报错信息下载通过Blob链接触发一次浏览器下载', () => {
     setTimeout: (callback) => callback()
   };
 
-  downloadErrorWorkbook(xlsx, reports.slice(0, 1), '报错信息汇总.xlsx', browser);
+  await downloadErrorWorkbook(ExcelJS, reports.slice(0, 1), '报错信息汇总.xlsx', browser);
 
   assert.equal(anchor.href, 'blob:error-report');
   assert.equal(anchor.download, '报错信息汇总.xlsx');

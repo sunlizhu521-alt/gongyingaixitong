@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import xlsx from 'xlsx';
+import ExcelJS from 'exceljs';
+import { createStyledWorkbook } from '../../shared/excelExport.js';
 import { getCachedSalesRows } from '../../src/components/kcfxUtils.js';
 import {
   buildInventorySummaryCache,
@@ -444,10 +445,12 @@ app.post('/api/kcfx-library/age-analysis/export', async (req, res) => {
       结算价: Number(row.settlementPrice) || 0,
       库存金额: Number(row.amount) || 0
     }));
-    const worksheet = xlsx.utils.json_to_sheet(data.length ? data : [{ 月份: '' }]);
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, '库龄维度分析明细');
-    const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx', compression: true });
+    const workbook = createStyledWorkbook(ExcelJS, [{
+      name: '库龄维度分析明细',
+      rows: data.length ? data : [{ 月份: '' }],
+      columns: Object.keys(data[0] || { 月份: '' })
+    }]);
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
     const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`库龄维度分析明细_${stamp}.xlsx`)}`);
@@ -571,10 +574,13 @@ app.post('/api/kcfx-library/inventory-summary/export', async (req, res) => {
         ...(view === 'onHand' ? { 库存所在地: row.inventoryLocation } : {})
       }));
     }
-    const worksheet = xlsx.utils.json_to_sheet(data.length ? data : [{ 提示: '暂无数据' }]);
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, sheetName);
-    const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx', compression: true });
+    const exportRows = data.length ? data : [{ 提示: '暂无数据' }];
+    const workbook = createStyledWorkbook(ExcelJS, [{
+      name: sheetName,
+      rows: exportRows,
+      columns: Object.keys(exportRows[0])
+    }]);
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
     const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`${sheetName}_${stamp}.xlsx`)}`);
