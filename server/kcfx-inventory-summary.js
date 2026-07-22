@@ -12,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_SUMMARY_VERSION = 13;
+export const KCFX_INVENTORY_SUMMARY_VERSION = 14;
 
 const INVENTORY_VIEW_FIELDS = {
   summary: ['department', 'productLine'],
@@ -20,7 +20,8 @@ const INVENTORY_VIEW_FIELDS = {
   inTransit: ['department', 'productLine'],
   undelivered: ['supplier', 'department', 'productLine']
 };
-const SALES_FILTER_FIELDS = ['salesMonth', 'department', 'productLine'];
+const SALES_STATUS_FIELDS = ['realTransactionStatus', 'nonInternalTransactionStatus', 'finishedGoodsStatus'];
+const SALES_FILTER_FIELDS = ['salesMonth', 'department', 'productLine', ...SALES_STATUS_FIELDS];
 
 function normalizeHeader(value) {
   return normalizeText(value)
@@ -218,7 +219,7 @@ function addInventoryMetric(map, row, field) {
 }
 
 function buildSalesDetails(records, productMap) {
-  return getCachedSalesRows(records)
+  return getCachedSalesRows(records, { includeExcluded: true })
     .filter((row) => row.salesMonth)
     .map((row) => {
       const materialCode = normalizeMaterialCode(row.materialCode);
@@ -238,6 +239,9 @@ function buildSalesDetails(records, productMap) {
         platform: normalizeDimension(platform, '未匹配平台'),
         productLine: normalizeDimension(row.productLine, '未匹配产品线'),
         productSeries: normalizeDimension(product.productSeries, '未匹配销售系列'),
+        realTransactionStatus: normalizeDimension(row.realTransactionStatus, '未匹配'),
+        nonInternalTransactionStatus: normalizeDimension(row.nonInternalTransactionStatus, '未匹配'),
+        finishedGoodsStatus: normalizeDimension(row.finishedGoodsStatus, '未匹配'),
         materialCode,
         sku,
         kingdeeName,
@@ -398,6 +402,7 @@ function matchesSearch(row, search, fields) {
 }
 
 function sortedOptions(values, field) {
+  if (SALES_STATUS_FIELDS.includes(field)) return ['是', '否', '未匹配'];
   const unique = [...new Set(values.map(normalizeText).filter(Boolean))];
   if (field === 'salesMonth') return unique.sort((a, b) => a.localeCompare(b));
   return unique.sort((a, b) => a.localeCompare(b, 'zh-CN'));

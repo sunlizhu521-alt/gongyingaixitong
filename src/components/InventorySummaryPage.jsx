@@ -80,7 +80,10 @@ const VIEW_CONFIG = {
     filters: [
       { id: 'salesMonth', field: 'salesMonth', type: 'month', multiple: true, allLabel: '全部销售月份', monthAllLabel: '全部数据月份' },
       { id: 'department', field: 'department', allLabel: '全部事业部' },
-      { id: 'productLine', field: 'productLine', allLabel: '全部产品线' }
+      { id: 'productLine', field: 'productLine', allLabel: '全部产品线' },
+      { id: 'realTransactionStatus', field: 'realTransactionStatus', allLabel: '是否真实交易' },
+      { id: 'nonInternalTransactionStatus', field: 'nonInternalTransactionStatus', allLabel: '是否非内部交易' },
+      { id: 'finishedGoodsStatus', field: 'finishedGoodsStatus', allLabel: '是否成品' }
     ],
     columns: [
       { key: 'dateLabel', label: '日期' },
@@ -97,13 +100,19 @@ const VIEW_CONFIG = {
   }
 };
 
-function emptyFilters(view) {
-  return Object.fromEntries(VIEW_CONFIG[view].filters.map((filter) => [filter.id, []]));
+function defaultFilters(view) {
+  const filters = Object.fromEntries(VIEW_CONFIG[view].filters.map((filter) => [filter.id, []]));
+  if (view === 'sales') {
+    filters.realTransactionStatus = ['是'];
+    filters.nonInternalTransactionStatus = ['是'];
+    filters.finishedGoodsStatus = ['是'];
+  }
+  return filters;
 }
 
 function initialTableStates() {
   return Object.fromEntries(Object.keys(VIEW_CONFIG).map((view) => [view, {
-    filters: emptyFilters(view),
+    filters: defaultFilters(view),
     search: '',
     page: 1
   }]));
@@ -202,7 +211,7 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
   }, [activeView, updateTableState]);
 
   const resetFilters = useCallback(() => {
-    updateTableState(activeView, (current) => ({ ...current, filters: emptyFilters(activeView), page: 1 }));
+    updateTableState(activeView, (current) => ({ ...current, filters: defaultFilters(activeView), page: 1 }));
     setOpenFilter('');
   }, [activeView, updateTableState]);
 
@@ -265,7 +274,14 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
     : error || `${config.label}共 ${formatNumber(pagination.totalRows)} 行，每页20行`;
 
   return (
-    <KcfxPageShell className="inventory-summary-page" title={pageTitle} status={status} loading={loading} onRefresh={refresh}>
+    <KcfxPageShell
+      className="inventory-summary-page"
+      title={pageTitle}
+      status={status}
+      note={isSalesReport ? '统计口径：销售数量取“应收数量”，销售金额取“销售额-不含税”。三个条件默认选择“是”。真实交易按销售仓库匹配一级仓库分类，系统集成仓库为“否”；非内部交易按客户名称+物料编码匹配销售部门，内部交易为“否”；成品按商品维表判断，销售产品线为“其他/配件”或“健康办公”，或一级分类为“配件”或“护理床附件”时为“否”；无法匹配均显示“未匹配”。' : ''}
+      loading={loading}
+      onRefresh={refresh}
+    >
       {!isSalesReport && (
         <section className="inventory-summary-controls" aria-label="库存报表类型">
           <div className="age-mode-switch">

@@ -3044,6 +3044,14 @@ th {
   margin: 6px 0 0;
 }
 
+.kcfx-page-note {
+  max-width: 1180px;
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .kcfx-metric-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

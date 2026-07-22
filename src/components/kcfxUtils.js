@@ -192,7 +192,9 @@ let salesRowsCache = {
   productRecord: null,
   storeRecord: null,
   departmentRecord: null,
-  rows: null
+  warehouseRecord: null,
+  rows: null,
+  allRows: null
 };
 
 export function mapProducts(rows) {
@@ -204,6 +206,10 @@ export function mapProducts(rows) {
       sku: firstText([firstValue(row, ['SKU', '领星SKU']), nthValue(row, 3)]),
       materialName: firstText([firstValue(row, ['金蝶名称', '物料名称', '货品名称', '商品名称']), nthValue(row, 4)]),
       productCategory: firstText([firstValue(row, ['销售产品分类', '产品分类', '销售产品类别', '产品类别', '品类'])]),
+      primaryCategory: firstText([
+        firstValue(row, ['一级分类', '商品一级分类', '产品一级分类', '一级产品分类']),
+        firstValueByHeaderIncludes(row, ['一级', '分类'])
+      ]),
       productLine: firstText([firstValue(row, ['销售产品线', '产品线']), nthValue(row, 7)]),
       productSeries: firstText([firstValue(row, ['销售系列', '产品系列', '系列']), nthValue(row, 8)]),
       model: firstText([firstValue(row, ['型号', '规格型号']), nthValue(row, 16)]),
@@ -235,7 +241,7 @@ class MaterialCodeLookupMap extends Map {
 }
 
 function productDimensionScore(product = {}) {
-  return ['sku', 'materialName', 'productCategory', 'productLine', 'productSeries', 'model', 'department']
+  return ['sku', 'materialName', 'productCategory', 'primaryCategory', 'productLine', 'productSeries', 'model', 'department']
     .reduce((score, field) => score + (normalizeText(product[field]) ? 1 : 0), Number(product.settlementPrice) !== 0 ? 1 : 0);
 }
 
@@ -463,23 +469,28 @@ function classifySaleStatus(warehouseType, productCategory) {
   return '';
 }
 
-export function getSalesRows(records) {
+export function getSalesRows(records, { includeExcluded = false } = {}) {
   const productMap = mapProducts(rowsOf(records['dim-product']));
   const storeMap = mapStoreInfo(rowsOf(records['dim-customer-material']));
   const departmentMap = mapSalesDepartments(rowsOf(records['dim-store-name']));
-  return rowsOf(records['sales-data']).map((row) => {
+  const warehouseMap = mapWarehouses(rowsOf(records['dim-warehouse']));
+  const rows = rowsOf(records['sales-data']).map((row) => {
     const materialCode = getSalesMaterialCode(row);
     const customer = getSalesCustomerName(row);
+    const productMatched = productMap.has(materialCode);
     const product = productMap.get(materialCode) || {};
     const salesMonth = getSalesMonth(row);
     const storeInfo = storeMap.get(normalizeStoreName(customer));
     const departmentKey = getSalesDepartmentKey(row);
+    const salesOrg = departmentMap.get(departmentKey) || '';
+    const warehouse = getSalesWarehouseName(row);
+    const warehouseInfo = warehouseMap.get(warehouse);
     return {
       sourceRow: row,
       salesMonth,
       salesYear: salesMonth.slice(0, 4),
       salesMonthNumber: salesMonth.slice(5, 7),
-      salesOrg: departmentMap.get(departmentKey) || '',
+      salesOrg,
       customer,
       storeShortName: storeInfo?.shortName || '',
       country: storeInfo?.country || '',
@@ -489,38 +500,50 @@ export function getSalesRows(records) {
       materialName: getSalesMaterialName(row) || product.materialName || '',
       productLine: product.productLine || '',
       productCategory: product.productCategory || '',
+      primaryCategory: product.primaryCategory || '',
       productSeries: product.productSeries || '',
       model: product.model || '',
+      warehouse,
+      warehouseType: warehouseInfo?.type || '',
+      realTransactionStatus: classifyRealTransaction(warehouse, warehouseInfo),
+      nonInternalTransactionStatus: classifyNonInternalTransaction(salesOrg),
+      finishedGoodsStatus: classifyFinishedGoods(product, productMatched),
       qty: getSalesReceivableQty(row),
       amount: getSalesTaxExcludedAmount(row),
       storeMatchStatus: storeInfo ? '已匹配' : '未匹配'
     };
-  }).filter((row) => (row.customer || row.materialCode || row.model || row.qty) && !isExcludedSalesRow(row));
+  }).filter((row) => row.customer || row.materialCode || row.model || row.qty);
+  return includeExcluded ? rows : rows.filter((row) => !isExcludedSalesRow(row));
 }
 
-export function getCachedSalesRows(records) {
+export function getCachedSalesRows(records, { includeExcluded = false } = {}) {
   const salesRecord = records['sales-data'];
   const productRecord = records['dim-product'];
   const storeRecord = records['dim-customer-material'];
   const departmentRecord = records['dim-store-name'];
+  const warehouseRecord = records['dim-warehouse'];
   if (
     salesRowsCache.rows
     && salesRowsCache.salesRecord === salesRecord
     && salesRowsCache.productRecord === productRecord
     && salesRowsCache.storeRecord === storeRecord
     && salesRowsCache.departmentRecord === departmentRecord
+    && salesRowsCache.warehouseRecord === warehouseRecord
   ) {
-    return salesRowsCache.rows;
+    return includeExcluded ? salesRowsCache.allRows : salesRowsCache.rows;
   }
-  const rows = getSalesRows(records);
+  const allRows = getSalesRows(records, { includeExcluded: true });
+  const rows = allRows.filter((row) => !isExcludedSalesRow(row));
   salesRowsCache = {
     salesRecord,
     productRecord,
     storeRecord,
     departmentRecord,
-    rows
+    warehouseRecord,
+    rows,
+    allRows
   };
-  return rows;
+  return includeExcluded ? allRows : rows;
 }
 
 function mapStoreInfo(rows) {
@@ -619,11 +642,40 @@ function getSalesReceivableQty(row) {
   ]);
 }
 
+function getSalesWarehouseName(row) {
+  return normalizeText(firstText([
+    firstValue(row, ['仓库', '仓库名称', '出库仓库', '出库仓库名称', '发货仓库']),
+    firstValueByHeaderIncludes(row, ['出库', '仓库']),
+    firstValueByHeaderIncludes(row, ['仓库'])
+  ]));
+}
+
 function getSalesTaxExcludedAmount(row) {
   return firstNumber([
     firstValue(row, ['销售额-不含税', '销售额（不含税）', '销售额(不含税)']),
     firstValueByHeaderIncludes(row, ['销售额', '不含税'])
   ]);
+}
+
+function classifyRealTransaction(warehouse, warehouseInfo) {
+  if (!normalizeText(warehouse) || !warehouseInfo || !normalizeText(warehouseInfo.type)) return '未匹配';
+  const warehouseType = normalizeText(warehouseInfo.type);
+  return warehouseType === '系统集成仓库' || warehouseType === '系统集成仓' ? '否' : '是';
+}
+
+function classifyNonInternalTransaction(salesOrg) {
+  const department = normalizeText(salesOrg);
+  if (!department) return '未匹配';
+  return isInternalTransactionText(department) ? '否' : '是';
+}
+
+function classifyFinishedGoods(product, productMatched) {
+  if (!productMatched) return '未匹配';
+  const productLine = normalizeSalesExclusionText(product.productLine);
+  const primaryCategory = normalizeSalesExclusionText(product.primaryCategory);
+  if (productLine === '其他/配件' || productLine === '健康办公') return '否';
+  if (!productLine || !primaryCategory) return '未匹配';
+  return primaryCategory === '配件' || primaryCategory === '护理床附件' ? '否' : '是';
 }
 
 function isExcludedSalesRow(row) {
