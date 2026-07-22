@@ -12,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_SUMMARY_VERSION = 5;
+export const KCFX_INVENTORY_SUMMARY_VERSION = 6;
 
 const INVENTORY_VIEW_FIELDS = {
   summary: ['department', 'productLine'],
@@ -143,6 +143,7 @@ function buildInventoryRows(records, productMap) {
       materialCode,
       sku: normalizeDimension(product.sku, '未匹配SKU'),
       kingdeeName: normalizeDimension(product.materialName, '未匹配金蝶名称'),
+      settlementPrice: Number(product.settlementPrice) || 0,
       inventoryLocation: normalizeDimension(inventoryLocation, '未匹配库存所在地'),
       productMissingFields: productMissingFields(product),
       departmentMissing: !department,
@@ -177,6 +178,7 @@ function buildUndeliveredRows(records, productMap) {
       materialCode,
       sku: normalizeDimension(product.sku, '未匹配SKU'),
       kingdeeName: normalizeDimension(product.materialName, '未匹配金蝶名称'),
+      settlementPrice: Number(product.settlementPrice) || 0,
       inventoryLocation: '',
       productMissingFields: productMissingFields(product),
       departmentMissing: splitPurchaseDepartment(departmentSource) === '未匹配事业部',
@@ -189,7 +191,7 @@ function buildUndeliveredRows(records, productMap) {
 }
 
 function addInventoryMetric(map, row, field) {
-  const keyFields = ['department', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
+  const keyFields = ['department', 'productLine', 'materialCode', 'sku', 'kingdeeName', 'settlementPrice'];
   const key = keyFields.map((keyField) => row[keyField] || '').join('\u0001');
   let target = map.get(key);
   if (!target) {
@@ -199,15 +201,18 @@ function addInventoryMetric(map, row, field) {
       materialCode: row.materialCode,
       sku: row.sku,
       kingdeeName: row.kingdeeName,
+      settlementPrice: Number(row.settlementPrice) || 0,
       onHandQty: 0,
       inTransitQty: 0,
       undeliveredQty: 0,
-      totalQty: 0
+      totalQty: 0,
+      inventoryValue: 0
     };
     map.set(key, target);
   }
   target[field] += Number(row.qty) || 0;
   target.totalQty = target.onHandQty + target.inTransitQty + target.undeliveredQty;
+  target.inventoryValue = target.totalQty * target.settlementPrice;
 }
 
 function buildSalesDetails(records, productMap) {
@@ -333,9 +338,9 @@ export function buildInventorySummaryCache(records = {}, savedAt = '') {
     generatedAt: new Date().toISOString(),
     inventoryViews: {
       summary: [...summaryMap.values()].filter((row) => row.totalQty !== 0).sort(compareInventoryRows),
-      onHand: groupRows(inventory.onHand, ['department', 'productLine', 'materialCode', 'sku', 'kingdeeName', 'inventoryLocation'], ['qty']).sort(compareInventoryRows),
-      inTransit: groupRows(inventory.inTransit, ['department', 'productLine', 'materialCode', 'sku', 'kingdeeName'], ['qty']).sort(compareInventoryRows),
-      undelivered: groupRows(undelivered, ['supplier', 'department', 'productLine', 'materialCode', 'sku', 'kingdeeName'], ['qty']).sort(compareInventoryRows)
+      onHand: groupRows(inventory.onHand, ['department', 'productLine', 'materialCode', 'sku', 'kingdeeName', 'settlementPrice', 'inventoryLocation'], ['qty']).sort(compareInventoryRows),
+      inTransit: groupRows(inventory.inTransit, ['department', 'productLine', 'materialCode', 'sku', 'kingdeeName', 'settlementPrice'], ['qty']).sort(compareInventoryRows),
+      undelivered: groupRows(undelivered, ['supplier', 'department', 'productLine', 'materialCode', 'sku', 'kingdeeName', 'settlementPrice'], ['qty']).sort(compareInventoryRows)
     },
     salesDetails,
     errors: buildInventorySummaryErrors(inventory, undelivered, salesDetails),
@@ -461,9 +466,14 @@ function metricsForRows(report, view, rows) {
     onHandQty: rows.reduce((total, row) => total + (Number(row.onHandQty) || 0), 0),
     inTransitQty: rows.reduce((total, row) => total + (Number(row.inTransitQty) || 0), 0),
     undeliveredQty: rows.reduce((total, row) => total + (Number(row.undeliveredQty) || 0), 0),
-    totalQty: rows.reduce((total, row) => total + (Number(row.totalQty) || 0), 0)
+    totalQty: rows.reduce((total, row) => total + (Number(row.totalQty) || 0), 0),
+    inventoryValue: rows.reduce((total, row) => total + (Number(row.inventoryValue) || 0), 0)
   };
-  return { rowCount: rows.length, qty: rows.reduce((total, row) => total + (Number(row.qty) || 0), 0) };
+  return {
+    rowCount: rows.length,
+    qty: rows.reduce((total, row) => total + (Number(row.qty) || 0), 0),
+    inventoryValue: rows.reduce((total, row) => total + ((Number(row.qty) || 0) * (Number(row.settlementPrice) || 0)), 0)
+  };
 }
 
 export function queryInventorySummary(cache, request = {}) {

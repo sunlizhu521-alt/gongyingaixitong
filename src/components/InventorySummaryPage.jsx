@@ -18,10 +18,12 @@ const VIEW_CONFIG = {
       { key: 'materialCode', label: '物料编码' },
       { key: 'sku', label: 'SKU' },
       { key: 'kingdeeName', label: '金蝶名称' },
+      { key: 'settlementPrice', label: '内部结算价', render: (row) => `¥${formatNumber(row.settlementPrice, 2)}` },
       { key: 'onHandQty', label: '在库数量', render: (row) => formatNumber(row.onHandQty, 2) },
       { key: 'inTransitQty', label: '在途数量', render: (row) => formatNumber(row.inTransitQty, 2) },
       { key: 'undeliveredQty', label: '未交付总数量', render: (row) => formatNumber(row.undeliveredQty, 2) },
-      { key: 'totalQty', label: '合计', render: (row) => formatNumber(row.totalQty, 2) }
+      { key: 'totalQty', label: '合计', render: (row) => formatNumber(row.totalQty, 2) },
+      { key: 'inventoryValue', label: '货值', render: (row) => `¥${formatNumber(row.inventoryValue, 2)}` }
     ]
   },
   onHand: {
@@ -260,10 +262,12 @@ export default function InventorySummaryPage({ user = null, kcfxData = null, onR
           { label: '在库数量', value: formatNumber(metrics.onHandQty, 2) },
           { label: '在途数量', value: formatNumber(metrics.inTransitQty, 2) },
           { label: '未交付总数量', value: formatNumber(metrics.undeliveredQty, 2) },
-          { label: '合计', value: formatNumber(metrics.totalQty, 2) }
+          { label: '合计', value: formatNumber(metrics.totalQty, 2) },
+          { label: '货值', value: `¥${formatNumber(metrics.inventoryValue, 2)}` }
         ]
       : [
           { label: config.label, value: formatNumber(metrics.qty, 2) },
+          { label: '货值', value: `¥${formatNumber(metrics.inventoryValue, 2)}` },
           { label: '汇总行数', value: formatNumber(metrics.rowCount) }
         ];
   const status = loading

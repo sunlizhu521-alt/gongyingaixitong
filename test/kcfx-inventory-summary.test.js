@@ -15,8 +15,8 @@ function record(rows) {
 function sampleRecords() {
   return {
     'dim-product': record([
-      { 物料编码: '1001', SKU: 'SKU-A', 销售产品线: '产品线A', 金蝶名称: '产品A' },
-      { 物料编码: '1002', SKU: 'SKU-B', 销售产品线: '产品线A', 金蝶名称: '产品B' }
+      { 物料编码: '1001', SKU: 'SKU-A', 销售产品线: '产品线A', 金蝶名称: '产品A', 结算价: '10' },
+      { 物料编码: '1002', SKU: 'SKU-B', 销售产品线: '产品线A', 金蝶名称: '产品B', 结算价: '20' }
     ]),
     'dim-warehouse': record([
       { 仓库名称: '正常仓', 二级仓库分类: '华南仓' },
@@ -63,7 +63,7 @@ test('采购订单事业部只保留第一个星号前的内容', () => {
 
 test('库存汇总按海上在途精确分段并排除汇总行', () => {
   const cache = buildInventorySummaryCache(sampleRecords(), 'saved-at');
-  assert.equal(cache.version, 5);
+  assert.equal(cache.version, 6);
   assert.equal(cache.inventoryViews.onHand.length, 2);
   assert.equal(cache.inventoryViews.onHand.reduce((sum, row) => sum + row.qty, 0), 12);
   assert.equal(cache.inventoryViews.inTransit.length, 1);
@@ -73,15 +73,22 @@ test('库存汇总按海上在途精确分段并排除汇总行', () => {
   assert.equal(cache.inventoryViews.undelivered[0].department, '海外事业一部');
   assert.equal(cache.inventoryViews.undelivered[0].sku, 'SKU-A');
   assert.equal(cache.inventoryViews.undelivered[0].kingdeeName, '产品A');
+  assert.equal(cache.inventoryViews.undelivered[0].settlementPrice, 10);
   assert.equal(cache.inventoryViews.onHand.find((row) => row.materialCode === '1001').kingdeeName, '产品A');
   assert.equal(cache.inventoryViews.inTransit[0].kingdeeName, '产品A');
 
   const summary = cache.inventoryViews.summary.find((row) => row.materialCode === '1001');
   assert.equal(summary.kingdeeName, '产品A');
+  assert.equal(summary.settlementPrice, 10);
+  assert.equal(summary.inventoryValue, 240);
   assert.deepEqual(
     [summary.onHandQty, summary.inTransitQty, summary.undeliveredQty, summary.totalQty],
     [12, 5, 7, 24]
   );
+  const result = queryInventorySummary(cache, { report: 'inventory', view: 'summary' });
+  assert.equal(result.metrics.inventoryValue, 240);
+  const onHandResult = queryInventorySummary(cache, { report: 'inventory', view: 'onHand' });
+  assert.equal(onHandResult.metrics.inventoryValue, 120);
   assert.equal(cache.errors.inventory.productMissing.length, 0);
   assert.equal(cache.errors.inventory.departmentMissing.length, 0);
   assert.equal(cache.errors.inventory.warehouseMissing.length, 0);
@@ -204,7 +211,9 @@ test('库存和销售汇总报表已分别接入菜单、页面、权限和受�
   assert.match(mainSource, /<SalesSummaryPage/);
   assert.match(inventoryPageSource, /reportType = 'inventory'/);
   assert.match(inventoryPageSource, /isSalesReport \? '销售汇总报表' : '库存汇总报表'/);
-  assert.match(inventoryPageSource, /key: 'sku', label: 'SKU'[\s\S]*key: 'kingdeeName', label: '金蝶名称'/);
+  assert.match(inventoryPageSource, /key: 'sku', label: 'SKU'[\s\S]*key: 'kingdeeName', label: '金蝶名称'[\s\S]*key: 'settlementPrice', label: '内部结算价'/);
+  assert.match(inventoryPageSource, /key: 'totalQty', label: '合计'[\s\S]*key: 'inventoryValue', label: '货值'/);
+  assert.match(inventoryPageSource, /label: '货值', value: `¥\$\{formatNumber\(metrics\.inventoryValue, 2\)\}`/);
   assert.doesNotMatch(inventoryPageSource, /materialCodeCount|物料编码数量/);
   assert.match(salesPageSource, /reportType="sales"/);
   assert.match(appSource, /'salesInventory\.inventorySummary'/);
@@ -214,7 +223,7 @@ test('库存和销售汇总报表已分别接入菜单、页面、权限和受�
   assert.match(routeSource, /requirePermission\(database, req, res, 'maintenanceLibrary\.errors'\)/);
   assert.match(routeSource, /function inventorySummaryPermission\(body = \{\}\)[\s\S]*body\.report === 'sales'[\s\S]*'salesInventory\.salesSummary'[\s\S]*'salesInventory\.inventorySummary'/);
   assert.equal((routeSource.match(/requirePermission\(database, req, res, inventorySummaryPermission\(req\.body\)\)/g) || []).length, 2);
-  assert.match(routeSource, /物料编码: row\.materialCode,[\s\S]*SKU: row\.sku,[\s\S]*金蝶名称: row\.kingdeeName/);
+  assert.match(routeSource, /物料编码: row\.materialCode,[\s\S]*SKU: row\.sku,[\s\S]*金蝶名称: row\.kingdeeName,[\s\S]*内部结算价: Number\(row\.settlementPrice\)[\s\S]*合计: Number\(row\.totalQty\)[\s\S]*货值: Number\(row\.inventoryValue\)/);
   assert.doesNotMatch(routeSource, /物料编码数量|materialCodeCount/);
   assert.match(errorsPageSource, /value: 'inventorySummary', label: '库存汇总报表'/);
   assert.match(errorsPageSource, /value: 'salesSummary', label: '销售汇总报表'/);

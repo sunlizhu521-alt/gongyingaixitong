@@ -550,10 +550,12 @@ app.post('/api/kcfx-library/inventory-summary/export', async (req, res) => {
         物料编码: row.materialCode,
         SKU: row.sku,
         金蝶名称: row.kingdeeName,
+        内部结算价: Number(row.settlementPrice) || 0,
         在库数量: Number(row.onHandQty) || 0,
         在途数量: Number(row.inTransitQty) || 0,
         未交付总数量: Number(row.undeliveredQty) || 0,
-        合计: Number(row.totalQty) || 0
+        合计: Number(row.totalQty) || 0,
+        货值: Number(row.inventoryValue) || 0
       }));
     } else {
       const isUndelivered = view === 'undelivered';
