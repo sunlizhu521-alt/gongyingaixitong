@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { API } from '../constants.js';
 import { getCache, setCache } from '../indexedDbCache.js';
-import { isKcfxDimensionRecordId, normalizeKcfxDimensionMaterialCodeRows } from '../../shared/kcfxDimensionMaterialCode.js';
+import { normalizeKcfxMaterialCodeRows } from '../../shared/kcfxMaterialCodeText.js';
 
 const recordCache = new Map();
 const inflightRecordRequests = new Map();
 let salesRowsPayloadCache = null;
 let inflightSalesRowsRequest = null;
 let recordCacheVersion = '';
-const salesRowsCacheVersion = 'v4';
-const recordRowsCacheVersion = 'v2';
+const salesRowsCacheVersion = 'v5';
+const recordRowsCacheVersion = 'v3';
 
 function uniqueRecordIds(ids = []) {
   return [...new Set((ids || []).map((id) => String(id || '').trim()).filter(Boolean))];
@@ -36,7 +36,7 @@ export async function fetchKcfxRecord(id, { force = false } = {}) {
   if (!force) {
     const cached = await getCache(cacheKey);
     if (cached) {
-      const normalizedRecord = normalizeDimensionRecord(cached, id);
+      const normalizedRecord = normalizeMaterialCodeRecord(cached, id);
       recordCache.set(id, normalizedRecord);
       return normalizedRecord;
     }
@@ -48,7 +48,7 @@ export async function fetchKcfxRecord(id, { force = false } = {}) {
       return response.json();
     })
     .then((payload) => {
-      const record = normalizeDimensionRecord(payload.record || { id, rows: [] }, id);
+      const record = normalizeMaterialCodeRecord(payload.record || { id, rows: [] }, id);
       recordCache.set(record.id || id, record);
       void setCache(cacheKey, record, 10 * 60 * 1000);
       return record;
@@ -99,16 +99,17 @@ export async function prefetchKcfxRecords(ids, { force = false, batchSize = 3, d
 export function kcfxRecordsArrayToMap(records) {
   if (Array.isArray(records)) {
     return Object.fromEntries(records
-      .map((record) => [record.id, normalizeDimensionRecord(record, record.id)])
+      .map((record) => [record.id, normalizeMaterialCodeRecord(record, record.id)])
       .filter(([id]) => id));
   }
-  return Object.fromEntries(Object.entries(records || {}).map(([id, record]) => [id, normalizeDimensionRecord(record, id)]));
+  return Object.fromEntries(Object.entries(records || {}).map(([id, record]) => [id, normalizeMaterialCodeRecord(record, id)]));
 }
 
-function normalizeDimensionRecord(record, fallbackId = '') {
+function normalizeMaterialCodeRecord(record, fallbackId = '') {
   const id = record?.id || fallbackId;
-  if (!isKcfxDimensionRecordId(id) || !Array.isArray(record?.rows)) return record;
-  const normalized = normalizeKcfxDimensionMaterialCodeRows(id, record.rows);
+  if (!Array.isArray(record?.rows)) return record;
+  const normalized = normalizeKcfxMaterialCodeRows(id, record.rows);
+  if (!normalized.diagnostics.columnFound) return record;
   return {
     ...record,
     rows: normalized.rows,

@@ -9,7 +9,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_ERRORS_SUMMARY_VERSION = 2;
+export const KCFX_ERRORS_SUMMARY_VERSION = 3;
 
 export const KCFX_ERRORS_RECORD_IDS = [
   'fact-inventory',

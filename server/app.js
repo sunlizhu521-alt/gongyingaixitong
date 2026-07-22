@@ -50,7 +50,7 @@ import {
   queryAgeAnalysis
 } from './kcfx-age-analysis.js';
 import { isStoreMappingHeaderSet, isStoreMappingRecordValid, pickStoreMappingSheetName, STORE_MAPPING_SHEET_HINT } from '../shared/kcfxStoreMapping.js';
-import { isKcfxDimensionRecordId, normalizeKcfxDimensionMaterialCodeRows } from '../shared/kcfxDimensionMaterialCode.js';
+import { normalizeKcfxMaterialCodeRows } from '../shared/kcfxMaterialCodeText.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -1234,7 +1234,7 @@ async function writeKcfxRecordRows(id, rows) {
   const fullPath = path.join(dataDir, relativePath);
   const tempPath = `${fullPath}.${randomUUID()}.tmp`;
   const savedAt = new Date().toISOString();
-  const materialCodeNormalization = normalizeKcfxDimensionMaterialCodeRows(id, rows);
+  const materialCodeNormalization = normalizeKcfxMaterialCodeRows(id, rows);
   const normalizedRows = materialCodeNormalization.rows;
   try {
     await writeFile(tempPath, JSON.stringify({
@@ -1256,9 +1256,7 @@ async function writeKcfxRecordRows(id, rows) {
     rowsPath: relativePath,
     rowsSavedAt: savedAt,
     rowCount: normalizedRows.length,
-    ...(isKcfxDimensionRecordId(id)
-      ? { materialCodeNormalization: materialCodeNormalization.diagnostics }
-      : {})
+    materialCodeNormalization: materialCodeNormalization.diagnostics
   };
 }
 
@@ -1269,7 +1267,7 @@ async function readKcfxRecordRows(record = {}) {
     const payload = JSON.parse(await readFile(kcfxRecordRowsFullPath(record), 'utf8'));
     rows = Array.isArray(payload?.rows) ? payload.rows : [];
   }
-  return normalizeKcfxDimensionMaterialCodeRows(record.id, rows).rows;
+  return normalizeKcfxMaterialCodeRows(record.id, rows).rows;
 }
 
 async function readKcfxRecordRowsPayload(id) {
@@ -1520,7 +1518,7 @@ const KCFX_RECEIPT_UNINSPECTED_RETURN_CATEGORIES = new Set(['全新品', '其他
 const KCFX_RECEIPT_OTHER_UNSALEABLE_RETURN_CATEGORIES = new Set(['健康办公', '其他/配件']);
 let kcfxReceiptSummaryCache = null;
 let kcfxReceiptSummaryPromise = null;
-const KCFX_RECEIPT_SUMMARY_CACHE_VERSION = 5;
+const KCFX_RECEIPT_SUMMARY_CACHE_VERSION = 6;
 let kcfxAgeAnalysisCache = null;
 let kcfxAgeAnalysisPromise = null;
 const KCFX_RECEIPT_SUMMARY_ROW_FIELDS = [
@@ -2827,7 +2825,7 @@ function parseKcfxWorkbookRows(workbook, slot) {
   const filtered = isInventoryMonthSlotId(slot.id)
     ? filterInventoryMonthSummaryRows(selected.rows)
     : { rows: selected.rows, removed: 0 };
-  const materialCodeNormalization = normalizeKcfxDimensionMaterialCodeRows(slot.id, filtered.rows);
+  const materialCodeNormalization = normalizeKcfxMaterialCodeRows(slot.id, filtered.rows);
   return {
     sheetName,
     originalSheetRange: sheetRange.originalRef,
@@ -2992,7 +2990,7 @@ function buildKcfxClientParsedFileRecord(file, storedFile, slot, clientRecord) {
   const completedAt = new Date().toISOString();
   const diagnostics = clientRecord.parseDiagnostics || {};
   const fileName = normalizeUploadedFileName(file.originalname);
-  const materialCodeNormalization = normalizeKcfxDimensionMaterialCodeRows(slot.id, clientRecord.rows);
+  const materialCodeNormalization = normalizeKcfxMaterialCodeRows(slot.id, clientRecord.rows);
   return {
     id: slot.id,
     type: slot.type,
