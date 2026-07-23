@@ -43,6 +43,7 @@ function formatAmount(value) {
 const COLUMNS = [
   { key: 'department', label: '事业部' },
   { key: 'productLine', label: '产品线' },
+  { key: 'productSeries', label: '销售系列' },
   { key: 'periodDays', label: '期间天数', render: (row) => formatNumber(row.periodDays) },
   { key: 'openingInventoryCost', label: '期初存货成本', render: (row) => formatAmount(row.openingInventoryCost) },
   { key: 'closingInventoryCost', label: '期末存货成本', render: (row) => formatAmount(row.closingInventoryCost) },
@@ -180,7 +181,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
     : error
       || payload?.message
       || (period
-        ? `统计期间：${period.startLabel}至${period.endLabel}，共${period.days}天；事业部＋产品线汇总明细${formatNumber(pagination.totalRows)}行`
+        ? `统计期间：${period.startLabel}至${period.endLabel}，共${period.days}天；事业部＋产品线＋销售系列汇总明细${formatNumber(pagination.totalRows)}行`
         : '等待数据');
   const warning = [
     period?.openingApproximate

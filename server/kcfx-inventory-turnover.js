@@ -13,7 +13,7 @@ import {
   rowsOf
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_TURNOVER_VERSION = 3;
+export const KCFX_INVENTORY_TURNOVER_VERSION = 4;
 export const INVENTORY_TURNOVER_PAGE_SIZE = 20;
 
 const GROUP_SEPARATOR = '\u001f';
@@ -319,7 +319,28 @@ export function buildInventoryTurnoverCache(records = {}, savedAt = '') {
   };
 }
 
-function calculateRow(identity, opening, closing, sales, undelivered, period, openingApproximate) {
+function uniqueMaterialCodes(values) {
+  return [...new Set((values || []).map(normalizeMaterialCode).filter(Boolean))].sort((a, b) => (
+    a.localeCompare(b, 'zh-CN', { numeric: true })
+  ));
+}
+
+function missingPriceStatus(label, count, materialCodes) {
+  if (!count) return '';
+  const codes = uniqueMaterialCodes(materialCodes);
+  return `${label}缺少结算价${count}条${codes.length ? `（物料编码：${codes.join('、')}）` : ''}`;
+}
+
+function calculateRow(
+  identity,
+  opening,
+  closing,
+  sales,
+  undelivered,
+  period,
+  openingApproximate,
+  missingPriceCodes = {}
+) {
   const openingInventoryCost = Number(opening?.amount) || 0;
   const closingInventoryCost = Number(closing?.amount) || 0;
   const averageInventoryCost = (openingInventoryCost + closingInventoryCost) / 2;
@@ -332,11 +353,14 @@ function calculateRow(identity, opening, closing, sales, undelivered, period, op
   const closingMissingPriceRows = Number(closing?.missingPriceRows) || 0;
   const salesMissingPriceRows = Number(sales?.missingPriceRows) || 0;
   const missingPriceRows = openingMissingPriceRows + closingMissingPriceRows + salesMissingPriceRows;
+  const openingMissingPriceMaterialCodes = uniqueMaterialCodes(missingPriceCodes.opening);
+  const closingMissingPriceMaterialCodes = uniqueMaterialCodes(missingPriceCodes.closing);
+  const salesMissingPriceMaterialCodes = uniqueMaterialCodes(missingPriceCodes.sales);
   const statusDetails = [
     openingApproximate ? `缺少${period.openingTargetMonth}期初库存快照，使用最早可用快照` : '',
-    openingMissingPriceRows ? `期初库存缺少结算价${openingMissingPriceRows}条` : '',
-    closingMissingPriceRows ? `期末库存缺少结算价${closingMissingPriceRows}条` : '',
-    salesMissingPriceRows ? `销售数据缺少结算价${salesMissingPriceRows}条` : ''
+    missingPriceStatus('期初库存', openingMissingPriceRows, openingMissingPriceMaterialCodes),
+    missingPriceStatus('期末库存', closingMissingPriceRows, closingMissingPriceMaterialCodes),
+    missingPriceStatus('销售数据', salesMissingPriceRows, salesMissingPriceMaterialCodes)
   ].filter(Boolean);
   return {
     ...identity,
@@ -360,6 +384,9 @@ function calculateRow(identity, opening, closing, sales, undelivered, period, op
     closingMissingPriceRows,
     salesMissingPriceRows,
     missingPriceRows,
+    openingMissingPriceMaterialCodes,
+    closingMissingPriceMaterialCodes,
+    salesMissingPriceMaterialCodes,
     dataStatus: statusDetails.length ? statusDetails.join('；') : '完整'
   };
 }
@@ -386,6 +413,11 @@ function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
     closingMissingPriceRows: 0,
     salesMissingPriceRows: 0
   });
+  const missingPriceCodes = {
+    opening: uniqueMaterialCodes(rows.flatMap((row) => row.openingMissingPriceMaterialCodes || [])),
+    closing: uniqueMaterialCodes(rows.flatMap((row) => row.closingMissingPriceMaterialCodes || [])),
+    sales: uniqueMaterialCodes(rows.flatMap((row) => row.salesMissingPriceMaterialCodes || []))
+  };
   return calculateRow(identity, {
     amount: totals.openingInventoryCost,
     missingPriceRows: totals.openingMissingPriceRows
@@ -399,7 +431,7 @@ function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
     missingPriceRows: totals.salesMissingPriceRows
   }, {
     undeliveredQty: totals.undeliveredQty
-  }, period, openingApproximate);
+  }, period, openingApproximate, missingPriceCodes);
 }
 
 function selected(filters, field) {
@@ -427,7 +459,7 @@ function aggregateInventoryComponents(source, filters) {
   for (const [key, values] of source || []) {
     const identity = groupIdentity(key);
     if (!matchesFilters(identity, filters, ['department', 'productLine', 'productSeries'])) continue;
-    addMetric(target, groupKey(identity.department, identity.productLine), values);
+    addMetric(target, groupKey(identity.department, identity.productLine, identity.productSeries), values);
   }
   return target;
 }
@@ -444,7 +476,7 @@ function aggregateSalesComponents(cache, period, filters) {
         'nonInternalTransactionStatus',
         'finishedGoodsStatus'
       ])) continue;
-      addMetric(target, groupKey(identity.department, identity.productLine), values);
+      addMetric(target, groupKey(identity.department, identity.productLine, identity.productSeries), values);
     }
   }
   return target;
@@ -502,7 +534,7 @@ function missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, 
   const salesMonths = new Set(period.monthList);
   return (cache.missingPriceRecords || []).filter((row) => {
     if (!matchesFilters(row, filters, ['department', 'productLine', 'productSeries'])) return false;
-    const hasSalesData = sales.has(groupKey(row.department, row.productLine))
+    const hasSalesData = sales.has(groupKey(row.department, row.productLine, row.productSeries))
       ? '有销售数据'
       : '无销售数据';
     if (!matchesFilters({ hasSalesData }, filters, ['hasSalesData'])) return false;
@@ -510,6 +542,27 @@ function missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, 
     return salesMonths.has(row.month)
       && matchesFilters(row, filters, ['nonInternalTransactionStatus', 'finishedGoodsStatus']);
   });
+}
+
+function missingPriceCodesByGroup(rows, openingSnapshotMonth, closingSnapshotMonth) {
+  const groups = new Map();
+  for (const row of rows) {
+    const key = groupKey(row.department, row.productLine, row.productSeries);
+    if (!groups.has(key)) groups.set(key, { opening: [], closing: [], sales: [] });
+    const group = groups.get(key);
+    if (row.sourceType === '销售数据') {
+      group.sales.push(row.materialCode);
+      continue;
+    }
+    if (row.month === openingSnapshotMonth) group.opening.push(row.materialCode);
+    if (row.month === closingSnapshotMonth) group.closing.push(row.materialCode);
+  }
+  for (const group of groups.values()) {
+    group.opening = uniqueMaterialCodes(group.opening);
+    group.closing = uniqueMaterialCodes(group.closing);
+    group.sales = uniqueMaterialCodes(group.sales);
+  }
+  return groups;
 }
 
 function chartRows(rows, field, period, openingApproximate) {
@@ -556,6 +609,12 @@ export function queryInventoryTurnover(cache, input = {}) {
   const closing = aggregateInventoryComponents(cache.inventorySnapshots.get(period.endMonth), filters);
   const sales = aggregateSalesComponents(cache, period, filters);
   const undelivered = aggregateInventoryComponents(cache.undelivered, filters);
+  const missingPriceRows = missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, sales);
+  const missingPriceCodes = missingPriceCodesByGroup(
+    missingPriceRows,
+    openingSnapshotMonth,
+    period.endMonth
+  );
   const keys = new Set([
     ...opening.keys(),
     ...closing.keys(),
@@ -569,14 +628,15 @@ export function queryInventoryTurnover(cache, input = {}) {
     sales.get(key),
     undelivered.get(key),
     period,
-    openingApproximate
+    openingApproximate,
+    missingPriceCodes.get(key)
   )).sort((a, b) => (
     a.department.localeCompare(b.department, 'zh-CN')
     || a.productLine.localeCompare(b.productLine, 'zh-CN')
+    || a.productSeries.localeCompare(b.productSeries, 'zh-CN')
   ));
   const filteredRows = allRows.filter((row) => matchesFilters(row, filters, ['hasSalesData']));
   const metrics = aggregateCalculatedRows(filteredRows, {}, period, openingApproximate);
-  const missingPriceRows = missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, sales);
   const pageSize = INVENTORY_TURNOVER_PAGE_SIZE;
   const totalRows = filteredRows.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));

@@ -675,6 +675,7 @@ app.post('/api/kcfx-library/inventory-turnover/export', async (req, res) => {
     const data = rows.map((row) => ({
       事业部: row.department,
       产品线: row.productLine,
+      销售系列: row.productSeries,
       期间月数: row.period?.months || 0,
       期间天数: row.periodDays,
       期初存货成本: row.openingInventoryCost,
