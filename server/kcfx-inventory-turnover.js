@@ -13,11 +13,37 @@ import {
   rowsOf
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_TURNOVER_VERSION = 4;
+export const KCFX_INVENTORY_TURNOVER_VERSION = 5;
 export const INVENTORY_TURNOVER_PAGE_SIZE = 20;
 
 const GROUP_SEPARATOR = '\u001f';
 const DAY_MS = 24 * 60 * 60 * 1000;
+const TURNOVER_CHART_ORDERS = {
+  department: [
+    '海外事业一部',
+    '海外事业二部',
+    '国内事业部',
+    '全球招商事业部',
+    '销售部-工厂'
+  ],
+  productLine: [
+    '手推车',
+    '升降椅',
+    '防褥疮气床垫',
+    '手动轮椅',
+    '电动轮椅',
+    '老年代步车',
+    '移位机',
+    '洗澡椅',
+    '护理床',
+    '其他/成品'
+  ]
+};
+const TURNOVER_CHART_ORDER_ALIASES = {
+  department: {
+    全球招商部: '全球招商事业部'
+  }
+};
 
 function normalizeDepartmentKey(value) {
   return normalizeMaterialCode(value).replace(/&/g, '').toLowerCase();
@@ -565,6 +591,17 @@ function missingPriceCodesByGroup(rows, openingSnapshotMonth, closingSnapshotMon
   return groups;
 }
 
+export function sortInventoryTurnoverChartRows(rows, field) {
+  const order = TURNOVER_CHART_ORDERS[field] || [];
+  const aliases = TURNOVER_CHART_ORDER_ALIASES[field] || {};
+  const orderIndex = new Map(order.map((value, index) => [value, index]));
+  const rank = (name) => orderIndex.get(aliases[name] || name) ?? Number.MAX_SAFE_INTEGER;
+  return [...rows].sort((a, b) => (
+    rank(a.name) - rank(b.name)
+    || String(a.name || '').localeCompare(String(b.name || ''), 'zh-CN')
+  ));
+}
+
 function chartRows(rows, field, period, openingApproximate) {
   const groups = new Map();
   for (const row of rows) {
@@ -572,15 +609,11 @@ function chartRows(rows, field, period, openingApproximate) {
     if (!groups.has(value)) groups.set(value, []);
     groups.get(value).push(row);
   }
-  return [...groups.entries()]
+  return sortInventoryTurnoverChartRows([...groups.entries()]
     .map(([name, items]) => ({
       name,
       ...aggregateCalculatedRows(items, { [field]: name }, period, openingApproximate)
-    }))
-    .sort((a, b) => (
-      (Number(b.inventoryTurnoverDays) || -Infinity) - (Number(a.inventoryTurnoverDays) || -Infinity)
-      || a.name.localeCompare(b.name, 'zh-CN')
-    ));
+    })), field);
 }
 
 export function queryInventoryTurnover(cache, input = {}) {

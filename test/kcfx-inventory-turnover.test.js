@@ -6,7 +6,8 @@ import {
   exportInventoryTurnoverMissingPriceRows,
   exportInventoryTurnoverRows,
   inventoryTurnoverPeriod,
-  queryInventoryTurnover
+  queryInventoryTurnover,
+  sortInventoryTurnoverChartRows
 } from '../server/kcfx-inventory-turnover.js';
 
 function record(rows, id = '') {
@@ -74,6 +75,42 @@ test('完整自然月期间正确处理大小月和闰年', () => {
     }
   );
   assert.equal(inventoryTurnoverPeriod('2024-03', 2, '2024-01').days, 60);
+});
+
+test('周转图表按固定事业部和产品线业务顺序排列', () => {
+  const rows = (names) => names.map((name) => ({ name }));
+  assert.deepEqual(
+    sortInventoryTurnoverChartRows(rows([
+      '其他事业部',
+      '销售部-工厂',
+      '国内事业部',
+      '海外事业二部',
+      '全球招商事业部',
+      '海外事业一部'
+    ]), 'department').map((row) => row.name),
+    ['海外事业一部', '海外事业二部', '国内事业部', '全球招商事业部', '销售部-工厂', '其他事业部']
+  );
+  assert.deepEqual(
+    sortInventoryTurnoverChartRows(rows(['销售部-工厂', '全球招商部', '国内事业部']), 'department')
+      .map((row) => row.name),
+    ['国内事业部', '全球招商部', '销售部-工厂']
+  );
+  assert.deepEqual(
+    sortInventoryTurnoverChartRows(rows([
+      '其他/成品',
+      '护理床',
+      '洗澡椅',
+      '移位机',
+      '老年代步车',
+      '电动轮椅',
+      '手动轮椅',
+      '防褥疮气床垫',
+      '升降椅',
+      '手推车',
+      '未配置产品线'
+    ]), 'productLine').map((row) => row.name),
+    ['手推车', '升降椅', '防褥疮气床垫', '手动轮椅', '电动轮椅', '老年代步车', '移位机', '洗澡椅', '护理床', '其他/成品', '未配置产品线']
+  );
 });
 
 test('周转成本使用应收数量而未交付覆盖使用出库数量', () => {
