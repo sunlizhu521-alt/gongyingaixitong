@@ -10,16 +10,24 @@ import { TablePagination } from './TablePagination.jsx';
 const TREND_YEARS = ['2025', '2026'];
 const TREND_YEAR_COLORS = { 2025: '#007aff', 2026: '#34c759' };
 const TREND_FILTERS = [
-  { id: 'salesMonth', field: 'salesMonth', allLabel: '全部销售月份', monthAllLabel: '全部数据月份', matchMonthNumber: true, limit: 300 },
+  { id: 'salesMonth', field: 'salesMonth', allLabel: '全部销售月份', monthAllLabel: '全部数据月份', multiple: true, independentOptions: true, limit: 300 },
   { id: 'salesOrg', field: 'salesOrg', allLabel: '全部销售部门', limit: 300 },
   { id: 'storeShortName', field: 'storeShortName', allLabel: '店铺简称', limit: 300 },
   { id: 'productLine', field: 'productLine', allLabel: '全部销售产品线', limit: 300 },
   { id: 'productSeries', field: 'productSeries', allLabel: '全部销售系列', limit: 300 },
-  { id: 'model', field: 'model', allLabel: '型号', limit: 300 }
+  { id: 'model', field: 'model', allLabel: '型号', limit: 300 },
+  { id: 'realTransactionStatus', field: 'realTransactionStatus', allLabel: '是否真实交易', limit: 10 },
+  { id: 'nonInternalTransactionStatus', field: 'nonInternalTransactionStatus', allLabel: '是否内部交易', limit: 10 },
+  { id: 'finishedGoodsStatus', field: 'finishedGoodsStatus', allLabel: '是否成品', limit: 10 }
 ];
-const EMPTY_SELECTIONS = Object.fromEntries(TREND_FILTERS.map((filter) => [filter.id, []]));
-const SALES_TREND_FILTER_STORAGE_KEY = 'gongyingai:filters:sales-trend:v1';
-const SALES_TREND_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
+const DEFAULT_SELECTIONS = {
+  ...Object.fromEntries(TREND_FILTERS.map((filter) => [filter.id, []])),
+  realTransactionStatus: ['真实交易'],
+  nonInternalTransactionStatus: ['非内部交易'],
+  finishedGoodsStatus: ['成品']
+};
+const SALES_TREND_FILTER_STORAGE_KEY = 'gongyingai:filters:sales-trend:v2';
+const SALES_TREND_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material', 'dim-warehouse'];
 const SALES_TREND_PAGE_SIZE = 20;
 const SALES_TREND_TABLE_COLUMNS = [
   { key: 'salesMonth', label: '月份' },
@@ -40,7 +48,7 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
   const shouldUseFallbackRecords = salesRowsResult.loaded && !salesRowsResult.loading && salesRowsResult.rows.length === 0;
   const fallbackRecordsResult = useKcfxRecordMap(kcfxData, shouldUseFallbackRecords ? SALES_TREND_RECORD_IDS : []);
   const fallbackRows = shouldUseFallbackRecords
-    ? getCachedSalesRows({ ...kcfxRecords, ...fallbackRecordsResult.records })
+    ? getCachedSalesRows({ ...kcfxRecords, ...fallbackRecordsResult.records }, { includeExcluded: true })
     : [];
   const salesRows = salesRowsResult.rows.length
     ? salesRowsResult.rows
@@ -131,18 +139,26 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
   }
 
   function clearFilters() {
-    setSelections(EMPTY_SELECTIONS);
-    writeTrendSelections(EMPTY_SELECTIONS);
+    const defaults = cloneDefaultSelections();
+    setSelections(defaults);
+    writeTrendSelections(defaults);
     setOpenFilter('');
   }
 
   return (
-    <KcfxPageShell title="销售趋势变化" status={status} loading={pageLoading} onRefresh={refresh}>
+    <KcfxPageShell
+      title="销售趋势变化"
+      status={status}
+      note="销售口径与销售汇总报表一致，默认显示真实交易、非内部交易和成品；无法匹配的数据可通过对应筛选器查看。"
+      loading={pageLoading}
+      onRefresh={refresh}
+    >
       <section className="toolbar trend-filter-toolbar">
         <MonthCalendarFilter
           id="sales-trend-salesMonth"
           label="全部销售月份"
           allLabel="全部数据月份"
+          multiple
           selected={normalizedSelections.salesMonth || []}
           options={linkedOptions.salesMonth || []}
           onChange={(value) => setFilterValue('salesMonth', value)}
@@ -211,6 +227,7 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
         <div><strong>商品分类维表</strong>：{recordSourceText(records['dim-product'])}</div>
         <div><strong>客户与物料对照表</strong>：{recordSourceText(records['dim-store-name'])}；销售数据文件 L 列匹配维表 D 列，取维表 E 列作为销售部门</div>
         <div><strong>店铺名称汇总（金蝶&领星&简称）</strong>：{recordSourceText(records['dim-customer-material'])}</div>
+        <div><strong>仓库维表</strong>：{recordSourceText(records['dim-warehouse'])}</div>
       </section>
     </KcfxPageShell>
   );
@@ -267,6 +284,10 @@ function VerticalTrendChart({ months, grouped }) {
 }
 
 function linkedFilterOptions(rows, targetFilter, selections) {
+  if (targetFilter.independentOptions) {
+    return [...new Set(rows.map((row) => String(row[targetFilter.field] || '').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  }
   const totals = new Map();
   for (const row of rows) {
     if (!rowMatchesSelections(row, selections, targetFilter.id)) continue;
@@ -300,23 +321,29 @@ function formatMonthLabel(value) {
 }
 
 function readTrendSelections() {
-  if (typeof window === 'undefined') return EMPTY_SELECTIONS;
+  if (typeof window === 'undefined') return cloneDefaultSelections();
   try {
     const parsed = JSON.parse(window.localStorage.getItem(SALES_TREND_FILTER_STORAGE_KEY) || '{}');
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return EMPTY_SELECTIONS;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return cloneDefaultSelections();
     return Object.fromEntries(TREND_FILTERS.map((filter) => [
       filter.id,
-      Array.isArray(parsed[filter.id]) ? parsed[filter.id].map(String).filter(Boolean) : []
+      Array.isArray(parsed[filter.id]) && parsed[filter.id].length
+        ? parsed[filter.id].map(String).filter(Boolean)
+        : [...(DEFAULT_SELECTIONS[filter.id] || [])]
     ]));
   } catch {
-    return EMPTY_SELECTIONS;
+    return cloneDefaultSelections();
   }
+}
+
+function cloneDefaultSelections() {
+  return Object.fromEntries(Object.entries(DEFAULT_SELECTIONS).map(([key, values]) => [key, [...values]]));
 }
 
 function writeTrendSelections(selections) {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(SALES_TREND_FILTER_STORAGE_KEY, JSON.stringify(selections || EMPTY_SELECTIONS));
+    window.localStorage.setItem(SALES_TREND_FILTER_STORAGE_KEY, JSON.stringify(selections || DEFAULT_SELECTIONS));
   } catch {
     // Filter persistence is best-effort.
   }

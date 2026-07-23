@@ -161,13 +161,13 @@ export function uniqueValues(rows, field) {
 function linkedFilterValues(rows, filters, targetFilter, selections) {
   const totals = new Map();
   for (const row of rows) {
-    if (!rowMatchesSelections(row, filters, selections, targetFilter.id)) continue;
+    if (!targetFilter.independentOptions && !rowMatchesSelections(row, filters, selections, targetFilter.id)) continue;
     const value = normalizeText(row[targetFilter.field]);
     if (!value) continue;
     totals.set(value, (totals.get(value) || 0) + (Number(row[targetFilter.sortValueField || 'qty']) || Number(row.amount) || Number(row.value) || 1));
   }
   const values = [...totals.entries()]
-    .filter(([, amount]) => amount !== 0)
+    .filter(([, amount]) => targetFilter.independentOptions || amount !== 0)
     .sort((a, b) => {
       if (targetFilter.sortByName) return a[0].localeCompare(b[0], 'zh-CN');
       return b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN');

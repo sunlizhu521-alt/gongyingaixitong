@@ -8,7 +8,7 @@ const inflightRecordRequests = new Map();
 let salesRowsPayloadCache = null;
 let inflightSalesRowsRequest = null;
 let recordCacheVersion = '';
-const salesRowsCacheVersion = 'v5';
+const salesRowsCacheVersion = 'v6';
 const recordRowsCacheVersion = 'v4';
 
 function uniqueRecordIds(ids = []) {

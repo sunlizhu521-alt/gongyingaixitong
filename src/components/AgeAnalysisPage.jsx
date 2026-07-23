@@ -14,7 +14,7 @@ import { buildSalesOutboundWarehouseLocationTrend, buildWarehouseFlowTrend } fro
 import { TablePagination } from './TablePagination.jsx';
 
 const FILTERS = [
-  { id: 'month', field: 'month', type: 'month', allLabel: '全部月份', monthAllLabel: '全部月份' },
+  { id: 'month', field: 'month', type: 'month', multiple: true, allLabel: '全部月份', monthAllLabel: '全部月份' },
   { id: 'warehouseType', field: 'warehouseType', allLabel: '全部仓库类型' },
   { id: 'department', field: 'department', allLabel: '全部事业部' },
   { id: 'ageGroup', field: 'ageGroup', allLabel: '全部库龄' },

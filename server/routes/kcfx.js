@@ -14,7 +14,7 @@ import {
 } from '../kcfx-errors-summary.js';
 
 const crypto = { randomUUID };
-const SALES_ROW_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
+const SALES_ROW_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material', 'dim-warehouse'];
 let salesRowsPayloadCache = { key: '', payload: null };
 const INVENTORY_SUMMARY_RECORD_IDS = [
   'fact-inventory',
@@ -286,7 +286,7 @@ async function buildSalesRowsPayload(db, { force = false } = {}) {
     return salesRowsPayloadCache.payload;
   }
 
-  const rows = getCachedSalesRows(records).map((row) => ({
+  const rows = getCachedSalesRows(records, { includeExcluded: true }).map((row) => ({
     salesMonth: row.salesMonth || '',
     salesYear: row.salesYear || '',
     salesMonthNumber: row.salesMonthNumber || '',
@@ -298,9 +298,16 @@ async function buildSalesRowsPayload(db, { force = false } = {}) {
     materialName: row.materialName || '',
     productLine: row.productLine || '',
     productCategory: row.productCategory || '',
+    primaryCategory: row.primaryCategory || '',
     productSeries: row.productSeries || '',
     model: row.model || '',
+    warehouse: row.warehouse || '',
+    warehouseType: row.warehouseType || '',
+    realTransactionStatus: row.realTransactionStatus || '未匹配',
+    nonInternalTransactionStatus: row.nonInternalTransactionStatus || '未匹配',
+    finishedGoodsStatus: row.finishedGoodsStatus || '未匹配',
     qty: Number(row.qty) || 0,
+    amount: Number(row.amount) || 0,
     storeMatchStatus: row.storeMatchStatus || ''
   }));
 

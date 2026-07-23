@@ -7,14 +7,22 @@ import { downloadKcfxRowsAsXlsx } from './kcfxExport.js';
 import { formatNumber, getCachedSalesRows, groupSum, recordSourceText, sum, uniqueCount } from './kcfxUtils.js';
 import { useKcfxRecordMap, useKcfxSalesRows } from './kcfxRecordLoader.js';
 
-const SALES_ANALYSIS_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material'];
+const SALES_ANALYSIS_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material', 'dim-warehouse'];
+const SALES_CLASSIFICATION_DEFAULTS = {
+  realTransactionStatus: ['真实交易'],
+  nonInternalTransactionStatus: ['非内部交易'],
+  finishedGoodsStatus: ['成品']
+};
 const SALES_FILTERS = [
-  { id: 'salesMonth', field: 'salesMonth', allLabel: '全部销售月份', monthAllLabel: '全部数据月份', type: 'month', sortByName: true, matchMonthNumber: true, sortValueField: 'qty' },
+  { id: 'salesMonth', field: 'salesMonth', allLabel: '全部销售月份', monthAllLabel: '全部数据月份', type: 'month', multiple: true, independentOptions: true, sortByName: true, sortValueField: 'qty' },
   { id: 'salesOrg', field: 'salesOrg', allLabel: '全部销售部门', sortValueField: 'qty' },
   { id: 'storeShortName', field: 'storeShortName', allLabel: '店铺简称', sortValueField: 'qty' },
   { id: 'productLine', field: 'productLine', allLabel: '全部销售产品线', sortValueField: 'qty' },
   { id: 'productSeries', field: 'productSeries', allLabel: '全部销售系列', sortValueField: 'qty' },
-  { id: 'model', field: 'model', allLabel: '型号', limit: 300, sortValueField: 'qty' }
+  { id: 'model', field: 'model', allLabel: '型号', limit: 300, sortValueField: 'qty' },
+  { id: 'realTransactionStatus', field: 'realTransactionStatus', allLabel: '是否真实交易', preferredOrder: ['真实交易', '非真实交易', '未匹配'] },
+  { id: 'nonInternalTransactionStatus', field: 'nonInternalTransactionStatus', allLabel: '是否内部交易', preferredOrder: ['非内部交易', '内部交易', '未匹配'] },
+  { id: 'finishedGoodsStatus', field: 'finishedGoodsStatus', allLabel: '是否成品', preferredOrder: ['成品', '非成品', '未匹配'] }
 ];
 const SALES_SEARCH_FIELDS = ['customer', 'storeShortName', 'model', 'materialCode', 'materialName', 'salesOrg', 'productLine', 'productSeries'];
 const SALES_TABLE_COLUMNS = [
@@ -35,7 +43,7 @@ export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRe
   const shouldUseFallbackRecords = salesRowsResult.loaded && !salesRowsResult.loading && salesRowsResult.rows.length === 0;
   const fallbackRecordsResult = useKcfxRecordMap(kcfxData, shouldUseFallbackRecords ? SALES_ANALYSIS_RECORD_IDS : []);
   const fallbackRows = shouldUseFallbackRecords
-    ? getCachedSalesRows({ ...kcfxRecords, ...fallbackRecordsResult.records })
+    ? getCachedSalesRows({ ...kcfxRecords, ...fallbackRecordsResult.records }, { includeExcluded: true })
     : [];
   const rows = salesRowsResult.rows.length
     ? salesRowsResult.rows
@@ -57,13 +65,16 @@ export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRe
     [...new Set(rows.map((row) => row.salesMonth).filter(Boolean))].sort().at(-1) || ''
   ), [rows]);
   const defaultSelections = useMemo(() => (
-    latestSalesMonth ? { salesMonth: [latestSalesMonth] } : {}
+    ({
+      ...SALES_CLASSIFICATION_DEFAULTS,
+      ...(latestSalesMonth ? { salesMonth: [latestSalesMonth] } : {})
+    })
   ), [latestSalesMonth]);
   const filterState = useDashboardFilters(rows, SALES_FILTERS, {
     searchFields: SALES_SEARCH_FIELDS,
     searchValue: search,
     defaultSelections,
-    storageKey: 'gongyingai:filters:sales-analysis:v1'
+    storageKey: 'gongyingai:filters:sales-analysis:v2'
   });
   const filteredRows = filterState.filteredRows;
   const totalQty = useMemo(() => sum(filteredRows, 'qty'), [filteredRows]);
@@ -175,7 +186,13 @@ export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRe
   ], [feedbackDrafts, salesFeedbackKey, submitSalesFeedback, updateSalesFeedbackDraft]);
 
   return (
-    <KcfxPageShell title="月度销售数据" status={status} loading={recordsLoading} onRefresh={refresh}>
+    <KcfxPageShell
+      title="月度销售数据"
+      status={status}
+      note="销售口径与销售汇总报表一致，默认显示真实交易、非内部交易和成品；无法匹配的数据可通过对应筛选器查看。"
+      loading={recordsLoading}
+      onRefresh={refresh}
+    >
       <FilterToolbar
         filters={SALES_FILTERS}
         searchValue={search}
@@ -211,7 +228,8 @@ export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRe
         { label: '销售数据文件', value: recordSourceText(records['sales-data']) },
         { label: '商品分类维表', value: recordSourceText(records['dim-product']) },
         { label: '店铺简称维表', value: recordSourceText(records['dim-customer-material']) },
-        { label: '销售部门维表', value: recordSourceText(records['dim-store-name']) }
+        { label: '销售部门维表', value: recordSourceText(records['dim-store-name']) },
+        { label: '仓库维表', value: recordSourceText(records['dim-warehouse']) }
       ]} />
     </KcfxPageShell>
   );
