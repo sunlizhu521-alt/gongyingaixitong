@@ -54,6 +54,7 @@ import SalesTrendPage from './components/SalesTrendPage.jsx';
 import ReceiptSummaryPage from './components/ReceiptSummaryPage.jsx';
 import InventoryTrendPage from './components/InventoryTrendPage.jsx';
 import InventorySummaryPage from './components/InventorySummaryPage.jsx';
+import InventoryTurnoverPage from './components/InventoryTurnoverPage.jsx';
 import SalesSummaryPage from './components/SalesSummaryPage.jsx';
 import AgeAnalysisPage from './components/AgeAnalysisPage.jsx';
 import SalesAnalysisPage from './components/SalesAnalysisPage.jsx';
@@ -74,6 +75,7 @@ const SERVER_QUERY_KCFX_TABS = new Set([
   'salesInventoryReceiptSummary',
   'salesInventoryAgeAnalysis',
   'salesInventoryInventorySummary',
+  'salesInventoryInventoryTurnover',
   'salesInventorySalesSummary'
 ]);
 function priorityKcfxRecordIdsForTab(tab) {
@@ -1922,6 +1924,16 @@ function App() {
         {mountedReactKcfxTabs.has('salesInventoryInventorySummary') && canAccessTab('salesInventoryInventorySummary') && (
           <div className={activeTab === 'salesInventoryInventorySummary' ? '' : 'kept-page-hidden'}>
             <InventorySummaryPage
+              user={user}
+              kcfxData={kcfxData}
+              onRefresh={loadKcfxMetadata}
+            />
+          </div>
+        )}
+
+        {mountedReactKcfxTabs.has('salesInventoryInventoryTurnover') && canAccessTab('salesInventoryInventoryTurnover') && (
+          <div className={activeTab === 'salesInventoryInventoryTurnover' ? '' : 'kept-page-hidden'}>
+            <InventoryTurnoverPage
               user={user}
               kcfxData={kcfxData}
               onRefresh={loadKcfxMetadata}

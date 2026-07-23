@@ -530,6 +530,7 @@ export function getSalesRows(records, { includeExcluded = false } = {}) {
       nonInternalTransactionStatus,
       finishedGoodsStatus: classifyFinishedGoods(product, productMatched),
       qty: getSalesReceivableQty(row),
+      outboundQty: getSalesOutboundQty(row),
       amount: getSalesTaxExcludedAmount(row),
       storeMatchStatus: storeInfo ? '已匹配' : '未匹配'
     };
@@ -660,6 +661,13 @@ function getSalesReceivableQty(row) {
   return firstNumber([
     firstValue(row, ['应收数量']),
     firstValueByHeaderIncludes(row, ['应收', '数量'])
+  ]);
+}
+
+function getSalesOutboundQty(row) {
+  return firstNumber([
+    firstValue(row, ['出库数量']),
+    firstValueByHeaderIncludes(row, ['出库', '数量'])
   ]);
 }
 

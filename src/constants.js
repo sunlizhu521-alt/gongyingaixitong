@@ -66,6 +66,7 @@ const SALES_INVENTORY_PAGES = [
   { tab: 'salesInventoryAgeAnalysis', key: 'ageAnalysis', label: '库龄维度分析' },
   { tab: 'salesInventoryInventoryTrend', key: 'inventoryTrend', label: '库存趋势分析', sourceFile: 'inventory-trend.html' },
   { tab: 'salesInventoryInventorySummary', key: 'inventorySummary', label: '库存汇总报表' },
+  { tab: 'salesInventoryInventoryTurnover', key: 'inventoryTurnover', label: '库存周转天数' },
   { tab: 'salesInventorySalesSummary', key: 'salesSummary', label: '销售汇总报表' },
   { tab: 'salesInventorySalesAnalysis', key: 'salesAnalysis', label: '月度销售数据', sourceFile: 'sales-analysis.html' },
   { tab: 'salesInventorySalesTrend', key: 'salesTrend', label: '销售趋势变化', sourceFile: 'sales-trend.html' },
@@ -87,6 +88,7 @@ const KCFX_REACT_DATA_TABS = new Set([
   'salesInventoryAgeAnalysis',
   'salesInventoryInventoryTrend',
   'salesInventoryInventorySummary',
+  'salesInventoryInventoryTurnover',
   'salesInventorySalesSummary',
   'salesInventorySalesAnalysis',
   'salesInventoryComparison',
@@ -164,7 +166,7 @@ const tabPermissionMap = Object.fromEntries(
 const legacyPermissionMap = {
   ...Object.fromEntries(
     SALES_INVENTORY_PAGES
-      .filter((page) => page.key !== 'ageAnalysis')
+      .filter((page) => !['ageAnalysis', 'inventoryTurnover'].includes(page.key))
       .map((page) => [`salesInventory.${page.key}`, ['salesInventory']])
   ),
   'maintenanceLibrary.factLibrary': ['maintenanceLibrary', 'salesInventory', 'salesInventory.factLibrary'],

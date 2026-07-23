@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import { createStyledWorkbook } from '../../shared/excelExport.js';
+import { INVENTORY_AGE_SLOT_IDS } from '../../shared/kcfxAgeMonths.js';
 import { getCachedSalesRows } from '../../src/components/kcfxUtils.js';
+import {
+  buildInventoryTurnoverCache,
+  exportInventoryTurnoverRows,
+  queryInventoryTurnover
+} from '../kcfx-inventory-turnover.js';
 import {
   buildInventorySummaryCache,
   exportInventorySummaryRows,
@@ -27,6 +33,18 @@ const INVENTORY_SUMMARY_RECORD_IDS = [
   'dim-customer-material'
 ];
 let inventorySummaryPayloadCache = { key: '', payload: null };
+const INVENTORY_TURNOVER_RECORD_IDS = [
+  ...INVENTORY_AGE_SLOT_IDS,
+  'fact-2',
+  'purchase-order-data',
+  'sales-data',
+  'dim-product',
+  'dim-warehouse',
+  'dim-warehouse-material',
+  'dim-store-name',
+  'dim-customer-material'
+];
+let inventoryTurnoverPayloadCache = { key: '', payload: null };
 let errorsSummaryPayloadCache = { key: '', payload: null };
 let errorsSummaryPayloadPromise = { key: '', promise: null };
 
@@ -193,6 +211,33 @@ async function getInventorySummaryCache(database, { force = false } = {}) {
   return payload;
 }
 
+async function getInventoryTurnoverCache(database, { force = false } = {}) {
+  const key = [
+    database.kcfxLibrary?.savedAt || '',
+    ...INVENTORY_TURNOVER_RECORD_IDS.map((id) => {
+      const record = database.kcfxLibrary?.records?.[id] || {};
+      return `${id}:${record.rowsSavedAt || record.serverSavedAt || record.savedAt || record.appliedAt || ''}:${record.rowCount || 0}`;
+    })
+  ].join('|');
+  if (!force && inventoryTurnoverPayloadCache.key === key && inventoryTurnoverPayloadCache.payload) {
+    return inventoryTurnoverPayloadCache.payload;
+  }
+
+  const records = {};
+  for (const id of INVENTORY_TURNOVER_RECORD_IDS) {
+    const source = database.kcfxLibrary.records[id] || await recoverKcfxRecordFromRowsFile(id);
+    if (!source) {
+      records[id] = { id, rows: [] };
+      continue;
+    }
+    const record = await ensureKcfxRecordRows(database, id, source);
+    records[id] = await attachKcfxRecordRows(record);
+  }
+  const payload = buildInventoryTurnoverCache(records, database.kcfxLibrary?.savedAt || '');
+  inventoryTurnoverPayloadCache = { key, payload };
+  return payload;
+}
+
 async function getErrorsSummaryCache(database, { force = false } = {}) {
   const key = kcfxErrorsSummaryCacheKey(database);
   if (!force && errorsSummaryPayloadCache.key === key && errorsSummaryPayloadCache.payload) {
@@ -307,6 +352,7 @@ async function buildSalesRowsPayload(db, { force = false } = {}) {
     nonInternalTransactionStatus: row.nonInternalTransactionStatus || '未匹配',
     finishedGoodsStatus: row.finishedGoodsStatus || '未匹配',
     qty: Number(row.qty) || 0,
+    outboundQty: Number(row.outboundQty) || 0,
     amount: Number(row.amount) || 0,
     storeMatchStatus: row.storeMatchStatus || ''
   }));
@@ -485,6 +531,24 @@ app.post('/api/kcfx-library/inventory-summary/query', async (req, res) => {
   }
 });
 
+app.post('/api/kcfx-library/inventory-turnover/query', async (req, res) => {
+  try {
+    const database = await initDb(dataDir);
+    const requestUser = requirePermission(database, req, res, 'salesInventory.inventoryTurnover');
+    if (!requestUser) return;
+    res.setHeader('Cache-Control', 'no-store');
+    const cache = await getInventoryTurnoverCache(database, { force: req.body?.refresh === true });
+    res.json(queryInventoryTurnover(cache, req.body || {}));
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      status: 'failed',
+      source: 'server-inventory-turnover',
+      error: error?.message || String(error)
+    });
+  }
+});
+
 app.get('/api/kcfx-library/inventory-summary/errors', async (req, res) => {
   try {
     const database = await initDb(dataDir);
@@ -592,6 +656,45 @@ app.post('/api/kcfx-library/inventory-summary/export', async (req, res) => {
     const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`${sheetName}_${stamp}.xlsx`)}`);
+    res.send(buffer);
+  } catch (error) {
+    res.status(500).json({ error: error?.message || String(error) });
+  }
+});
+
+app.post('/api/kcfx-library/inventory-turnover/export', async (req, res) => {
+  try {
+    const database = await initDb(dataDir);
+    const requestUser = requirePermission(database, req, res, 'salesInventory.inventoryTurnover');
+    if (!requestUser) return;
+    const cache = await getInventoryTurnoverCache(database);
+    const rows = exportInventoryTurnoverRows(cache, req.body || {});
+    const data = rows.map((row) => ({
+      事业部: row.department,
+      产品线: row.productLine,
+      期间月数: row.period?.months || 0,
+      期间天数: row.periodDays,
+      期初存货成本: row.openingInventoryCost,
+      期末存货成本: row.closingInventoryCost,
+      平均存货成本: row.averageInventoryCost,
+      月均销售产品成本: row.monthlyAverageSalesCost,
+      期间营业成本: row.periodOperatingCost,
+      库存周转天数: row.inventoryTurnoverDays,
+      未交付总数量: row.undeliveredQty,
+      期间销售出库总数量: row.outboundQty,
+      未交付覆盖天数: row.undeliveredCoverageDays,
+      数据状态: row.dataStatus
+    }));
+    const exportRows = data.length ? data : [{ 提示: '暂无数据' }];
+    const workbook = createStyledWorkbook(ExcelJS, [{
+      name: '库存周转天数',
+      rows: exportRows,
+      columns: Object.keys(exportRows[0])
+    }]);
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`库存周转天数_${stamp}.xlsx`)}`);
     res.send(buffer);
   } catch (error) {
     res.status(500).json({ error: error?.message || String(error) });

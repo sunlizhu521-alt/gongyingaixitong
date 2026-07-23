@@ -1434,6 +1434,209 @@ th {
   }
 }
 
+.turnover-period-toolbar {
+  align-items: center;
+  gap: 10px;
+}
+
+.turnover-period-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: #16324f;
+}
+
+.turnover-period-input input {
+  width: 76px;
+  height: 36px;
+  border: 1px solid #bfd0e3;
+  border-radius: 6px;
+  padding: 0 10px;
+  text-align: center;
+  font: inherit;
+  background: #fff;
+}
+
+.turnover-period-shortcuts {
+  display: inline-flex;
+}
+
+.turnover-period-range {
+  color: #36566f;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.turnover-formulas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 10px 0;
+  border: 1px solid #d8e3ef;
+  background: #d8e3ef;
+}
+
+.turnover-formulas p {
+  margin: 0;
+  min-width: 0;
+  padding: 10px 12px;
+  background: #f7fafc;
+  color: #29445c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.turnover-warning {
+  margin: 10px 0;
+  border-left: 3px solid #ff9f0a;
+  padding: 9px 12px;
+  background: #fff8e8;
+  color: #8a5400;
+  font-size: 13px;
+}
+
+.kcfx-react-page .dashboard-grid.receipt-chart-grid.turnover-chart-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.turnover-comparison-panel {
+  min-width: 0;
+}
+
+.turnover-chart-heading,
+.turnover-detail-panel .panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.turnover-chart-heading h3,
+.turnover-detail-panel .panel-title-row h3 {
+  margin: 0;
+}
+
+.turnover-chart-heading > span {
+  color: #526b82;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.turnover-legend {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin: 0 4px 0 10px;
+}
+
+.turnover-legend-inventory {
+  background: #1677ff;
+}
+
+.turnover-legend-undelivered {
+  background: #ff9f0a;
+}
+
+.turnover-comparison-rows {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.turnover-comparison-row {
+  display: grid;
+  grid-template-columns: minmax(86px, 150px) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.turnover-comparison-row > strong {
+  overflow: hidden;
+  color: #1d3850;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.turnover-comparison-bars {
+  display: grid;
+  gap: 4px;
+}
+
+.turnover-comparison-bars > div {
+  position: relative;
+  height: 18px;
+  border-radius: 3px;
+  background: #e8eef5;
+  overflow: hidden;
+}
+
+.turnover-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 3px;
+}
+
+.turnover-bar.inventory {
+  background: #1677ff;
+}
+
+.turnover-bar.undelivered {
+  background: #ff9f0a;
+}
+
+.turnover-comparison-bars em {
+  position: relative;
+  z-index: 1;
+  display: block;
+  padding: 1px 6px;
+  color: #17334d;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  text-align: right;
+}
+
+.turnover-detail-panel {
+  margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .turnover-formulas {
+    grid-template-columns: 1fr;
+  }
+
+  .kcfx-react-page .dashboard-grid.receipt-chart-grid.turnover-chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .turnover-period-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .turnover-period-shortcuts {
+    width: 100%;
+  }
+
+  .turnover-period-shortcuts button {
+    flex: 1;
+  }
+
+  .turnover-comparison-row {
+    grid-template-columns: minmax(82px, 105px) minmax(0, 1fr);
+  }
+
+  .turnover-chart-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .sales-trend-page {
   display: grid;
   gap: 18px;

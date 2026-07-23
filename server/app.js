@@ -173,6 +173,7 @@ const SALES_INVENTORY_PERMISSIONS = [
   'salesInventory.ageAnalysis',
   'salesInventory.inventoryTrend',
   'salesInventory.inventorySummary',
+  'salesInventory.inventoryTurnover',
   'salesInventory.salesSummary',
   'salesInventory.salesAnalysis',
   'salesInventory.salesTrend',
@@ -283,7 +284,10 @@ function expandPermissionKey(permission) {
   if (permission === 'salesInventory') {
     return [
       'salesInventory',
-      ...SALES_INVENTORY_PERMISSIONS.filter((item) => item !== 'salesInventory.ageAnalysis'),
+      ...SALES_INVENTORY_PERMISSIONS.filter((item) => (
+        item !== 'salesInventory.ageAnalysis'
+        && item !== 'salesInventory.inventoryTurnover'
+      )),
       'maintenanceLibrary.receiptFeedback',
       'maintenanceLibrary.salesFeedback',
       'maintenanceLibrary.errors'
