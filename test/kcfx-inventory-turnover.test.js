@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   buildInventoryTurnoverCache,
+  exportInventoryTurnoverMissingPriceRows,
   exportInventoryTurnoverRows,
   inventoryTurnoverPeriod,
   queryInventoryTurnover
@@ -15,8 +16,8 @@ function record(rows, id = '') {
 function sampleRecords() {
   const records = {
     'dim-product': record([
-      { 物料编码: '1001', SKU: 'SKU-1', 金蝶名称: '产品A', 销售产品线: '产品线A', 一级分类: '成品', 结算价: 10 },
-      { 物料编码: '1002', SKU: 'SKU-2', 金蝶名称: '配件B', 销售产品线: '健康办公', 一级分类: '成品', 结算价: 20 }
+      { 物料编码: '1001', SKU: 'SKU-1', 金蝶名称: '产品A', 销售产品线: '产品线A', 销售系列: '系列A', 一级分类: '成品', 结算价: 10 },
+      { 物料编码: '1002', SKU: 'SKU-2', 金蝶名称: '配件B', 销售产品线: '健康办公', 销售系列: '护理床附件', 一级分类: '成品', 结算价: 20 }
     ]),
     'dim-warehouse': record([
       { 仓库名称: '销售仓', 一级仓库分类: '销售出库仓', 二级仓库分类: '国内' },
@@ -112,7 +113,7 @@ test('缺少严格期初时使用最早库存快照并标记数据不完整', ()
   assert.equal(result.period.openingTargetMonth, '2025-12');
   assert.equal(result.period.openingSnapshotMonth, '2026-01');
   assert.equal(result.period.openingApproximate, true);
-  assert.equal(result.metrics.dataStatus, '数据不完整');
+  assert.match(result.metrics.dataStatus, /缺少2025-12期初库存快照/);
 });
 
 test('零分母返回空周转天数且缺失结算价标记不完整', () => {
@@ -123,24 +124,62 @@ test('零分母返回空周转天数且缺失结算价标记不完整', () => {
   assert.equal(result.metrics.inventoryTurnoverDays, null);
   assert.equal(result.metrics.undeliveredCoverageDays, null);
   assert.ok(result.diagnostics.missingPriceRows > 0);
-  assert.equal(result.metrics.dataStatus, '数据不完整');
+  assert.match(result.metrics.dataStatus, /期初库存缺少结算价2条/);
+  assert.match(result.metrics.dataStatus, /期末库存缺少结算价2条/);
+  assert.match(result.metrics.dataStatus, /销售数据缺少结算价3条/);
+  const missingRows = exportInventoryTurnoverMissingPriceRows(buildInventoryTurnoverCache(records), { periodMonths: 3 });
+  assert.equal(missingRows.length, result.diagnostics.missingPriceRows);
+  assert.deepEqual([...new Set(missingRows.map((row) => row.sourceType))].sort(), ['库存快照', '销售数据']);
 });
 
-test('菜单、独立权限、查询和导出接口已接入', async () => {
-  const [constants, main, app, routes] = await Promise.all([
+test('销售系列、内部交易和成品筛选分别作用于正确的数据范围', () => {
+  const cache = buildInventoryTurnoverCache(sampleRecords());
+  const allSeriesA = queryInventoryTurnover(cache, {
+    periodMonths: 3,
+    filters: {
+      productSeries: ['系列A'],
+      nonInternalTransactionStatus: [],
+      finishedGoodsStatus: []
+    }
+  });
+  assert.equal(allSeriesA.metrics.periodOperatingCost, 1300);
+  assert.equal(allSeriesA.metrics.outboundQty, 124);
+  assert.deepEqual(allSeriesA.options.nonInternalTransactionStatus, ['非内部交易', '内部交易']);
+  assert.deepEqual(allSeriesA.options.finishedGoodsStatus, ['成品', '非成品']);
+
+  const accessories = queryInventoryTurnover(cache, {
+    periodMonths: 3,
+    filters: {
+      productSeries: ['护理床附件'],
+      nonInternalTransactionStatus: [],
+      finishedGoodsStatus: ['非成品']
+    }
+  });
+  assert.equal(accessories.metrics.periodOperatingCost, 2000);
+  assert.equal(accessories.metrics.outboundQty, 100);
+});
+
+test('菜单、独立权限、筛选器、查询和导出接口已接入', async () => {
+  const [constants, main, app, routes, page] = await Promise.all([
     readFile(new URL('../src/constants.js', import.meta.url), 'utf8'),
     readFile(new URL('../src/main.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../server/app.js', import.meta.url), 'utf8'),
-    readFile(new URL('../server/routes/kcfx.js', import.meta.url), 'utf8')
+    readFile(new URL('../server/routes/kcfx.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/InventoryTurnoverPage.jsx', import.meta.url), 'utf8')
   ]);
   assert.match(constants, /inventorySummary', label: '库存汇总报表' \},[\s\S]*inventoryTurnover', label: '库存周转天数' \},[\s\S]*salesSummary'/);
   assert.match(main, /InventoryTurnoverPage/);
   assert.match(app, /'salesInventory\.inventoryTurnover'/);
   assert.match(app, /item !== 'salesInventory\.inventoryTurnover'/);
   assert.match(constants, /!\['ageAnalysis', 'inventoryTurnover'\]\.includes\(page\.key\)/);
-  assert.equal((routes.match(/requirePermission\(database, req, res, 'salesInventory\.inventoryTurnover'\)/g) || []).length, 2);
+  assert.equal((routes.match(/requirePermission\(database, req, res, 'salesInventory\.inventoryTurnover'\)/g) || []).length, 3);
   assert.match(routes, /\/api\/kcfx-library\/inventory-turnover\/query/);
   assert.match(routes, /\/api\/kcfx-library\/inventory-turnover\/export/);
+  assert.match(routes, /\/api\/kcfx-library\/inventory-turnover\/missing-price\/export/);
+  assert.match(page, /productSeries[\s\S]*nonInternalTransactionStatus[\s\S]*finishedGoodsStatus/);
+  assert.match(page, /事业部＋产品线汇总明细/);
+  assert.match(page, /导出缺少内部结算价明细/);
+  assert.doesNotMatch(page, /近1月|近3月|近6月/);
 });
 
 function rowsForMonth(qty) {

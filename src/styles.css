@@ -1470,7 +1470,7 @@ th {
 
 .turnover-formulas {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
   margin: 10px 0;
   border: 1px solid #d8e3ef;
@@ -1488,12 +1488,23 @@ th {
 }
 
 .turnover-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin: 10px 0;
   border-left: 3px solid #ff9f0a;
   padding: 9px 12px;
   background: #fff8e8;
   color: #8a5400;
   font-size: 13px;
+}
+
+.turnover-warning button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 6px 12px;
+  white-space: nowrap;
 }
 
 .kcfx-react-page .dashboard-grid.receipt-chart-grid.turnover-chart-grid {
@@ -1512,9 +1523,18 @@ th {
   gap: 12px;
 }
 
+.turnover-chart-heading {
+  min-height: 44px;
+}
+
 .turnover-chart-heading h3,
 .turnover-detail-panel .panel-title-row h3 {
   margin: 0;
+}
+
+.turnover-chart-heading h3 {
+  flex: 1 1 auto;
+  line-height: 1.45;
 }
 
 .turnover-chart-heading > span {
@@ -1619,20 +1639,17 @@ th {
     align-items: stretch;
   }
 
-  .turnover-period-shortcuts {
-    width: 100%;
-  }
-
-  .turnover-period-shortcuts button {
-    flex: 1;
-  }
-
   .turnover-comparison-row {
     grid-template-columns: minmax(82px, 105px) minmax(0, 1fr);
   }
 
   .turnover-chart-heading {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .turnover-warning {
+    align-items: stretch;
     flex-direction: column;
   }
 }

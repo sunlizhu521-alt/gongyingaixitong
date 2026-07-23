@@ -5,7 +5,9 @@ import { INVENTORY_AGE_SLOT_IDS } from '../../shared/kcfxAgeMonths.js';
 import { getCachedSalesRows } from '../../src/components/kcfxUtils.js';
 import {
   buildInventoryTurnoverCache,
+  exportInventoryTurnoverMissingPriceRows,
   exportInventoryTurnoverRows,
+  KCFX_INVENTORY_TURNOVER_VERSION,
   queryInventoryTurnover
 } from '../kcfx-inventory-turnover.js';
 import {
@@ -213,6 +215,7 @@ async function getInventorySummaryCache(database, { force = false } = {}) {
 
 async function getInventoryTurnoverCache(database, { force = false } = {}) {
   const key = [
+    KCFX_INVENTORY_TURNOVER_VERSION,
     database.kcfxLibrary?.savedAt || '',
     ...INVENTORY_TURNOVER_RECORD_IDS.map((id) => {
       const record = database.kcfxLibrary?.records?.[id] || {};
@@ -695,6 +698,47 @@ app.post('/api/kcfx-library/inventory-turnover/export', async (req, res) => {
     const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`库存周转天数_${stamp}.xlsx`)}`);
+    res.send(buffer);
+  } catch (error) {
+    res.status(500).json({ error: error?.message || String(error) });
+  }
+});
+
+app.post('/api/kcfx-library/inventory-turnover/missing-price/export', async (req, res) => {
+  try {
+    const database = await initDb(dataDir);
+    const requestUser = requirePermission(database, req, res, 'salesInventory.inventoryTurnover');
+    if (!requestUser) return;
+    const cache = await getInventoryTurnoverCache(database);
+    const rows = exportInventoryTurnoverMissingPriceRows(cache, req.body || {});
+    const data = rows.map((row) => ({
+      数据来源: row.sourceType,
+      月份: row.month,
+      事业部: row.department,
+      产品线: row.productLine,
+      销售系列: row.productSeries,
+      物料编码: row.materialCode,
+      SKU: row.sku,
+      金蝶名称: row.materialName,
+      库存组织: row.organization || '',
+      仓库名称: row.warehouse || '',
+      客户名称: row.customer || '',
+      是否内部交易: row.nonInternalTransactionStatus || '',
+      是否成品: row.finishedGoodsStatus || '',
+      应收或库存数量: row.quantity,
+      出库数量: row.outboundQty || 0,
+      缺失字段: '2026年结算价'
+    }));
+    const exportRows = data.length ? data : [{ 提示: '当前筛选条件没有缺少内部结算价的记录' }];
+    const workbook = createStyledWorkbook(ExcelJS, [{
+      name: '缺少内部结算价明细',
+      rows: exportRows,
+      columns: Object.keys(exportRows[0])
+    }]);
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`缺少内部结算价明细_${stamp}.xlsx`)}`);
     res.send(buffer);
   } catch (error) {
     res.status(500).json({ error: error?.message || String(error) });

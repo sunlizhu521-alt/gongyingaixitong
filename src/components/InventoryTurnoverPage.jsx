@@ -7,8 +7,18 @@ import { TablePagination } from './TablePagination.jsx';
 
 const FILTERS = [
   { id: 'department', field: 'department', allLabel: '全部事业部' },
-  { id: 'productLine', field: 'productLine', allLabel: '全部产品线' }
+  { id: 'productLine', field: 'productLine', allLabel: '全部产品线' },
+  { id: 'productSeries', field: 'productSeries', allLabel: '全部销售系列' },
+  { id: 'nonInternalTransactionStatus', field: 'nonInternalTransactionStatus', allLabel: '全部内部交易状态' },
+  { id: 'finishedGoodsStatus', field: 'finishedGoodsStatus', allLabel: '全部成品状态' }
 ];
+const DEFAULT_FILTERS = {
+  department: [],
+  productLine: [],
+  productSeries: [],
+  nonInternalTransactionStatus: ['非内部交易'],
+  finishedGoodsStatus: ['成品']
+};
 const PAGE_SIZE = 20;
 
 function userHeaders(user, extra = {}) {
@@ -46,12 +56,13 @@ const COLUMNS = [
 
 export default function InventoryTurnoverPage({ user = null, kcfxData = null, onRefresh }) {
   const [periodMonths, setPeriodMonths] = useState(3);
-  const [filters, setFilters] = useState({ department: [], productLine: [] });
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
   const [openFilter, setOpenFilter] = useState('');
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingMissingPrice, setExportingMissingPrice] = useState(false);
   const [error, setError] = useState('');
   const [refreshVersion, setRefreshVersion] = useState(0);
   const filterKey = useMemo(() => JSON.stringify(filters), [filters]);
@@ -102,7 +113,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
   }, []);
 
   const resetFilters = useCallback(() => {
-    setFilters({ department: [], productLine: [] });
+    setFilters(DEFAULT_FILTERS);
     setPage(1);
     setOpenFilter('');
   }, []);
@@ -135,6 +146,29 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
     }
   }, [filters, periodMonths, user]);
 
+  const exportMissingPriceRows = useCallback(async () => {
+    setExportingMissingPrice(true);
+    try {
+      const response = await fetch(`${API}/api/kcfx-library/inventory-turnover/missing-price/export`, {
+        method: 'POST',
+        headers: userHeaders(user, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ periodMonths, filters })
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `缺少内部结算价明细_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (exportError) {
+      window.alert(`导出失败：${exportError?.message || exportError}`);
+    } finally {
+      setExportingMissingPrice(false);
+    }
+  }, [filters, periodMonths, user]);
+
   const period = payload?.period;
   const metrics = payload?.metrics || {};
   const pagination = payload?.pagination || { page, pageSize: PAGE_SIZE, totalPages: 1, totalRows: 0 };
@@ -144,7 +178,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
     : error
       || payload?.message
       || (period
-        ? `统计期间：${period.startLabel}至${period.endLabel}，共${period.days}天；明细${formatNumber(pagination.totalRows)}行`
+        ? `统计期间：${period.startLabel}至${period.endLabel}，共${period.days}天；事业部＋产品线汇总明细${formatNumber(pagination.totalRows)}行`
         : '等待数据');
   const warning = [
     period?.openingApproximate
@@ -154,11 +188,6 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
       ? `有${formatNumber(payload.diagnostics.missingPriceRows)}条记录缺少内部结算价，相关成本按0计算。`
       : ''
   ].filter(Boolean).join(' ');
-
-  function choosePeriod(months) {
-    setPeriodMonths(Math.min(months, maxMonths));
-    setPage(1);
-  }
 
   return (
     <KcfxPageShell title="库存周转天数" status={status} loading={loading} onRefresh={refresh}>
@@ -178,19 +207,6 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
             }}
           />
         </label>
-        <div className="segmented turnover-period-shortcuts" aria-label="快捷期间">
-          {[1, 3, 6].map((months) => (
-            <button
-              key={months}
-              type="button"
-              className={periodMonths === months ? 'active' : ''}
-              disabled={months > maxMonths}
-              onClick={() => choosePeriod(months)}
-            >
-              近{months}月
-            </button>
-          ))}
-        </div>
         {period && <strong className="turnover-period-range">{period.startDate} 至 {period.endDate} · {period.days}天</strong>}
       </section>
 
@@ -208,9 +224,19 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
         <p><strong>存货周转天数</strong> = 期间天数 ×（平均存货成本 ÷ 期间营业成本）</p>
         <p><strong>平均存货成本</strong> =（期初存货成本 + 期末存货成本）÷ 2</p>
         <p><strong>未交付覆盖天数</strong> = 期间天数 ×（未交付总数量 ÷ 期间销售出库总数量）</p>
+        <p><strong>成本计算</strong> = 应收数量 × 2026年结算价；<strong>未交付数量</strong> = 采购订单剩余入库数量</p>
       </section>
 
-      {warning && <div className="turnover-warning" role="status">{warning}</div>}
+      {warning && (
+        <div className="turnover-warning" role="status">
+          <span>{warning}</span>
+          {Number(payload?.diagnostics?.missingPriceRows) > 0 && (
+            <button type="button" onClick={exportMissingPriceRows} disabled={exportingMissingPrice}>
+              {exportingMissingPrice ? '导出中...' : '导出缺少内部结算价明细'}
+            </button>
+          )}
+        </div>
+      )}
 
       <MetricCards metrics={[
         { label: '期初存货成本', value: formatAmount(metrics.openingInventoryCost) },
@@ -224,8 +250,8 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
       ]} />
 
       <PanelGrid className="turnover-chart-grid">
-        <TurnoverComparison title="事业部周转与覆盖天数" rows={payload?.charts?.department || []} />
-        <TurnoverComparison title="产品线周转与覆盖天数" rows={payload?.charts?.productLine || []} />
+        <TurnoverComparison title="事业部存货周转天数与未交付周转天数" rows={payload?.charts?.department || []} />
+        <TurnoverComparison title="产品线存货周转天数与未交付周转天数" rows={payload?.charts?.productLine || []} />
       </PanelGrid>
 
       <section className="kcfx-panel turnover-detail-panel">
@@ -261,7 +287,7 @@ function TurnoverComparison({ title, rows }) {
     <section className="kcfx-panel turnover-comparison-panel">
       <div className="turnover-chart-heading">
         <h3>{title}</h3>
-        <span><i className="turnover-legend turnover-legend-inventory" />库存周转 <i className="turnover-legend turnover-legend-undelivered" />未交付覆盖</span>
+        <span><i className="turnover-legend turnover-legend-inventory" />存货周转天数 <i className="turnover-legend turnover-legend-undelivered" />未交付周转天数</span>
       </div>
       <div className="turnover-comparison-rows">
         {visibleRows.length ? visibleRows.map((row) => (
