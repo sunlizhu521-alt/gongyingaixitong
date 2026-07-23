@@ -10,11 +10,25 @@ import { selectInventoryTrendPrice } from '../../shared/kcfxTrendPrice.js';
 
 export { INVENTORY_TREND_MONTHS };
 export const KCFX_COLORS = ['#007aff', '#34c759', '#ff9f0a', '#af52de', '#ff375f', '#5ac8fa', '#5856d6', '#30d158', '#bf5af2', '#ff6b35'];
+export const INTERNAL_SALES_CUSTOMERS = [
+  '浙江迈德斯特医疗器械科技有限公司',
+  'MATESIDE GLOBAL US INC.',
+  '杭州国源养老科技有限公司',
+  '杭州欧德佳医疗器械有限公司',
+  '杭州奇邦医疗器械有限公司',
+  '河北瑞朗德医疗器械科技集团有限公司',
+  '香港邁德斯特科技有限公司',
+  '迈德斯特（宁波）医疗科技有限公司',
+  '殷亚星',
+  '刘岩'
+];
+const INTERNAL_SALES_CUSTOMER_SET = new Set(INTERNAL_SALES_CUSTOMERS.map(normalizeInternalCustomerName));
 export const SALES_CLASSIFICATION_NOTE = [
   '统计口径：',
   '销售数量取“应收数量”，销售金额取“销售额-不含税”。三个条件默认选择“真实交易、非内部交易、成品”。',
-  '1、是否真实交易先按客户名称+物料编码匹配销售部门：无法匹配为“未匹配”，内部交易为“非真实交易”；其余数据再按销售仓库匹配一级仓库分类，仓库为空为“真实交易”，仓库不为空但无法匹配或一级分类为空为“未匹配”，系统集成仓或系统集成仓库为“非真实交易”，其他已匹配仓库为“真实交易”；',
-  '2、是否内部交易按客户名称+物料编码匹配销售部门，内部交易显示“内部交易”，其他显示“非内部交易”；',
+  '1、是否真实交易先按已确认的内部交易客户名单判断：内部交易客户为“非真实交易”，客户名称为空为“未匹配”；其余客户再按销售仓库匹配一级仓库分类，仓库为空为“真实交易”，仓库不为空但无法匹配或一级分类为空为“未匹配”，系统集成仓或系统集成仓库为“非真实交易”，其他已匹配仓库为“真实交易”；',
+  '2、是否内部交易按客户名称与内部交易客户名单精确匹配，名单内显示“内部交易”，其他非空客户显示“非内部交易”，客户名称为空显示“未匹配”；',
+  `内部交易客户名单：${INTERNAL_SALES_CUSTOMERS.join('、')}。`,
   '3、是否成品按商品维表判断，销售产品线为“其他/配件”或“健康办公”，或一级分类为“配件”或“护理床附件”时显示“非成品”；无法匹配均显示“未匹配”。'
 ].join('\n');
 
@@ -492,7 +506,7 @@ export function getSalesRows(records, { includeExcluded = false } = {}) {
     const salesOrg = departmentMap.get(departmentKey) || '';
     const warehouse = getSalesWarehouseName(row);
     const warehouseInfo = warehouseMap.get(warehouse);
-    const nonInternalTransactionStatus = classifyNonInternalTransaction(salesOrg);
+    const nonInternalTransactionStatus = classifyNonInternalTransaction(customer);
     return {
       sourceRow: row,
       salesMonth,
@@ -674,10 +688,10 @@ function classifyRealTransaction(nonInternalTransactionStatus, warehouse, wareho
   return warehouseType === '系统集成仓库' || warehouseType === '系统集成仓' ? '非真实交易' : '真实交易';
 }
 
-function classifyNonInternalTransaction(salesOrg) {
-  const department = normalizeText(salesOrg);
-  if (!department) return '未匹配';
-  return isInternalTransactionText(department) ? '内部交易' : '非内部交易';
+function classifyNonInternalTransaction(customer) {
+  const normalizedCustomer = normalizeInternalCustomerName(customer);
+  if (!normalizedCustomer) return '未匹配';
+  return INTERNAL_SALES_CUSTOMER_SET.has(normalizedCustomer) ? '内部交易' : '非内部交易';
 }
 
 function classifyFinishedGoods(product, productMatched) {
@@ -695,30 +709,15 @@ function isExcludedSalesRow(row) {
 }
 
 function hasInternalTransaction(row) {
-  const knownValues = [
-    row.customer,
-    row.storeShortName,
-    row.salesOrg,
-    row.salesDepartmentKey,
-    row.materialName,
-    row.productLine,
-    row.productCategory,
-    row.productSeries,
-    row.model
-  ];
-  if (knownValues.some(isInternalTransactionText)) return true;
-  if (Array.isArray(row.sourceRow?.__cells)) {
-    return row.sourceRow.__cells.some(isInternalTransactionText);
-  }
-  for (const [key, value] of Object.entries(row.sourceRow || {})) {
-    if (key !== '__cells' && isInternalTransactionText(value)) return true;
-  }
-  return false;
+  return classifyNonInternalTransaction(row.customer) === '内部交易';
 }
 
-function isInternalTransactionText(value) {
-  const text = normalizeText(value);
-  return text === '内部交易' || text.includes('内部交易');
+function normalizeInternalCustomerName(value) {
+  return normalizeText(value)
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
 }
 
 function normalizeSalesExclusionText(value) {
