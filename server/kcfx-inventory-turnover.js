@@ -13,7 +13,7 @@ import {
   rowsOf
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_TURNOVER_VERSION = 5;
+export const KCFX_INVENTORY_TURNOVER_VERSION = 6;
 export const INVENTORY_TURNOVER_PAGE_SIZE = 20;
 
 const GROUP_SEPARATOR = '\u001f';
@@ -508,51 +508,21 @@ function aggregateSalesComponents(cache, period, filters) {
   return target;
 }
 
-function inventoryTurnoverOptions(cache) {
-  const values = {
-    department: new Set(),
-    productLine: new Set(),
-    productSeries: new Set(),
-    nonInternalTransactionStatus: new Set(),
-    finishedGoodsStatus: new Set()
-  };
-  for (const snapshot of cache.inventorySnapshots.values()) {
-    for (const key of snapshot.keys()) {
-      const identity = groupIdentity(key);
-      values.department.add(identity.department);
-      values.productLine.add(identity.productLine);
-      values.productSeries.add(identity.productSeries);
-    }
-  }
-  for (const month of cache.salesMonths.values()) {
-    for (const key of month.keys()) {
-      const identity = salesGroupIdentity(key);
-      for (const field of Object.keys(values)) values[field].add(identity[field]);
-    }
-  }
-  for (const key of cache.undelivered.keys()) {
-    const identity = groupIdentity(key);
-    values.department.add(identity.department);
-    values.productLine.add(identity.productLine);
-    values.productSeries.add(identity.productSeries);
-  }
-  const statusOrder = ['非内部交易', '内部交易', '未匹配'];
-  const finishedOrder = ['成品', '非成品', '未匹配'];
-  const sortText = (items) => [...items].filter(Boolean).sort((a, b) => a.localeCompare(b, 'zh-CN'));
-  const sortPreferred = (items, order) => [...items].filter(Boolean).sort((a, b) => {
+function withoutFilter(filters, field) {
+  return { ...(filters || {}), [field]: [] };
+}
+
+function sortTextOptions(items) {
+  return [...items].filter(Boolean).sort((a, b) => a.localeCompare(b, 'zh-CN'));
+}
+
+function sortPreferredOptions(items, order) {
+  return [...items].filter(Boolean).sort((a, b) => {
     const ai = order.indexOf(a);
     const bi = order.indexOf(b);
     return (ai < 0 ? Number.MAX_SAFE_INTEGER : ai) - (bi < 0 ? Number.MAX_SAFE_INTEGER : bi)
       || a.localeCompare(b, 'zh-CN');
   });
-  return {
-    department: sortText(values.department),
-    productLine: sortText(values.productLine),
-    productSeries: sortText(values.productSeries),
-    nonInternalTransactionStatus: sortPreferred(values.nonInternalTransactionStatus, statusOrder),
-    finishedGoodsStatus: sortPreferred(values.finishedGoodsStatus, finishedOrder),
-    hasSalesData: ['有销售数据', '无销售数据']
-  };
 }
 
 function missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, sales) {
@@ -589,6 +559,103 @@ function missingPriceCodesByGroup(rows, openingSnapshotMonth, closingSnapshotMon
     group.sales = uniqueMaterialCodes(group.sales);
   }
   return groups;
+}
+
+function calculatedRowsForFilters(
+  cache,
+  period,
+  filters,
+  openingSnapshotMonth,
+  openingApproximate,
+  { includeMissingPrices = false } = {}
+) {
+  const opening = aggregateInventoryComponents(cache.inventorySnapshots.get(openingSnapshotMonth), filters);
+  const closing = aggregateInventoryComponents(cache.inventorySnapshots.get(period.endMonth), filters);
+  const sales = aggregateSalesComponents(cache, period, filters);
+  const undelivered = aggregateInventoryComponents(cache.undelivered, filters);
+  const missingPriceRows = includeMissingPrices
+    ? missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, sales)
+    : [];
+  const missingPriceCodes = includeMissingPrices
+    ? missingPriceCodesByGroup(missingPriceRows, openingSnapshotMonth, period.endMonth)
+    : new Map();
+  const keys = new Set([
+    ...opening.keys(),
+    ...closing.keys(),
+    ...sales.keys(),
+    ...undelivered.keys()
+  ]);
+  const rows = [...keys].map((key) => calculateRow(
+    groupIdentity(key),
+    opening.get(key),
+    closing.get(key),
+    sales.get(key),
+    undelivered.get(key),
+    period,
+    openingApproximate,
+    missingPriceCodes.get(key)
+  )).sort((a, b) => (
+    a.department.localeCompare(b.department, 'zh-CN')
+    || a.productLine.localeCompare(b.productLine, 'zh-CN')
+    || a.productSeries.localeCompare(b.productSeries, 'zh-CN')
+  ));
+  return { rows, sales, missingPriceRows };
+}
+
+function linkedSalesStatusOptions(cache, period, filters, targetField) {
+  const hasSalesSelection = selected(filters, 'hasSalesData');
+  if (hasSalesSelection.length && !hasSalesSelection.includes('有销售数据')) return [];
+  const effectiveFilters = withoutFilter(filters, targetField);
+  const values = new Set();
+  for (const month of period.monthList) {
+    for (const key of cache.salesMonths.get(month)?.keys() || []) {
+      const identity = salesGroupIdentity(key);
+      if (!matchesFilters(identity, effectiveFilters, [
+        'department',
+        'productLine',
+        'productSeries',
+        'nonInternalTransactionStatus',
+        'finishedGoodsStatus'
+      ])) continue;
+      values.add(identity[targetField]);
+    }
+  }
+  const order = targetField === 'nonInternalTransactionStatus'
+    ? ['非内部交易', '内部交易', '未匹配']
+    : ['成品', '非成品', '未匹配'];
+  return sortPreferredOptions(values, order);
+}
+
+function linkedInventoryTurnoverOptions(cache, period, filters, openingSnapshotMonth, openingApproximate) {
+  const options = {};
+  for (const field of ['department', 'productLine', 'productSeries', 'hasSalesData']) {
+    const effectiveFilters = withoutFilter(filters, field);
+    const result = calculatedRowsForFilters(
+      cache,
+      period,
+      effectiveFilters,
+      openingSnapshotMonth,
+      openingApproximate
+    );
+    const rows = result.rows.filter((row) => matchesFilters(row, effectiveFilters, ['hasSalesData']));
+    const values = new Set(rows.map((row) => normalizeText(row[field])).filter(Boolean));
+    options[field] = field === 'hasSalesData'
+      ? sortPreferredOptions(values, ['有销售数据', '无销售数据'])
+      : sortTextOptions(values);
+  }
+  options.nonInternalTransactionStatus = linkedSalesStatusOptions(
+    cache,
+    period,
+    filters,
+    'nonInternalTransactionStatus'
+  );
+  options.finishedGoodsStatus = linkedSalesStatusOptions(
+    cache,
+    period,
+    filters,
+    'finishedGoodsStatus'
+  );
+  return options;
 }
 
 export function sortInventoryTurnoverChartRows(rows, field) {
@@ -638,36 +705,15 @@ export function queryInventoryTurnover(cache, input = {}) {
     : cache.earliestInventoryMonth;
   const openingApproximate = openingSnapshotMonth !== period.openingTargetMonth;
   const filters = inputFilters(input);
-  const opening = aggregateInventoryComponents(cache.inventorySnapshots.get(openingSnapshotMonth), filters);
-  const closing = aggregateInventoryComponents(cache.inventorySnapshots.get(period.endMonth), filters);
-  const sales = aggregateSalesComponents(cache, period, filters);
-  const undelivered = aggregateInventoryComponents(cache.undelivered, filters);
-  const missingPriceRows = missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, sales);
-  const missingPriceCodes = missingPriceCodesByGroup(
-    missingPriceRows,
-    openingSnapshotMonth,
-    period.endMonth
-  );
-  const keys = new Set([
-    ...opening.keys(),
-    ...closing.keys(),
-    ...sales.keys(),
-    ...undelivered.keys()
-  ]);
-  const allRows = [...keys].map((key) => calculateRow(
-    groupIdentity(key),
-    opening.get(key),
-    closing.get(key),
-    sales.get(key),
-    undelivered.get(key),
+  const calculation = calculatedRowsForFilters(
+    cache,
     period,
+    filters,
+    openingSnapshotMonth,
     openingApproximate,
-    missingPriceCodes.get(key)
-  )).sort((a, b) => (
-    a.department.localeCompare(b.department, 'zh-CN')
-    || a.productLine.localeCompare(b.productLine, 'zh-CN')
-    || a.productSeries.localeCompare(b.productSeries, 'zh-CN')
-  ));
+    { includeMissingPrices: true }
+  );
+  const allRows = calculation.rows;
   const filteredRows = allRows.filter((row) => matchesFilters(row, filters, ['hasSalesData']));
   const metrics = aggregateCalculatedRows(filteredRows, {}, period, openingApproximate);
   const pageSize = INVENTORY_TURNOVER_PAGE_SIZE;
@@ -696,11 +742,17 @@ export function queryInventoryTurnover(cache, input = {}) {
     },
     diagnostics: {
       openingApproximate,
-      missingPriceRows: missingPriceRows.length,
+      missingPriceRows: calculation.missingPriceRows.length,
       inventoryMonths: cache.inventoryMonths,
       commonMonths: cache.commonMonths
     },
-    options: inventoryTurnoverOptions(cache),
+    options: linkedInventoryTurnoverOptions(
+      cache,
+      period,
+      filters,
+      openingSnapshotMonth,
+      openingApproximate
+    ),
     rows: filteredRows.slice((page - 1) * pageSize, page * pageSize),
     pagination: { page, pageSize, totalPages, totalRows }
   };

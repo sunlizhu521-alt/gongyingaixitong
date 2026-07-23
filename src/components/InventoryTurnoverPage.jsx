@@ -110,6 +110,24 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
     (payload?.options?.[filter.id] || []).map((value) => ({ value, label: value }))
   ])), [payload?.options]);
 
+  useEffect(() => {
+    if (!payload?.options) return;
+    setFilters((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const filter of FILTERS) {
+        const currentValues = current[filter.id] || [];
+        const allowed = new Set(payload.options[filter.id] || []);
+        const validValues = currentValues.filter((value) => allowed.has(value));
+        if (validValues.length !== currentValues.length) {
+          next[filter.id] = validValues;
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [payload?.options]);
+
   const setFilterValue = useCallback((id, value) => {
     setFilters((current) => ({ ...current, [id]: value }));
     setPage(1);
