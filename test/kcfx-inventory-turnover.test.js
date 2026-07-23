@@ -323,6 +323,13 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(page, /在库量 = 非海上在途仓库库存；在途量 = 海上在途仓库存；未交付数量 = 采购订单剩余数量/);
   assert.match(page, /在库量存货周转天数[\s\S]*在途量存货周转天数[\s\S]*未交付周转天数/);
   assert.doesNotMatch(page, /未交付覆盖天数|inventoryTurnoverDays|undeliveredCoverageDays/);
+  assert.match(page, /库存周转明细[\s\S]*TablePagination[\s\S]*详细计算逻辑/);
+  assert.match(page, /按仓库维表二级仓库分类拆分库存成本[\s\S]*“海上在途”计入在途库存成本[\s\S]*其他有效库存计入在库库存成本/);
+  assert.match(page, /平均在库库存成本 =（期初在库库存成本 \+ 期末在库库存成本）÷ 2/);
+  assert.match(page, /平均在途库存成本 =（期初在途库存成本 \+ 期末在途库存成本）÷ 2/);
+  assert.match(page, /两项相加等于原存货周转天数/);
+  assert.match(page, /期间营业成本或期间销售出库总数量小于等于0时，对应周转天数显示“--”/);
+  assert.match(styles, /\.turnover-calculation-details\s*\{[\s\S]*border-top:/);
   assert.match(routes, /期初在库库存成本: row\.openingOnHandInventoryCost[\s\S]*期初在途库存成本: row\.openingInTransitInventoryCost/);
   assert.match(routes, /在库量存货周转天数: row\.onHandInventoryTurnoverDays[\s\S]*在途量存货周转天数: row\.inTransitInventoryTurnoverDays[\s\S]*未交付周转天数: row\.undeliveredTurnoverDays/);
   assert.match(page, /导出缺少内部结算价明细/);

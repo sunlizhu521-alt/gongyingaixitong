@@ -298,6 +298,36 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
           totalRows={pagination.totalRows}
           onPageChange={setPage}
         />
+        <div className="turnover-calculation-details">
+          <h4>详细计算逻辑</h4>
+          <ol>
+            <li>
+              <strong>库存成本分类：</strong>
+              按仓库维表二级仓库分类拆分库存成本。“海上在途”计入在途库存成本，其他有效库存计入在库库存成本。
+            </li>
+            <li>
+              <strong>期初、期末及平均成本：</strong>
+              平均在库库存成本 =（期初在库库存成本 + 期末在库库存成本）÷ 2；
+              平均在途库存成本 =（期初在途库存成本 + 期末在途库存成本）÷ 2。
+            </li>
+            <li>
+              <strong>在库与在途存货周转天数：</strong>
+              两项共用完整期间营业成本。在库量存货周转天数 = 期间天数 ×（平均在库库存成本 ÷ 期间营业成本）；
+              在途量存货周转天数 = 期间天数 ×（平均在途库存成本 ÷ 期间营业成本）。
+              两项相加等于原存货周转天数。
+            </li>
+            <li>
+              <strong>未交付周转天数：</strong>
+              期间天数 ×（未交付总数量 ÷ 期间销售出库总数量）。
+              期间营业成本或期间销售出库总数量小于等于0时，对应周转天数显示“--”。
+            </li>
+            <li>
+              <strong>页面及导出口径：</strong>
+              指标卡、库存周转明细和导出分别展示期初、期末、平均在库与在途库存成本，不再保留原总存货周转天数。
+              事业部和产品线图表每项显示在库量存货周转天数、在途量存货周转天数、未交付周转天数三条横柱。
+            </li>
+          </ol>
+        </div>
       </section>
     </KcfxPageShell>
   );

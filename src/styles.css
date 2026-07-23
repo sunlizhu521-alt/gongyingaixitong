@@ -1678,6 +1678,36 @@ th {
   margin-top: 12px;
 }
 
+.turnover-calculation-details {
+  margin-top: 16px;
+  border-top: 1px solid #d8e3ef;
+  padding-top: 14px;
+  color: #29445c;
+}
+
+.turnover-calculation-details h4 {
+  margin: 0 0 10px;
+  color: #17334d;
+  font-size: 15px;
+}
+
+.turnover-calculation-details ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.turnover-calculation-details li {
+  padding-left: 2px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.turnover-calculation-details strong {
+  color: #17334d;
+}
+
 @media (max-width: 900px) {
   .turnover-formulas {
     grid-template-columns: 1fr;
@@ -1718,6 +1748,10 @@ th {
   .turnover-warning {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .turnover-calculation-details li {
+    font-size: 12px;
   }
 }
 
