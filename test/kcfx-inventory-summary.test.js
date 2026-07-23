@@ -444,10 +444,11 @@ test('库存和销售汇总报表已分别接入菜单、页面、权限和受�
   assert.match(inventoryPageSource, /reportType = 'inventory'/);
   assert.match(inventoryPageSource, /isSalesReport \? '销售汇总报表' : '库存汇总报表'/);
   assert.match(inventoryPageSource, /id: 'salesMonth', field: 'salesMonth', type: 'month', multiple: true, allLabel: '全部销售月份', monthAllLabel: '全部数据月份'/);
-  assert.match(inventoryPageSource, /id: 'realTransactionStatus'/);
+  assert.doesNotMatch(inventoryPageSource, /id: 'realTransactionStatus'/);
   assert.match(inventoryPageSource, /id: 'nonInternalTransactionStatus'/);
   assert.match(inventoryPageSource, /id: 'finishedGoodsStatus'/);
-  assert.match(inventoryPageSource, /filters\.realTransactionStatus = \['真实交易'\][\s\S]*filters\.nonInternalTransactionStatus = \['非内部交易'\][\s\S]*filters\.finishedGoodsStatus = \['成品'\]/);
+  assert.doesNotMatch(inventoryPageSource, /filters\.realTransactionStatus = \['真实交易'\]/);
+  assert.match(inventoryPageSource, /filters\.nonInternalTransactionStatus = \['非内部交易'\][\s\S]*filters\.finishedGoodsStatus = \['成品'\]/);
   assert.match(inventoryPageSource, /SALES_CLASSIFICATION_NOTE/);
   assert.match(inventoryPageSource, /note=\{isSalesReport \? SALES_CLASSIFICATION_NOTE : ''\}/);
   assert.match(filtersSource, /multiple=\{Boolean\(filter\.multiple\)\}/);

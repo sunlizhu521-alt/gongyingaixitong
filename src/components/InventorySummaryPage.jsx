@@ -81,7 +81,6 @@ const VIEW_CONFIG = {
       { id: 'salesMonth', field: 'salesMonth', type: 'month', multiple: true, allLabel: '全部销售月份', monthAllLabel: '全部数据月份' },
       { id: 'department', field: 'department', allLabel: '全部事业部' },
       { id: 'productLine', field: 'productLine', allLabel: '全部产品线' },
-      { id: 'realTransactionStatus', field: 'realTransactionStatus', allLabel: '是否真实交易' },
       { id: 'nonInternalTransactionStatus', field: 'nonInternalTransactionStatus', allLabel: '是否内部交易' },
       { id: 'finishedGoodsStatus', field: 'finishedGoodsStatus', allLabel: '是否成品' }
     ],
@@ -103,7 +102,6 @@ const VIEW_CONFIG = {
 function defaultFilters(view) {
   const filters = Object.fromEntries(VIEW_CONFIG[view].filters.map((filter) => [filter.id, []]));
   if (view === 'sales') {
-    filters.realTransactionStatus = ['真实交易'];
     filters.nonInternalTransactionStatus = ['非内部交易'];
     filters.finishedGoodsStatus = ['成品'];
   }

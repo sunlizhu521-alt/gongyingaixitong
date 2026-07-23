@@ -16,17 +16,15 @@ const TREND_FILTERS = [
   { id: 'productLine', field: 'productLine', allLabel: '全部销售产品线', limit: 300 },
   { id: 'productSeries', field: 'productSeries', allLabel: '全部销售系列', limit: 300 },
   { id: 'model', field: 'model', allLabel: '型号', limit: 300 },
-  { id: 'realTransactionStatus', field: 'realTransactionStatus', allLabel: '是否真实交易', limit: 10 },
   { id: 'nonInternalTransactionStatus', field: 'nonInternalTransactionStatus', allLabel: '是否内部交易', limit: 10 },
   { id: 'finishedGoodsStatus', field: 'finishedGoodsStatus', allLabel: '是否成品', limit: 10 }
 ];
 const DEFAULT_SELECTIONS = {
   ...Object.fromEntries(TREND_FILTERS.map((filter) => [filter.id, []])),
-  realTransactionStatus: ['真实交易'],
   nonInternalTransactionStatus: ['非内部交易'],
   finishedGoodsStatus: ['成品']
 };
-const SALES_TREND_FILTER_STORAGE_KEY = 'gongyingai:filters:sales-trend:v2';
+const SALES_TREND_FILTER_STORAGE_KEY = 'gongyingai:filters:sales-trend:v3';
 const SALES_TREND_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material', 'dim-warehouse'];
 const SALES_TREND_PAGE_SIZE = 20;
 const SALES_TREND_TABLE_COLUMNS = [

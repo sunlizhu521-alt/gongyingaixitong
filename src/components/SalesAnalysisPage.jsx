@@ -9,7 +9,6 @@ import { useKcfxRecordMap, useKcfxSalesRows } from './kcfxRecordLoader.js';
 
 const SALES_ANALYSIS_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material', 'dim-warehouse'];
 const SALES_CLASSIFICATION_DEFAULTS = {
-  realTransactionStatus: ['真实交易'],
   nonInternalTransactionStatus: ['非内部交易'],
   finishedGoodsStatus: ['成品']
 };
@@ -20,7 +19,6 @@ const SALES_FILTERS = [
   { id: 'productLine', field: 'productLine', allLabel: '全部销售产品线', sortValueField: 'qty' },
   { id: 'productSeries', field: 'productSeries', allLabel: '全部销售系列', sortValueField: 'qty' },
   { id: 'model', field: 'model', allLabel: '型号', limit: 300, sortValueField: 'qty' },
-  { id: 'realTransactionStatus', field: 'realTransactionStatus', allLabel: '是否真实交易', preferredOrder: ['真实交易', '非真实交易', '未匹配'] },
   { id: 'nonInternalTransactionStatus', field: 'nonInternalTransactionStatus', allLabel: '是否内部交易', preferredOrder: ['非内部交易', '内部交易', '未匹配'] },
   { id: 'finishedGoodsStatus', field: 'finishedGoodsStatus', allLabel: '是否成品', preferredOrder: ['成品', '非成品', '未匹配'] }
 ];
@@ -74,7 +72,7 @@ export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRe
     searchFields: SALES_SEARCH_FIELDS,
     searchValue: search,
     defaultSelections,
-    storageKey: 'gongyingai:filters:sales-analysis:v2'
+    storageKey: 'gongyingai:filters:sales-analysis:v3'
   });
   const filteredRows = filterState.filteredRows;
   const totalQty = useMemo(() => sum(filteredRows, 'qty'), [filteredRows]);
