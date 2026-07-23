@@ -12,7 +12,7 @@ const TREND_YEAR_COLORS = { 2025: '#007aff', 2026: '#34c759' };
 const TREND_FILTERS = [
   { id: 'salesMonth', field: 'salesMonth', allLabel: '全部销售月份', monthAllLabel: '全部数据月份', multiple: true, independentOptions: true, limit: 300 },
   { id: 'salesOrg', field: 'salesOrg', allLabel: '全部销售部门', limit: 300 },
-  { id: 'storeShortName', field: 'storeShortName', allLabel: '店铺简称', limit: 300 },
+  { id: 'storeShortName', field: 'storeShortName', allLabel: '店铺简称', limit: 300, sortValueField: 'qty' },
   { id: 'productLine', field: 'productLine', allLabel: '全部销售产品线', limit: 300 },
   { id: 'productSeries', field: 'productSeries', allLabel: '全部销售系列', limit: 300 },
   { id: 'model', field: 'model', allLabel: '型号', limit: 300 },
@@ -291,7 +291,7 @@ function linkedFilterOptions(rows, targetFilter, selections) {
     if (!rowMatchesSelections(row, selections, targetFilter.id)) continue;
     const name = String(row[targetFilter.field] || '').trim();
     if (!name) continue;
-    totals.set(name, (totals.get(name) || 0) + (Number(row.qty) || 0));
+    totals.set(name, (totals.get(name) || 0) + (Number(row[targetFilter.sortValueField || 'qty']) || 0));
   }
   return [...totals.entries()]
     .filter(([, value]) => value !== 0)
