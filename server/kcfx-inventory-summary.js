@@ -12,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_SUMMARY_VERSION = 18;
+export const KCFX_INVENTORY_SUMMARY_VERSION = 19;
 
 const INVENTORY_VIEW_FIELDS = {
   summary: ['department', 'productLine'],

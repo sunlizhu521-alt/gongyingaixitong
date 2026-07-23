@@ -28,7 +28,7 @@ export const SALES_CLASSIFICATION_NOTE = [
   '销售数量取“应收数量”，销售金额取“销售额-不含税”。两个条件默认选择“非内部交易、成品”。',
   '1、是否内部交易按客户名称与内部交易客户名单精确匹配，名单内显示“内部交易”，其他非空客户显示“非内部交易”，客户名称为空显示“未匹配”；',
   `内部交易客户名单：${INTERNAL_SALES_CUSTOMERS.join('、')}。`,
-  '2、是否成品按商品维表判断，销售产品线为“其他/配件”或“健康办公”，或一级分类为“配件”或“护理床附件”时显示“非成品”；无法匹配均显示“未匹配”。'
+  '2、是否成品按商品维表判断，销售产品线为“其他/配件”或“健康办公”，一级分类为“配件”或“护理床附件”，或销售系列为“护理床附件”时显示“非成品”；无法匹配均显示“未匹配”。'
 ].join('\n');
 
 const AGE_BUCKET_DEFINITIONS = [
@@ -697,7 +697,8 @@ function classifyFinishedGoods(product, productMatched) {
   if (!productMatched) return '未匹配';
   const productLine = normalizeSalesExclusionText(product.productLine);
   const primaryCategory = normalizeSalesExclusionText(product.primaryCategory || product.productCategory);
-  if (productLine === '其他/配件' || productLine === '健康办公') return '非成品';
+  const productSeries = normalizeSalesExclusionText(product.productSeries);
+  if (productLine === '其他/配件' || productLine === '健康办公' || productSeries === '护理床附件') return '非成品';
   if (!productLine || !primaryCategory) return '未匹配';
   return primaryCategory === '配件' || primaryCategory === '护理床附件' ? '非成品' : '成品';
 }

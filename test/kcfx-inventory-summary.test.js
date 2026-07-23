@@ -63,7 +63,7 @@ test('采购订单事业部只保留第一个星号前的内容', () => {
 
 test('库存汇总按海上在途精确分段并排除汇总行', () => {
   const cache = buildInventorySummaryCache(sampleRecords(), 'saved-at');
-  assert.equal(cache.version, 18);
+  assert.equal(cache.version, 19);
   assert.equal(cache.inventoryViews.onHand.length, 2);
   assert.equal(cache.inventoryViews.onHand.reduce((sum, row) => sum + row.qty, 0), 12);
   assert.equal(cache.inventoryViews.inTransit.length, 1);
@@ -195,7 +195,8 @@ test('销售汇总保留全部交易并按三个独立条件分类筛选', () =>
     { 物料编码: '1003', SKU: 'SKU-3', 销售产品线: '产品线A', 销售产品分类: '配件', 金蝶名称: '配件' },
     { 物料编码: '1004', SKU: 'SKU-4', 销售产品线: '产品线A', 一级分类: '护理床附件', 金蝶名称: '护理床附件' },
     { 物料编码: '1005', SKU: 'SKU-5', 销售产品线: '健康办公', 一级分类: '成品', 金蝶名称: '健康办公' },
-    { 物料编码: '1006', SKU: 'SKU-6', 销售产品线: '产品线A', 一级分类: '', 金蝶名称: '分类缺失' }
+    { 物料编码: '1006', SKU: 'SKU-6', 销售产品线: '产品线A', 一级分类: '', 金蝶名称: '分类缺失' },
+    { 物料编码: '1007', SKU: 'SKU-7', 销售产品线: '产品线A', 销售系列: '护理床附件', 一级分类: '成品', 金蝶名称: '护理床系列附件' }
   ]);
   records['dim-warehouse'] = record([
     { 仓库名称: '销售仓', 一级仓库分类: '销售出库仓' },
@@ -216,11 +217,12 @@ test('销售汇总保留全部交易并按三个独立条件分类筛选', () =>
     { 日期: '2026-01-04', 客户名称: '客户A', 物料编码: '1004', 客户物料编码: '客户A1004', 仓库: '销售仓', 应收数量: 4, '销售额-不含税': 40 },
     { 日期: '2026-01-05', 客户名称: '客户A', 物料编码: '1005', 客户物料编码: '客户A1005', 仓库: '销售仓', 应收数量: 5, '销售额-不含税': 50 },
     { 日期: '2026-01-06', 客户名称: '', 物料编码: '1006', 客户物料编码: '客户A1006', 仓库: '未知仓', 应收数量: 6, '销售额-不含税': 60 },
-    { 日期: '2026-01-07', 客户名称: '拼多多*迈德斯特官方旗舰店', 物料编码: '9999', 客户物料编码: '客户A1003', 仓库: '', 应收数量: 7, '销售额-不含税': 70 }
+    { 日期: '2026-01-07', 客户名称: '拼多多*迈德斯特官方旗舰店', 物料编码: '9999', 客户物料编码: '客户A1003', 仓库: '', 应收数量: 7, '销售额-不含税': 70 },
+    { 日期: '2026-01-08', 客户名称: '客户A', 物料编码: '1007', 客户物料编码: '客户A1007', 仓库: '销售仓', 应收数量: 8, '销售额-不含税': 80 }
   ]);
 
   const cache = buildInventorySummaryCache(records, 'saved-at');
-  assert.equal(cache.salesDetails.length, 7);
+  assert.equal(cache.salesDetails.length, 8);
   assert.deepEqual(
     cache.salesDetails.map((row) => [row.materialCode, row.realTransactionStatus, row.nonInternalTransactionStatus, row.finishedGoodsStatus]),
     [
@@ -230,7 +232,8 @@ test('销售汇总保留全部交易并按三个独立条件分类筛选', () =>
       ['1004', '真实交易', '非内部交易', '非成品'],
       ['1005', '真实交易', '非内部交易', '非成品'],
       ['1006', '未匹配', '未匹配', '未匹配'],
-      ['9999', '真实交易', '非内部交易', '未匹配']
+      ['9999', '真实交易', '非内部交易', '未匹配'],
+      ['1007', '真实交易', '非内部交易', '非成品']
     ]
   );
 
@@ -263,7 +266,7 @@ test('销售汇总保留全部交易并按三个独立条件分类筛选', () =>
   }).rows[0].materialCode, '1006');
   assert.deepEqual(queryInventorySummary(cache, {
     report: 'sales', filters: { finishedGoodsStatus: ['非成品'] }
-  }).rows.map((row) => row.materialCode).sort(), ['1002', '1003', '1004', '1005']);
+  }).rows.map((row) => row.materialCode).sort(), ['1002', '1003', '1004', '1005', '1007']);
   assert.deepEqual(exportInventorySummaryRows(cache, {
     report: 'sales', filters: { finishedGoodsStatus: ['未匹配'] }
   }).map((row) => row.materialCode), ['9999', '1006']);
