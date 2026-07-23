@@ -407,7 +407,10 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(page, /className="turnover-metric-scroll"[\s\S]*<MetricCards/);
   assert.match(styles, /\.turnover-metric-scroll\s*\{[\s\S]*overflow-x:\s*auto/);
   assert.match(styles, /\.turnover-metric-scroll \.kcfx-metric-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(6,/);
-  assert.match(page, /库存周转明细[\s\S]*TablePagination[\s\S]*详细计算逻辑/);
+  assert.match(page, /库存周转明细[\s\S]*TablePagination[\s\S]*详细计算逻辑[\s\S]*className="turnover-detail-formulas"/);
+  assert.doesNotMatch(page, /className="turnover-formulas"/);
+  assert.match(styles, /\.turnover-detail-formulas\s*\{[\s\S]*grid-template-columns:/);
+  assert.doesNotMatch(styles, /\.turnover-formulas\s*\{/);
   assert.match(page, /按仓库维表二级仓库分类拆分库存成本[\s\S]*“海上在途”计入在途库存成本[\s\S]*其他有效库存计入在库库存成本/);
   assert.match(page, /平均在库库存成本 =（期初在库库存成本 \+ 期末在库库存成本）÷ 2/);
   assert.match(page, /平均在途库存成本 =（期初在途库存成本 \+ 期末在途库存成本）÷ 2/);

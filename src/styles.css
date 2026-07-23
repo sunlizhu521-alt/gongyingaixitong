@@ -1508,25 +1508,6 @@ th {
   font-weight: 600;
 }
 
-.turnover-formulas {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1px;
-  margin: 10px 0;
-  border: 1px solid #d8e3ef;
-  background: #d8e3ef;
-}
-
-.turnover-formulas p {
-  margin: 0;
-  min-width: 0;
-  padding: 10px 12px;
-  background: #f7fafc;
-  color: #29445c;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
 .turnover-warning {
   display: flex;
   align-items: center;
@@ -1706,6 +1687,25 @@ th {
   font-size: 15px;
 }
 
+.turnover-detail-formulas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1px;
+  margin-bottom: 14px;
+  border: 1px solid #d8e3ef;
+  background: #d8e3ef;
+}
+
+.turnover-detail-formulas p {
+  margin: 0;
+  min-width: 0;
+  padding: 10px 12px;
+  background: #f7fafc;
+  color: #29445c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .turnover-calculation-details ol {
   display: grid;
   gap: 8px;
@@ -1724,7 +1724,7 @@ th {
 }
 
 @media (max-width: 900px) {
-  .turnover-formulas {
+  .turnover-detail-formulas {
     grid-template-columns: 1fr;
   }
 

@@ -246,14 +246,6 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
         )}
       />
 
-      <section className="turnover-formulas" aria-label="计算公式">
-        <p><strong>在库量存货周转天数</strong> = 期间天数 ×（平均在库库存成本 ÷ 期间营业成本）</p>
-        <p><strong>在途量存货周转天数</strong> = 期间天数 ×（平均在途库存成本 ÷ 期间营业成本）</p>
-        <p><strong>平均库存成本</strong> =（对应期初库存成本 + 对应期末库存成本）÷ 2</p>
-        <p><strong>未交付周转天数</strong> = 期间天数 ×（未交付总数量 ÷ 期间销售出库总数量）</p>
-        <p><strong>成本计算</strong> = 应收数量 × 2026年结算价；<strong>未交付数量</strong> = 采购订单剩余入库数量</p>
-      </section>
-
       {warning && (
         <div className="turnover-warning" role="status">
           <span>{warning}</span>
@@ -304,6 +296,13 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
         />
         <div className="turnover-calculation-details">
           <h4>详细计算逻辑</h4>
+          <div className="turnover-detail-formulas" aria-label="计算公式">
+            <p><strong>在库量存货周转天数</strong> = 期间天数 ×（平均在库库存成本 ÷ 期间营业成本）</p>
+            <p><strong>在途量存货周转天数</strong> = 期间天数 ×（平均在途库存成本 ÷ 期间营业成本）</p>
+            <p><strong>平均库存成本</strong> =（对应期初库存成本 + 对应期末库存成本）÷ 2</p>
+            <p><strong>未交付周转天数</strong> = 期间天数 ×（未交付总数量 ÷ 期间销售出库总数量）</p>
+            <p><strong>成本计算</strong> = 应收数量 × 2026年结算价；<strong>未交付数量</strong> = 采购订单剩余入库数量</p>
+          </div>
           <ol>
             <li>
               <strong>库存成本分类：</strong>
