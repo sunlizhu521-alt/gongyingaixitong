@@ -20,6 +20,13 @@ const TREND_FILTERS = [
   { id: 'nonInternalTransactionStatus', field: 'nonInternalTransactionStatus', allLabel: '是否内部交易', limit: 10 },
   { id: 'finishedGoodsStatus', field: 'finishedGoodsStatus', allLabel: '是否成品', limit: 10 }
 ];
+const SALES_TREND_NOTE = [
+  '统计口径：',
+  '销售数量取“应收数量”，销售金额取“销售额-不含税”。三个条件默认选择“真实交易、非内部交易、成品”。',
+  '1、是否真实交易按销售仓库匹配一级仓库分类，系统集成仓库为“非真实交易”；',
+  '2、是否内部交易按客户名称+物料编码匹配销售部门，内部交易显示“内部交易”，其他显示“非内部交易”；',
+  '3、是否成品按商品维表判断，销售产品线为“其他/配件”或“健康办公”，或一级分类为“配件”或“护理床附件”时显示“非成品”；无法匹配均显示“未匹配”。'
+].join('\n');
 const DEFAULT_SELECTIONS = {
   ...Object.fromEntries(TREND_FILTERS.map((filter) => [filter.id, []])),
   realTransactionStatus: ['真实交易'],
@@ -149,7 +156,7 @@ export default function SalesTrendPage({ kcfxData = null, kcfxRecords = {}, erro
     <KcfxPageShell
       title="销售趋势变化"
       status={status}
-      note="销售口径与销售汇总报表一致，默认显示真实交易、非内部交易和成品；无法匹配的数据可通过对应筛选器查看。"
+      note={SALES_TREND_NOTE}
       loading={pageLoading}
       onRefresh={refresh}
     >
