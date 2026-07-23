@@ -6,6 +6,7 @@ import { formatNumber, moneyWan } from './kcfxUtils.js';
 import { TablePagination } from './TablePagination.jsx';
 
 const FILTERS = [
+  { id: 'inventorySegment', field: 'inventorySegment', allLabel: '全部库存段' },
   { id: 'department', field: 'department', allLabel: '全部事业部' },
   { id: 'productLine', field: 'productLine', allLabel: '全部产品线' },
   { id: 'productSeries', field: 'productSeries', allLabel: '全部销售系列' },
@@ -14,6 +15,7 @@ const FILTERS = [
   { id: 'hasSalesData', field: 'hasSalesData', allLabel: '是否有销售数据' }
 ];
 const DEFAULT_FILTERS = {
+  inventorySegment: [],
   department: [],
   productLine: [],
   productSeries: [],

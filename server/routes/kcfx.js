@@ -718,6 +718,7 @@ app.post('/api/kcfx-library/inventory-turnover/missing-price/export', async (req
     const rows = exportInventoryTurnoverMissingPriceRows(cache, req.body || {});
     const data = rows.map((row) => ({
       数据来源: row.sourceType,
+      库存段: row.inventorySegment || '',
       月份: row.month,
       事业部: row.department,
       产品线: row.productLine,

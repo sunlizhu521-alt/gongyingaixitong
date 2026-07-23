@@ -13,11 +13,12 @@ import {
   rowsOf
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_TURNOVER_VERSION = 7;
+export const KCFX_INVENTORY_TURNOVER_VERSION = 8;
 export const INVENTORY_TURNOVER_PAGE_SIZE = 20;
 
 const GROUP_SEPARATOR = '\u001f';
 const DAY_MS = 24 * 60 * 60 * 1000;
+const INVENTORY_SEGMENTS = ['在库量', '在途量', '未交付数量'];
 const TURNOVER_CHART_ORDERS = {
   department: [
     '海外事业一部',
@@ -202,6 +203,7 @@ function buildInventorySnapshots(records, productMap, warehouseMap, departmentMa
         amount: qty * settlementPrice,
         [`${scope}Qty`]: qty,
         [`${scope}Amount`]: qty * settlementPrice,
+        [`${scope}MissingPriceRows`]: settlementPrice ? 0 : 1,
         missingPriceRows: settlementPrice ? 0 : 1
       });
       if (!settlementPrice) {
@@ -216,6 +218,7 @@ function buildInventorySnapshots(records, productMap, warehouseMap, departmentMa
           materialName: normalizeText(product.materialName),
           organization: identity.organization,
           warehouse: identity.warehouse,
+          inventorySegment: scope === 'inTransit' ? '在途量' : '在库量',
           quantity: qty
         });
       }
@@ -398,6 +401,13 @@ function calculateRow(
   return {
     ...identity,
     periodDays: period.days,
+    hasOnHandInventory: Boolean(
+      (Number(opening?.onHandQty) || 0) || (Number(closing?.onHandQty) || 0)
+    ),
+    hasInTransitInventory: Boolean(
+      (Number(opening?.inTransitQty) || 0) || (Number(closing?.inTransitQty) || 0)
+    ),
+    hasUndeliveredInventory: Boolean(undeliveredQty),
     openingOnHandInventoryCost,
     openingInTransitInventoryCost,
     closingOnHandInventoryCost,
@@ -483,6 +493,66 @@ function selected(filters, field) {
   return Array.isArray(filters?.[field]) ? filters[field].map(normalizeText).filter(Boolean) : [];
 }
 
+function inventorySegmentSelection(filters) {
+  return new Set(selected(filters, 'inventorySegment').filter((value) => (
+    INVENTORY_SEGMENTS.includes(value)
+  )));
+}
+
+function inventorySegmentHasData(values, segment) {
+  if (segment === '在库量') return Boolean(Number(values?.onHandQty) || 0);
+  if (segment === '在途量') return Boolean(Number(values?.inTransitQty) || 0);
+  if (segment === '未交付数量') return Boolean(Number(values?.undeliveredQty) || 0);
+  return false;
+}
+
+function inventorySegmentKeys(opening, closing, undelivered, filters) {
+  const segments = inventorySegmentSelection(filters);
+  if (!segments.size) return null;
+  const keys = new Set();
+  for (const source of [opening, closing, undelivered]) {
+    for (const [key, values] of source || []) {
+      if ([...segments].some((segment) => inventorySegmentHasData(values, segment))) {
+        keys.add(key);
+      }
+    }
+  }
+  return keys;
+}
+
+function filterInventoryMetrics(values, filters) {
+  if (!values) return values;
+  const segments = inventorySegmentSelection(filters);
+  if (!segments.size) return values;
+  const includeOnHand = segments.has('在库量');
+  const includeInTransit = segments.has('在途量');
+  const onHandQty = includeOnHand ? Number(values.onHandQty) || 0 : 0;
+  const inTransitQty = includeInTransit ? Number(values.inTransitQty) || 0 : 0;
+  const onHandAmount = includeOnHand ? Number(values.onHandAmount) || 0 : 0;
+  const inTransitAmount = includeInTransit ? Number(values.inTransitAmount) || 0 : 0;
+  const onHandMissingPriceRows = includeOnHand ? Number(values.onHandMissingPriceRows) || 0 : 0;
+  const inTransitMissingPriceRows = includeInTransit ? Number(values.inTransitMissingPriceRows) || 0 : 0;
+  return {
+    ...values,
+    qty: onHandQty + inTransitQty,
+    amount: onHandAmount + inTransitAmount,
+    onHandQty,
+    inTransitQty,
+    onHandAmount,
+    inTransitAmount,
+    onHandMissingPriceRows,
+    inTransitMissingPriceRows,
+    missingPriceRows: onHandMissingPriceRows + inTransitMissingPriceRows
+  };
+}
+
+function filterUndeliveredMetrics(values, filters) {
+  if (!values) return values;
+  const segments = inventorySegmentSelection(filters);
+  if (!segments.size || segments.has('未交付数量')) return values;
+  return { ...values, undeliveredQty: 0 };
+}
+
 function inputFilters(input) {
   if (input?.filters && typeof input.filters === 'object') return input.filters;
   return {
@@ -544,16 +614,22 @@ function sortPreferredOptions(items, order) {
   });
 }
 
-function missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, sales) {
+function missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, sales, eligibleKeys = null) {
   const inventoryMonths = new Set([openingSnapshotMonth, period.endMonth]);
   const salesMonths = new Set(period.monthList);
+  const inventorySegments = inventorySegmentSelection(filters);
   return (cache.missingPriceRecords || []).filter((row) => {
     if (!matchesFilters(row, filters, ['department', 'productLine', 'productSeries'])) return false;
+    const key = groupKey(row.department, row.productLine, row.productSeries);
+    if (eligibleKeys && !eligibleKeys.has(key)) return false;
     const hasSalesData = sales.has(groupKey(row.department, row.productLine, row.productSeries))
       ? '有销售数据'
       : '无销售数据';
     if (!matchesFilters({ hasSalesData }, filters, ['hasSalesData'])) return false;
-    if (row.sourceType === '库存快照') return inventoryMonths.has(row.month);
+    if (row.sourceType === '库存快照') {
+      return inventoryMonths.has(row.month)
+        && (!inventorySegments.size || inventorySegments.has(row.inventorySegment));
+    }
     return salesMonths.has(row.month)
       && matchesFilters(row, filters, ['nonInternalTransactionStatus', 'finishedGoodsStatus']);
   });
@@ -592,24 +668,25 @@ function calculatedRowsForFilters(
   const closing = aggregateInventoryComponents(cache.inventorySnapshots.get(period.endMonth), filters);
   const sales = aggregateSalesComponents(cache, period, filters);
   const undelivered = aggregateInventoryComponents(cache.undelivered, filters);
-  const missingPriceRows = includeMissingPrices
-    ? missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, sales)
-    : [];
-  const missingPriceCodes = includeMissingPrices
-    ? missingPriceCodesByGroup(missingPriceRows, openingSnapshotMonth, period.endMonth)
-    : new Map();
-  const keys = new Set([
+  const selectedKeys = inventorySegmentKeys(opening, closing, undelivered, filters);
+  const keys = selectedKeys || new Set([
     ...opening.keys(),
     ...closing.keys(),
     ...sales.keys(),
     ...undelivered.keys()
   ]);
+  const missingPriceRows = includeMissingPrices
+    ? missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, sales, keys)
+    : [];
+  const missingPriceCodes = includeMissingPrices
+    ? missingPriceCodesByGroup(missingPriceRows, openingSnapshotMonth, period.endMonth)
+    : new Map();
   const rows = [...keys].map((key) => calculateRow(
     groupIdentity(key),
-    opening.get(key),
-    closing.get(key),
+    filterInventoryMetrics(opening.get(key), filters),
+    filterInventoryMetrics(closing.get(key), filters),
     sales.get(key),
-    undelivered.get(key),
+    filterUndeliveredMetrics(undelivered.get(key), filters),
     period,
     openingApproximate,
     missingPriceCodes.get(key)
@@ -662,6 +739,26 @@ function linkedInventoryTurnoverOptions(cache, period, filters, openingSnapshotM
       ? sortPreferredOptions(values, ['有销售数据', '无销售数据'])
       : sortTextOptions(values);
   }
+  const inventorySegmentFilters = withoutFilter(filters, 'inventorySegment');
+  const inventorySegmentResult = calculatedRowsForFilters(
+    cache,
+    period,
+    inventorySegmentFilters,
+    openingSnapshotMonth,
+    openingApproximate
+  );
+  const inventorySegmentRows = inventorySegmentResult.rows.filter((row) => (
+    matchesFilters(row, inventorySegmentFilters, ['hasSalesData'])
+  ));
+  options.inventorySegment = INVENTORY_SEGMENTS.filter((segment) => (
+    inventorySegmentRows.some((row) => (
+      segment === '在库量'
+        ? row.hasOnHandInventory
+        : segment === '在途量'
+          ? row.hasInTransitInventory
+          : row.hasUndeliveredInventory
+    ))
+  ));
   options.nonInternalTransactionStatus = linkedSalesStatusOptions(
     cache,
     period,
@@ -804,6 +901,9 @@ export function exportInventoryTurnoverMissingPriceRows(cache, input = {}) {
     result.period,
     filters,
     result.period.openingSnapshotMonth,
-    sales
+    sales,
+    new Set(exportInventoryTurnoverRows(cache, input).map((row) => (
+      groupKey(row.department, row.productLine, row.productSeries)
+    )))
   );
 }
