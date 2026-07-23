@@ -1510,7 +1510,7 @@ th {
 
 .turnover-formulas {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 1px;
   margin: 10px 0;
   border: 1px solid #d8e3ef;
@@ -1597,8 +1597,12 @@ th {
   margin: 0 4px 0 10px;
 }
 
-.turnover-legend-inventory {
+.turnover-legend-on-hand {
   background: #1677ff;
+}
+
+.turnover-legend-in-transit {
+  background: #13a8a8;
 }
 
 .turnover-legend-undelivered {
@@ -1646,8 +1650,12 @@ th {
   border-radius: 3px;
 }
 
-.turnover-bar.inventory {
+.turnover-bar.on-hand {
   background: #1677ff;
+}
+
+.turnover-bar.in-transit {
+  background: #13a8a8;
 }
 
 .turnover-bar.undelivered {

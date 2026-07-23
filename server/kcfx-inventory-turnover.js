@@ -13,7 +13,7 @@ import {
   rowsOf
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_TURNOVER_VERSION = 6;
+export const KCFX_INVENTORY_TURNOVER_VERSION = 7;
 export const INVENTORY_TURNOVER_PAGE_SIZE = 20;
 
 const GROUP_SEPARATOR = '\u001f';
@@ -196,9 +196,12 @@ function buildInventorySnapshots(records, productMap, warehouseMap, departmentMa
       const productSeries = normalizeText(product.productSeries) || '未匹配销售系列';
       const settlementPrice = Number(product.settlementPrice) || 0;
       const key = groupKey(department, productLine, productSeries);
+      const scope = warehouse.location === '海上在途' ? 'inTransit' : 'onHand';
       addMetric(totals, key, {
         qty,
         amount: qty * settlementPrice,
+        [`${scope}Qty`]: qty,
+        [`${scope}Amount`]: qty * settlementPrice,
         missingPriceRows: settlementPrice ? 0 : 1
       });
       if (!settlementPrice) {
@@ -216,9 +219,6 @@ function buildInventorySnapshots(records, productMap, warehouseMap, departmentMa
           quantity: qty
         });
       }
-      const scope = warehouse.location === '海上在途' ? 'inTransitQty' : 'onHandQty';
-      const grouped = totals.get(key);
-      grouped[scope] = (Number(grouped[scope]) || 0) + qty;
     }
     snapshots.set(month.month, totals);
     sources[month.month] = {
@@ -367,9 +367,16 @@ function calculateRow(
   openingApproximate,
   missingPriceCodes = {}
 ) {
-  const openingInventoryCost = Number(opening?.amount) || 0;
-  const closingInventoryCost = Number(closing?.amount) || 0;
-  const averageInventoryCost = (openingInventoryCost + closingInventoryCost) / 2;
+  const openingOnHandInventoryCost = Number(opening?.onHandAmount) || 0;
+  const openingInTransitInventoryCost = Number(opening?.inTransitAmount) || 0;
+  const closingOnHandInventoryCost = Number(closing?.onHandAmount) || 0;
+  const closingInTransitInventoryCost = Number(closing?.inTransitAmount) || 0;
+  const averageOnHandInventoryCost = (
+    openingOnHandInventoryCost + closingOnHandInventoryCost
+  ) / 2;
+  const averageInTransitInventoryCost = (
+    openingInTransitInventoryCost + closingInTransitInventoryCost
+  ) / 2;
   const periodOperatingCost = Number(sales?.salesCost) || 0;
   const salesRecordRows = Number(sales?.salesRecordRows) || 0;
   const monthlyAverageSalesCost = periodOperatingCost / period.months;
@@ -391,19 +398,25 @@ function calculateRow(
   return {
     ...identity,
     periodDays: period.days,
-    openingInventoryCost,
-    closingInventoryCost,
-    averageInventoryCost,
+    openingOnHandInventoryCost,
+    openingInTransitInventoryCost,
+    closingOnHandInventoryCost,
+    closingInTransitInventoryCost,
+    averageOnHandInventoryCost,
+    averageInTransitInventoryCost,
     monthlyAverageSalesCost,
     periodOperatingCost,
     salesRecordRows,
     hasSalesData: salesRecordRows > 0 ? '有销售数据' : '无销售数据',
-    inventoryTurnoverDays: periodOperatingCost > 0
-      ? period.days * (averageInventoryCost / periodOperatingCost)
+    onHandInventoryTurnoverDays: periodOperatingCost > 0
+      ? period.days * (averageOnHandInventoryCost / periodOperatingCost)
+      : null,
+    inTransitInventoryTurnoverDays: periodOperatingCost > 0
+      ? period.days * (averageInTransitInventoryCost / periodOperatingCost)
       : null,
     undeliveredQty,
     outboundQty,
-    undeliveredCoverageDays: outboundQty > 0
+    undeliveredTurnoverDays: outboundQty > 0
       ? period.days * (undeliveredQty / outboundQty)
       : null,
     openingMissingPriceRows,
@@ -419,8 +432,10 @@ function calculateRow(
 
 function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
   const totals = rows.reduce((result, row) => ({
-    openingInventoryCost: result.openingInventoryCost + row.openingInventoryCost,
-    closingInventoryCost: result.closingInventoryCost + row.closingInventoryCost,
+    openingOnHandInventoryCost: result.openingOnHandInventoryCost + row.openingOnHandInventoryCost,
+    openingInTransitInventoryCost: result.openingInTransitInventoryCost + row.openingInTransitInventoryCost,
+    closingOnHandInventoryCost: result.closingOnHandInventoryCost + row.closingOnHandInventoryCost,
+    closingInTransitInventoryCost: result.closingInTransitInventoryCost + row.closingInTransitInventoryCost,
     periodOperatingCost: result.periodOperatingCost + row.periodOperatingCost,
     salesRecordRows: result.salesRecordRows + row.salesRecordRows,
     undeliveredQty: result.undeliveredQty + row.undeliveredQty,
@@ -429,8 +444,10 @@ function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
     closingMissingPriceRows: result.closingMissingPriceRows + row.closingMissingPriceRows,
     salesMissingPriceRows: result.salesMissingPriceRows + row.salesMissingPriceRows
   }), {
-    openingInventoryCost: 0,
-    closingInventoryCost: 0,
+    openingOnHandInventoryCost: 0,
+    openingInTransitInventoryCost: 0,
+    closingOnHandInventoryCost: 0,
+    closingInTransitInventoryCost: 0,
     periodOperatingCost: 0,
     salesRecordRows: 0,
     undeliveredQty: 0,
@@ -445,10 +462,12 @@ function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
     sales: uniqueMaterialCodes(rows.flatMap((row) => row.salesMissingPriceMaterialCodes || []))
   };
   return calculateRow(identity, {
-    amount: totals.openingInventoryCost,
+    onHandAmount: totals.openingOnHandInventoryCost,
+    inTransitAmount: totals.openingInTransitInventoryCost,
     missingPriceRows: totals.openingMissingPriceRows
   }, {
-    amount: totals.closingInventoryCost,
+    onHandAmount: totals.closingOnHandInventoryCost,
+    inTransitAmount: totals.closingInTransitInventoryCost,
     missingPriceRows: totals.closingMissingPriceRows
   }, {
     salesCost: totals.periodOperatingCost,

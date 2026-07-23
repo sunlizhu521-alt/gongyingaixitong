@@ -113,21 +113,31 @@ test('周转图表按固定事业部和产品线业务顺序排列', () => {
   );
 });
 
-test('周转成本使用应收数量而未交付覆盖使用出库数量', () => {
+test('在库与在途成本分别计算周转天数且未交付使用出库数量', () => {
   const cache = buildInventoryTurnoverCache(sampleRecords(), 'saved-at');
   const result = queryInventoryTurnover(cache, { periodMonths: 3 });
   assert.equal(result.status, 'ready');
   assert.equal(result.period.openingSnapshotMonth, '2026-01');
   assert.equal(result.period.openingApproximate, false);
-  assert.equal(result.metrics.openingInventoryCost, 1000);
-  assert.equal(result.metrics.closingInventoryCost, 800);
-  assert.equal(result.metrics.averageInventoryCost, 900);
+  assert.equal(result.metrics.openingOnHandInventoryCost, 600);
+  assert.equal(result.metrics.openingInTransitInventoryCost, 400);
+  assert.equal(result.metrics.closingOnHandInventoryCost, 500);
+  assert.equal(result.metrics.closingInTransitInventoryCost, 300);
+  assert.equal(result.metrics.averageOnHandInventoryCost, 550);
+  assert.equal(result.metrics.averageInTransitInventoryCost, 350);
   assert.equal(result.metrics.monthlyAverageSalesCost, 100);
   assert.equal(result.metrics.periodOperatingCost, 300);
-  assert.equal(result.metrics.inventoryTurnoverDays, 267);
+  assert.equal(result.metrics.onHandInventoryTurnoverDays, 89 * (550 / 300));
+  assert.equal(result.metrics.inTransitInventoryTurnoverDays, 89 * (350 / 300));
+  assert.equal(
+    result.metrics.onHandInventoryTurnoverDays + result.metrics.inTransitInventoryTurnoverDays,
+    267
+  );
   assert.equal(result.metrics.undeliveredQty, 12);
   assert.equal(result.metrics.outboundQty, 24);
-  assert.equal(result.metrics.undeliveredCoverageDays, 44.5);
+  assert.equal(result.metrics.undeliveredTurnoverDays, 44.5);
+  assert.equal('inventoryTurnoverDays' in result.metrics, false);
+  assert.equal('undeliveredCoverageDays' in result.metrics, false);
   assert.equal(result.rows[0].dataStatus, '完整');
   assert.equal(result.rows[0].productSeries, '系列A');
   assert.equal(result.pagination.pageSize, 20);
@@ -159,8 +169,9 @@ test('零分母返回空周转天数且缺失结算价标记不完整', () => {
   records['dim-product'].rows[0].结算价 = 0;
   for (const row of records['sales-data'].rows) row.出库数量 = 0;
   const result = queryInventoryTurnover(buildInventoryTurnoverCache(records), { periodMonths: 3 });
-  assert.equal(result.metrics.inventoryTurnoverDays, null);
-  assert.equal(result.metrics.undeliveredCoverageDays, null);
+  assert.equal(result.metrics.onHandInventoryTurnoverDays, null);
+  assert.equal(result.metrics.inTransitInventoryTurnoverDays, null);
+  assert.equal(result.metrics.undeliveredTurnoverDays, null);
   assert.ok(result.diagnostics.missingPriceRows > 0);
   assert.match(result.metrics.dataStatus, /期初库存缺少结算价2条/);
   assert.match(result.metrics.dataStatus, /期末库存缺少结算价2条/);
@@ -310,6 +321,10 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(routes, /产品线: row\.productLine,[\s\S]*销售系列: row\.productSeries,[\s\S]*期间月数/);
   assert.match(page, /事业部＋产品线＋销售系列汇总明细/);
   assert.match(page, /在库量 = 非海上在途仓库库存；在途量 = 海上在途仓库存；未交付数量 = 采购订单剩余数量/);
+  assert.match(page, /在库量存货周转天数[\s\S]*在途量存货周转天数[\s\S]*未交付周转天数/);
+  assert.doesNotMatch(page, /未交付覆盖天数|inventoryTurnoverDays|undeliveredCoverageDays/);
+  assert.match(routes, /期初在库库存成本: row\.openingOnHandInventoryCost[\s\S]*期初在途库存成本: row\.openingInTransitInventoryCost/);
+  assert.match(routes, /在库量存货周转天数: row\.onHandInventoryTurnoverDays[\s\S]*在途量存货周转天数: row\.inTransitInventoryTurnoverDays[\s\S]*未交付周转天数: row\.undeliveredTurnoverDays/);
   assert.match(page, /导出缺少内部结算价明细/);
   assert.doesNotMatch(page, /近1月|近3月|近6月/);
   assert.match(page, /className="turnover-filter-toolbar"[\s\S]*leadingContent/);
