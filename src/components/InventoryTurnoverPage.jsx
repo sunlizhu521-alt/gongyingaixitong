@@ -199,7 +199,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
     : error
       || payload?.message
       || (period
-        ? `统计期间：${period.startLabel}至${period.endLabel}，共${period.days}天；事业部＋产品线＋销售系列汇总明细${formatNumber(pagination.totalRows)}行`
+        ? `统计期间：${period.startLabel}至${period.endLabel}，共${period.days}天；事业部＋产品线＋销售系列汇总明细${formatNumber(pagination.totalRows)}行；在库量 = 非海上在途仓库库存；在途量 = 海上在途仓库存；未交付数量 = 采购订单剩余数量`
         : '等待数据');
   const warning = [
     period?.openingApproximate

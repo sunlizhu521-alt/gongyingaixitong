@@ -309,6 +309,7 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(page, /key: 'productLine', label: '产品线' \},[\s\S]*key: 'productSeries', label: '销售系列'/);
   assert.match(routes, /产品线: row\.productLine,[\s\S]*销售系列: row\.productSeries,[\s\S]*期间月数/);
   assert.match(page, /事业部＋产品线＋销售系列汇总明细/);
+  assert.match(page, /在库量 = 非海上在途仓库库存；在途量 = 海上在途仓库存；未交付数量 = 采购订单剩余数量/);
   assert.match(page, /导出缺少内部结算价明细/);
   assert.doesNotMatch(page, /近1月|近3月|近6月/);
   assert.match(page, /className="turnover-filter-toolbar"[\s\S]*leadingContent/);
