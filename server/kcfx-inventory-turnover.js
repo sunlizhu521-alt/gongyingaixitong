@@ -13,7 +13,7 @@ import {
   rowsOf
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_TURNOVER_VERSION = 8;
+export const KCFX_INVENTORY_TURNOVER_VERSION = 9;
 export const INVENTORY_TURNOVER_PAGE_SIZE = 20;
 
 const GROUP_SEPARATOR = '\u001f';
@@ -385,6 +385,9 @@ function calculateRow(
   const monthlyAverageSalesCost = periodOperatingCost / period.months;
   const outboundQty = Number(sales?.outboundQty) || 0;
   const undeliveredQty = Number(undelivered?.undeliveredQty) || 0;
+  const onHandQty = Number(closing?.onHandQty) || 0;
+  const inTransitQty = Number(closing?.inTransitQty) || 0;
+  const inventoryTotalQty = onHandQty + inTransitQty + undeliveredQty;
   const openingMissingPriceRows = Number(opening?.missingPriceRows) || 0;
   const closingMissingPriceRows = Number(closing?.missingPriceRows) || 0;
   const salesMissingPriceRows = Number(sales?.missingPriceRows) || 0;
@@ -429,6 +432,9 @@ function calculateRow(
     undeliveredTurnoverDays: outboundQty > 0
       ? period.days * (undeliveredQty / outboundQty)
       : null,
+    onHandQty,
+    inTransitQty,
+    inventoryTotalQty,
     openingMissingPriceRows,
     closingMissingPriceRows,
     salesMissingPriceRows,
@@ -446,6 +452,8 @@ function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
     openingInTransitInventoryCost: result.openingInTransitInventoryCost + row.openingInTransitInventoryCost,
     closingOnHandInventoryCost: result.closingOnHandInventoryCost + row.closingOnHandInventoryCost,
     closingInTransitInventoryCost: result.closingInTransitInventoryCost + row.closingInTransitInventoryCost,
+    onHandQty: result.onHandQty + row.onHandQty,
+    inTransitQty: result.inTransitQty + row.inTransitQty,
     periodOperatingCost: result.periodOperatingCost + row.periodOperatingCost,
     salesRecordRows: result.salesRecordRows + row.salesRecordRows,
     undeliveredQty: result.undeliveredQty + row.undeliveredQty,
@@ -458,6 +466,8 @@ function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
     openingInTransitInventoryCost: 0,
     closingOnHandInventoryCost: 0,
     closingInTransitInventoryCost: 0,
+    onHandQty: 0,
+    inTransitQty: 0,
     periodOperatingCost: 0,
     salesRecordRows: 0,
     undeliveredQty: 0,
@@ -478,6 +488,8 @@ function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
   }, {
     onHandAmount: totals.closingOnHandInventoryCost,
     inTransitAmount: totals.closingInTransitInventoryCost,
+    onHandQty: totals.onHandQty,
+    inTransitQty: totals.inTransitQty,
     missingPriceRows: totals.closingMissingPriceRows
   }, {
     salesCost: totals.periodOperatingCost,

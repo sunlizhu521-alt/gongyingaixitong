@@ -691,6 +691,9 @@ app.post('/api/kcfx-library/inventory-turnover/export', async (req, res) => {
       未交付总数量: row.undeliveredQty,
       期间销售出库总数量: row.outboundQty,
       未交付周转天数: row.undeliveredTurnoverDays,
+      在库量: row.onHandQty,
+      在途量: row.inTransitQty,
+      库存合计: row.inventoryTotalQty,
       数据状态: row.dataStatus
     }));
     const exportRows = data.length ? data : [{ 提示: '暂无数据' }];

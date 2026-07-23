@@ -60,6 +60,9 @@ const COLUMNS = [
   { key: 'undeliveredQty', label: '未交付总数量', render: (row) => formatNumber(row.undeliveredQty, 2) },
   { key: 'outboundQty', label: '期间销售出库总数量', render: (row) => formatNumber(row.outboundQty, 2) },
   { key: 'undeliveredTurnoverDays', label: '未交付周转天数', render: (row) => formatDays(row.undeliveredTurnoverDays) },
+  { key: 'onHandQty', label: '在库量', render: (row) => formatNumber(row.onHandQty, 2) },
+  { key: 'inTransitQty', label: '在途量', render: (row) => formatNumber(row.inTransitQty, 2) },
+  { key: 'inventoryTotalQty', label: '库存合计', render: (row) => formatNumber(row.inventoryTotalQty, 2) },
   { key: 'dataStatus', label: '数据状态' }
 ];
 
@@ -302,6 +305,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
             <p><strong>平均库存成本</strong> =（对应期初库存成本 + 对应期末库存成本）÷ 2</p>
             <p><strong>未交付周转天数</strong> = 期间天数 ×（未交付总数量 ÷ 期间销售出库总数量）</p>
             <p><strong>成本计算</strong> = 应收数量 × 2026年结算价；<strong>未交付数量</strong> = 采购订单剩余入库数量</p>
+            <p><strong>库存合计</strong> = 在库量 + 在途量 + 未交付总数量</p>
           </div>
           <ol>
             <li>
