@@ -1547,6 +1547,21 @@ th {
   white-space: nowrap;
 }
 
+.turnover-metric-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.turnover-metric-scroll .kcfx-metric-grid {
+  width: max(100%, 1020px);
+  grid-template-columns: repeat(6, minmax(150px, 1fr));
+}
+
+.turnover-metric-scroll .kcfx-metric-card {
+  min-width: 0;
+}
+
 .kcfx-react-page .dashboard-grid.receipt-chart-grid.turnover-chart-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

@@ -265,20 +265,22 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
         </div>
       )}
 
-      <MetricCards metrics={[
-        { label: '期初在库库存成本', value: formatAmount(metrics.openingOnHandInventoryCost) },
-        { label: '期初在途库存成本', value: formatAmount(metrics.openingInTransitInventoryCost) },
-        { label: '期末在库库存成本', value: formatAmount(metrics.closingOnHandInventoryCost) },
-        { label: '期末在途库存成本', value: formatAmount(metrics.closingInTransitInventoryCost) },
-        { label: '平均在库库存成本', value: formatAmount(metrics.averageOnHandInventoryCost) },
-        { label: '平均在途库存成本', value: formatAmount(metrics.averageInTransitInventoryCost) },
-        { label: '月均销售产品成本', value: formatAmount(metrics.monthlyAverageSalesCost) },
-        { label: '期间营业成本', value: formatAmount(metrics.periodOperatingCost) },
-        { label: '在库量存货周转天数', value: formatDays(metrics.onHandInventoryTurnoverDays) },
-        { label: '在途量存货周转天数', value: formatDays(metrics.inTransitInventoryTurnoverDays) },
-        { label: '未交付总数量', value: formatNumber(metrics.undeliveredQty, 2) },
-        { label: '未交付周转天数', value: formatDays(metrics.undeliveredTurnoverDays) }
-      ]} />
+      <div className="turnover-metric-scroll">
+        <MetricCards metrics={[
+          { label: '期初在库库存成本', value: formatAmount(metrics.openingOnHandInventoryCost) },
+          { label: '期初在途库存成本', value: formatAmount(metrics.openingInTransitInventoryCost) },
+          { label: '期末在库库存成本', value: formatAmount(metrics.closingOnHandInventoryCost) },
+          { label: '期末在途库存成本', value: formatAmount(metrics.closingInTransitInventoryCost) },
+          { label: '平均在库库存成本', value: formatAmount(metrics.averageOnHandInventoryCost) },
+          { label: '平均在途库存成本', value: formatAmount(metrics.averageInTransitInventoryCost) },
+          { label: '月均销售产品成本', value: formatAmount(metrics.monthlyAverageSalesCost) },
+          { label: '期间营业成本', value: formatAmount(metrics.periodOperatingCost) },
+          { label: '在库量存货周转天数', value: formatDays(metrics.onHandInventoryTurnoverDays) },
+          { label: '在途量存货周转天数', value: formatDays(metrics.inTransitInventoryTurnoverDays) },
+          { label: '未交付总数量', value: formatNumber(metrics.undeliveredQty, 2) },
+          { label: '未交付周转天数', value: formatDays(metrics.undeliveredTurnoverDays) }
+        ]} />
+      </div>
 
       <PanelGrid className="turnover-chart-grid">
         <TurnoverComparison title="事业部在库量、在途量存货周转天数与未交付周转天数" rows={payload?.charts?.department || []} />
