@@ -4,7 +4,7 @@ import { BarPanel, KcfxPageShell, MetricCards, PanelGrid, SimpleTable, SourcePan
 import { FilterToolbar, useDashboardFilters } from './KcfxFilters.jsx';
 import { readFeedbackDrafts, writeFeedbackDrafts } from './feedbackDraftStorage.js';
 import { downloadKcfxRowsAsXlsx } from './kcfxExport.js';
-import { formatNumber, getCachedSalesRows, groupSum, recordSourceText, sum, uniqueCount } from './kcfxUtils.js';
+import { formatNumber, getCachedSalesRows, groupSum, recordSourceText, SALES_CLASSIFICATION_NOTE, sum, uniqueCount } from './kcfxUtils.js';
 import { useKcfxRecordMap, useKcfxSalesRows } from './kcfxRecordLoader.js';
 
 const SALES_ANALYSIS_RECORD_IDS = ['sales-data', 'dim-product', 'dim-store-name', 'dim-customer-material', 'dim-warehouse'];
@@ -189,7 +189,7 @@ export default function SalesAnalysisPage({ user = null, kcfxData = null, kcfxRe
     <KcfxPageShell
       title="月度销售数据"
       status={status}
-      note="销售口径与销售汇总报表一致，默认显示真实交易、非内部交易和成品；无法匹配的数据可通过对应筛选器查看。"
+      note={SALES_CLASSIFICATION_NOTE}
       loading={recordsLoading}
       onRefresh={refresh}
     >

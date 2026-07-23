@@ -10,6 +10,13 @@ import { selectInventoryTrendPrice } from '../../shared/kcfxTrendPrice.js';
 
 export { INVENTORY_TREND_MONTHS };
 export const KCFX_COLORS = ['#007aff', '#34c759', '#ff9f0a', '#af52de', '#ff375f', '#5ac8fa', '#5856d6', '#30d158', '#bf5af2', '#ff6b35'];
+export const SALES_CLASSIFICATION_NOTE = [
+  '统计口径：',
+  '销售数量取“应收数量”，销售金额取“销售额-不含税”。三个条件默认选择“真实交易、非内部交易、成品”。',
+  '1、是否真实交易按销售仓库匹配一级仓库分类；销售仓库为空时默认为“真实交易”，系统集成仓库为“非真实交易”，其他已匹配仓库为“真实交易”，仓库不为空但无法匹配时为“未匹配”；',
+  '2、是否内部交易按客户名称+物料编码匹配销售部门，内部交易显示“内部交易”，其他显示“非内部交易”；',
+  '3、是否成品按商品维表判断，销售产品线为“其他/配件”或“健康办公”，或一级分类为“配件”或“护理床附件”时显示“非成品”；无法匹配均显示“未匹配”。'
+].join('\n');
 
 const AGE_BUCKET_DEFINITIONS = [
   { label: '0-30天', candidates: ['(0天到30天)数量(库存)', '0-30天数量', '0-30天库存数量', '0-30天结余库存数量', '0-30天库龄数量', '0-30天'] },
@@ -658,7 +665,8 @@ function getSalesTaxExcludedAmount(row) {
 }
 
 function classifyRealTransaction(warehouse, warehouseInfo) {
-  if (!normalizeText(warehouse) || !warehouseInfo || !normalizeText(warehouseInfo.type)) return '未匹配';
+  if (!normalizeText(warehouse)) return '真实交易';
+  if (!warehouseInfo || !normalizeText(warehouseInfo.type)) return '未匹配';
   const warehouseType = normalizeText(warehouseInfo.type);
   return warehouseType === '系统集成仓库' || warehouseType === '系统集成仓' ? '非真实交易' : '真实交易';
 }
