@@ -13,7 +13,7 @@ export const KCFX_COLORS = ['#007aff', '#34c759', '#ff9f0a', '#af52de', '#ff375f
 export const SALES_CLASSIFICATION_NOTE = [
   '统计口径：',
   '销售数量取“应收数量”，销售金额取“销售额-不含税”。三个条件默认选择“真实交易、非内部交易、成品”。',
-  '1、是否真实交易按销售仓库匹配一级仓库分类；销售仓库为空时默认为“真实交易”，系统集成仓库为“非真实交易”，其他已匹配仓库为“真实交易”，仓库不为空但无法匹配时为“未匹配”；',
+  '1、是否真实交易先按客户名称+物料编码匹配销售部门：无法匹配为“未匹配”，内部交易为“非真实交易”；其余数据再按销售仓库匹配一级仓库分类，仓库为空为“真实交易”，仓库不为空但无法匹配或一级分类为空为“未匹配”，系统集成仓或系统集成仓库为“非真实交易”，其他已匹配仓库为“真实交易”；',
   '2、是否内部交易按客户名称+物料编码匹配销售部门，内部交易显示“内部交易”，其他显示“非内部交易”；',
   '3、是否成品按商品维表判断，销售产品线为“其他/配件”或“健康办公”，或一级分类为“配件”或“护理床附件”时显示“非成品”；无法匹配均显示“未匹配”。'
 ].join('\n');
@@ -492,6 +492,7 @@ export function getSalesRows(records, { includeExcluded = false } = {}) {
     const salesOrg = departmentMap.get(departmentKey) || '';
     const warehouse = getSalesWarehouseName(row);
     const warehouseInfo = warehouseMap.get(warehouse);
+    const nonInternalTransactionStatus = classifyNonInternalTransaction(salesOrg);
     return {
       sourceRow: row,
       salesMonth,
@@ -512,8 +513,8 @@ export function getSalesRows(records, { includeExcluded = false } = {}) {
       model: product.model || '',
       warehouse,
       warehouseType: warehouseInfo?.type || '',
-      realTransactionStatus: classifyRealTransaction(warehouse, warehouseInfo),
-      nonInternalTransactionStatus: classifyNonInternalTransaction(salesOrg),
+      realTransactionStatus: classifyRealTransaction(nonInternalTransactionStatus, warehouse, warehouseInfo),
+      nonInternalTransactionStatus,
       finishedGoodsStatus: classifyFinishedGoods(product, productMatched),
       qty: getSalesReceivableQty(row),
       amount: getSalesTaxExcludedAmount(row),
@@ -664,7 +665,9 @@ function getSalesTaxExcludedAmount(row) {
   ]);
 }
 
-function classifyRealTransaction(warehouse, warehouseInfo) {
+function classifyRealTransaction(nonInternalTransactionStatus, warehouse, warehouseInfo) {
+  if (nonInternalTransactionStatus === '未匹配') return '未匹配';
+  if (nonInternalTransactionStatus === '内部交易') return '非真实交易';
   if (!normalizeText(warehouse)) return '真实交易';
   if (!warehouseInfo || !normalizeText(warehouseInfo.type)) return '未匹配';
   const warehouseType = normalizeText(warehouseInfo.type);

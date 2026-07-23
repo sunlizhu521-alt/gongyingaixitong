@@ -63,7 +63,7 @@ test('采购订单事业部只保留第一个星号前的内容', () => {
 
 test('库存汇总按海上在途精确分段并排除汇总行', () => {
   const cache = buildInventorySummaryCache(sampleRecords(), 'saved-at');
-  assert.equal(cache.version, 16);
+  assert.equal(cache.version, 17);
   assert.equal(cache.inventoryViews.onHand.length, 2);
   assert.equal(cache.inventoryViews.onHand.reduce((sum, row) => sum + row.qty, 0), 12);
   assert.equal(cache.inventoryViews.inTransit.length, 1);
@@ -207,7 +207,6 @@ test('销售汇总保留全部交易并按三个独立条件分类筛选', () =>
     { 匹配键: '客户A1003', 销售部门: '内部交易' },
     { 匹配键: '客户A1004', 销售部门: '海外事业一部' },
     { 匹配键: '客户A1005', 销售部门: '海外事业一部' },
-    { 匹配键: '客户A1006', 销售部门: '海外事业一部' },
     { 匹配键: '客户A9999', 销售部门: '海外事业一部' }
   ]);
   records['sales-data'] = record([
@@ -227,10 +226,10 @@ test('销售汇总保留全部交易并按三个独立条件分类筛选', () =>
     [
       ['1001', '真实交易', '非内部交易', '成品'],
       ['1002', '非真实交易', '非内部交易', '非成品'],
-      ['1003', '真实交易', '内部交易', '非成品'],
+      ['1003', '非真实交易', '内部交易', '非成品'],
       ['1004', '真实交易', '非内部交易', '非成品'],
       ['1005', '真实交易', '非内部交易', '非成品'],
-      ['1006', '未匹配', '非内部交易', '未匹配'],
+      ['1006', '未匹配', '未匹配', '未匹配'],
       ['9999', '真实交易', '非内部交易', '未匹配']
     ]
   );
@@ -250,21 +249,24 @@ test('销售汇总保留全部交易并按三个独立条件分类筛选', () =>
   assert.deepEqual(qualified.options.finishedGoodsStatus, ['成品', '非成品', '未匹配']);
   assert.deepEqual(qualified.options.salesMonth, ['2026-01']);
 
-  assert.equal(queryInventorySummary(cache, {
+  assert.deepEqual(queryInventorySummary(cache, {
     report: 'sales', filters: { realTransactionStatus: ['非真实交易'] }
-  }).rows[0].materialCode, '1002');
+  }).rows.map((row) => row.materialCode), ['1002', '1003']);
   assert.equal(queryInventorySummary(cache, {
     report: 'sales', filters: { realTransactionStatus: ['未匹配'] }
   }).rows[0].materialCode, '1006');
   assert.equal(queryInventorySummary(cache, {
     report: 'sales', filters: { nonInternalTransactionStatus: ['内部交易'] }
   }).rows[0].materialCode, '1003');
+  assert.equal(queryInventorySummary(cache, {
+    report: 'sales', filters: { nonInternalTransactionStatus: ['未匹配'] }
+  }).rows[0].materialCode, '1006');
   assert.deepEqual(queryInventorySummary(cache, {
     report: 'sales', filters: { finishedGoodsStatus: ['非成品'] }
   }).rows.map((row) => row.materialCode).sort(), ['1002', '1003', '1004', '1005']);
   assert.deepEqual(exportInventorySummaryRows(cache, {
     report: 'sales', filters: { finishedGoodsStatus: ['未匹配'] }
-  }).map((row) => row.materialCode), ['1006', '9999']);
+  }).map((row) => row.materialCode), ['9999', '1006']);
   assert.deepEqual(queryInventorySummary(cache, {
     report: 'sales', filters: { finishedGoodsStatus: ['不存在'] }
   }).options.salesMonth, ['2026-01']);
