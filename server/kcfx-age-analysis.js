@@ -10,7 +10,7 @@ import {
   latestInventoryAgeSlotId
 } from '../shared/kcfxAgeMonths.js';
 
-export const KCFX_AGE_ANALYSIS_VERSION = 4;
+export const KCFX_AGE_ANALYSIS_VERSION = 5;
 
 export const AGE_ANALYSIS_FILTER_FIELDS = [
   'month',
@@ -128,6 +128,11 @@ function firstValue(row, names) {
   return entries.find((entry) => candidates.some((candidate) => candidate.length >= 4 && entry.key.includes(candidate)))?.value ?? '';
 }
 
+function hasHeader(row, names) {
+  const candidates = names.map(normalizeHeader);
+  return rowEntries(row).some(([key]) => candidates.includes(normalizeHeader(key)));
+}
+
 function toNumber(value) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
   const parsed = Number(normalizeText(value).replace(/[,，\s元]/g, ''));
@@ -153,6 +158,16 @@ function buildMaps(records) {
   for (const row of records['dim-product']?.rows || []) {
     const materialCode = normalizeMaterialCode(firstValue(row, ['物料编码', '货品编码', '商品编码']) || nthValue(row, 1));
     if (!materialCode || products.has(materialCode)) continue;
+    const settlementPriceHeaders = [
+      '结算价(含税)',
+      '结算价（含税）',
+      '结算价含税',
+      '结算价',
+      '内部结算价',
+      '26年内部结算价',
+      '2026年内部结算价'
+    ];
+    const settlementPriceValue = firstValue(row, settlementPriceHeaders);
     products.set(materialCode, {
       sku: normalizeText(firstValue(row, ['SKU']) || nthValue(row, 3)),
       materialName: normalizeText(firstValue(row, ['金蝶名称', '物料名称', '商品名称']) || nthValue(row, 4)),
@@ -160,8 +175,7 @@ function buildMaps(records) {
       productLine: normalizeText(firstValue(row, ['销售产品线', '产品线']) || nthValue(row, 7)),
       productSeries: normalizeText(firstValue(row, ['销售系列', '产品系列', '系列']) || nthValue(row, 8)),
       settlementPrice: toNumber(
-        firstValue(row, ['结算价(含税)', '结算价（含税）', '结算价含税', '结算价', '内部结算价'])
-        || nthValue(row, 10)
+        hasHeader(row, settlementPriceHeaders) ? settlementPriceValue : nthValue(row, 10)
       )
     });
   }
