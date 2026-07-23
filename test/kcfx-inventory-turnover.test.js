@@ -233,6 +233,8 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.doesNotMatch(authPage, /setAuthMode\('register'\)/);
   assert.equal((authPage.match(/auth-switch-button/g) || []).length, 1);
   assert.match(styles, /\.turnover-chart-heading h3[\s\S]*white-space:\s*nowrap/);
+  assert.match(styles, /\.turnover-comparison-panel\s*\{[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\)/);
+  assert.match(styles, /\.turnover-comparison-rows\s*\{[\s\S]*align-content:\s*start/);
 });
 
 function rowsForMonth(qty) {

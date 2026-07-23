@@ -1553,6 +1553,7 @@ th {
 
 .turnover-comparison-panel {
   min-width: 0;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .turnover-chart-heading,
@@ -1606,6 +1607,7 @@ th {
 
 .turnover-comparison-rows {
   display: grid;
+  align-content: start;
   gap: 10px;
   margin-top: 14px;
 }
