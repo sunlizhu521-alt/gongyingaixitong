@@ -10,14 +10,16 @@ const FILTERS = [
   { id: 'productLine', field: 'productLine', allLabel: '全部产品线' },
   { id: 'productSeries', field: 'productSeries', allLabel: '全部销售系列' },
   { id: 'nonInternalTransactionStatus', field: 'nonInternalTransactionStatus', allLabel: '全部内部交易状态' },
-  { id: 'finishedGoodsStatus', field: 'finishedGoodsStatus', allLabel: '全部成品状态' }
+  { id: 'finishedGoodsStatus', field: 'finishedGoodsStatus', allLabel: '全部成品状态' },
+  { id: 'hasSalesData', field: 'hasSalesData', allLabel: '是否有销售数据' }
 ];
 const DEFAULT_FILTERS = {
   department: [],
   productLine: [],
   productSeries: [],
   nonInternalTransactionStatus: ['非内部交易'],
-  finishedGoodsStatus: ['成品']
+  finishedGoodsStatus: ['成品'],
+  hasSalesData: ['有销售数据']
 };
 const PAGE_SIZE = 20;
 
@@ -191,25 +193,6 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
 
   return (
     <KcfxPageShell title="库存周转天数" status={status} loading={loading} onRefresh={refresh}>
-      <section className="toolbar turnover-period-toolbar">
-        <label className="turnover-period-input">
-          <span>期间（月）</span>
-          <input
-            type="number"
-            min="1"
-            max={maxMonths}
-            step="1"
-            value={periodMonths}
-            onChange={(event) => {
-              const next = Math.min(maxMonths, Math.max(1, Math.trunc(Number(event.target.value) || 1)));
-              setPeriodMonths(next);
-              setPage(1);
-            }}
-          />
-        </label>
-        {period && <strong className="turnover-period-range">{period.startDate} 至 {period.endDate} · {period.days}天</strong>}
-      </section>
-
       <FilterToolbar
         filters={FILTERS}
         optionsById={optionsById}
@@ -218,6 +201,24 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
         setOpenFilter={setOpenFilter}
         setFilterValue={setFilterValue}
         resetFilters={resetFilters}
+        className="turnover-filter-toolbar"
+        leadingContent={(
+          <label className="turnover-period-input">
+            <span>期间（月）</span>
+            <input
+              type="number"
+              min="1"
+              max={maxMonths}
+              step="1"
+              value={periodMonths}
+              onChange={(event) => {
+                const next = Math.min(maxMonths, Math.max(1, Math.trunc(Number(event.target.value) || 1)));
+                setPeriodMonths(next);
+                setPage(1);
+              }}
+            />
+          </label>
+        )}
       />
 
       <section className="turnover-formulas" aria-label="计算公式">

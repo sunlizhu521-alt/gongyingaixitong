@@ -13,7 +13,7 @@ import {
   rowsOf
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_TURNOVER_VERSION = 2;
+export const KCFX_INVENTORY_TURNOVER_VERSION = 3;
 export const INVENTORY_TURNOVER_PAGE_SIZE = 20;
 
 const GROUP_SEPARATOR = '\u001f';
@@ -134,6 +134,7 @@ function addMetric(map, key, values) {
     qty: 0,
     amount: 0,
     salesCost: 0,
+    salesRecordRows: 0,
     receivableQty: 0,
     outboundQty: 0,
     undeliveredQty: 0,
@@ -229,6 +230,7 @@ function buildSalesMonths(records, productMap) {
       receivableQty: Number(row.qty) || 0,
       outboundQty: Number(row.outboundQty) || 0,
       salesCost: (Number(row.qty) || 0) * settlementPrice,
+      salesRecordRows: 1,
       missingPriceRows: settlementPrice || (!(Number(row.qty) || 0) && !(Number(row.outboundQty) || 0)) ? 0 : 1
     });
     if (!settlementPrice && ((Number(row.qty) || 0) || (Number(row.outboundQty) || 0))) {
@@ -322,6 +324,7 @@ function calculateRow(identity, opening, closing, sales, undelivered, period, op
   const closingInventoryCost = Number(closing?.amount) || 0;
   const averageInventoryCost = (openingInventoryCost + closingInventoryCost) / 2;
   const periodOperatingCost = Number(sales?.salesCost) || 0;
+  const salesRecordRows = Number(sales?.salesRecordRows) || 0;
   const monthlyAverageSalesCost = periodOperatingCost / period.months;
   const outboundQty = Number(sales?.outboundQty) || 0;
   const undeliveredQty = Number(undelivered?.undeliveredQty) || 0;
@@ -343,6 +346,8 @@ function calculateRow(identity, opening, closing, sales, undelivered, period, op
     averageInventoryCost,
     monthlyAverageSalesCost,
     periodOperatingCost,
+    salesRecordRows,
+    hasSalesData: salesRecordRows > 0 ? '有销售数据' : '无销售数据',
     inventoryTurnoverDays: periodOperatingCost > 0
       ? period.days * (averageInventoryCost / periodOperatingCost)
       : null,
@@ -364,6 +369,7 @@ function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
     openingInventoryCost: result.openingInventoryCost + row.openingInventoryCost,
     closingInventoryCost: result.closingInventoryCost + row.closingInventoryCost,
     periodOperatingCost: result.periodOperatingCost + row.periodOperatingCost,
+    salesRecordRows: result.salesRecordRows + row.salesRecordRows,
     undeliveredQty: result.undeliveredQty + row.undeliveredQty,
     outboundQty: result.outboundQty + row.outboundQty,
     openingMissingPriceRows: result.openingMissingPriceRows + row.openingMissingPriceRows,
@@ -373,6 +379,7 @@ function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
     openingInventoryCost: 0,
     closingInventoryCost: 0,
     periodOperatingCost: 0,
+    salesRecordRows: 0,
     undeliveredQty: 0,
     outboundQty: 0,
     openingMissingPriceRows: 0,
@@ -387,6 +394,7 @@ function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
     missingPriceRows: totals.closingMissingPriceRows
   }, {
     salesCost: totals.periodOperatingCost,
+    salesRecordRows: totals.salesRecordRows,
     outboundQty: totals.outboundQty,
     missingPriceRows: totals.salesMissingPriceRows
   }, {
@@ -402,7 +410,8 @@ function inputFilters(input) {
   if (input?.filters && typeof input.filters === 'object') return input.filters;
   return {
     nonInternalTransactionStatus: ['非内部交易'],
-    finishedGoodsStatus: ['成品']
+    finishedGoodsStatus: ['成品'],
+    hasSalesData: ['有销售数据']
   };
 }
 
@@ -483,15 +492,20 @@ function inventoryTurnoverOptions(cache) {
     productLine: sortText(values.productLine),
     productSeries: sortText(values.productSeries),
     nonInternalTransactionStatus: sortPreferred(values.nonInternalTransactionStatus, statusOrder),
-    finishedGoodsStatus: sortPreferred(values.finishedGoodsStatus, finishedOrder)
+    finishedGoodsStatus: sortPreferred(values.finishedGoodsStatus, finishedOrder),
+    hasSalesData: ['有销售数据', '无销售数据']
   };
 }
 
-function missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth) {
+function missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, sales) {
   const inventoryMonths = new Set([openingSnapshotMonth, period.endMonth]);
   const salesMonths = new Set(period.monthList);
   return (cache.missingPriceRecords || []).filter((row) => {
     if (!matchesFilters(row, filters, ['department', 'productLine', 'productSeries'])) return false;
+    const hasSalesData = sales.has(groupKey(row.department, row.productLine))
+      ? '有销售数据'
+      : '无销售数据';
+    if (!matchesFilters({ hasSalesData }, filters, ['hasSalesData'])) return false;
     if (row.sourceType === '库存快照') return inventoryMonths.has(row.month);
     return salesMonths.has(row.month)
       && matchesFilters(row, filters, ['nonInternalTransactionStatus', 'finishedGoodsStatus']);
@@ -560,10 +574,11 @@ export function queryInventoryTurnover(cache, input = {}) {
     a.department.localeCompare(b.department, 'zh-CN')
     || a.productLine.localeCompare(b.productLine, 'zh-CN')
   ));
-  const metrics = aggregateCalculatedRows(allRows, {}, period, openingApproximate);
-  const missingPriceRows = missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth);
+  const filteredRows = allRows.filter((row) => matchesFilters(row, filters, ['hasSalesData']));
+  const metrics = aggregateCalculatedRows(filteredRows, {}, period, openingApproximate);
+  const missingPriceRows = missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, sales);
   const pageSize = INVENTORY_TURNOVER_PAGE_SIZE;
-  const totalRows = allRows.length;
+  const totalRows = filteredRows.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
   const page = Math.min(Math.max(1, Math.trunc(Number(input.page) || 1)), totalPages);
   return {
@@ -583,8 +598,8 @@ export function queryInventoryTurnover(cache, input = {}) {
     },
     metrics,
     charts: {
-      department: chartRows(allRows, 'department', period, openingApproximate),
-      productLine: chartRows(allRows, 'productLine', period, openingApproximate)
+      department: chartRows(filteredRows, 'department', period, openingApproximate),
+      productLine: chartRows(filteredRows, 'productLine', period, openingApproximate)
     },
     diagnostics: {
       openingApproximate,
@@ -593,7 +608,7 @@ export function queryInventoryTurnover(cache, input = {}) {
       commonMonths: cache.commonMonths
     },
     options: inventoryTurnoverOptions(cache),
-    rows: allRows.slice((page - 1) * pageSize, page * pageSize),
+    rows: filteredRows.slice((page - 1) * pageSize, page * pageSize),
     pagination: { page, pageSize, totalPages, totalRows }
   };
 }
@@ -618,10 +633,13 @@ export function exportInventoryTurnoverRows(cache, input = {}) {
 export function exportInventoryTurnoverMissingPriceRows(cache, input = {}) {
   const result = queryInventoryTurnover(cache, { ...input, page: 1 });
   if (result.status !== 'ready') return [];
+  const filters = inputFilters(input);
+  const sales = aggregateSalesComponents(cache, result.period, filters);
   return missingPriceRowsForQuery(
     cache,
     result.period,
-    inputFilters(input),
-    result.period.openingSnapshotMonth
+    filters,
+    result.period.openingSnapshotMonth,
+    sales
   );
 }

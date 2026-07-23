@@ -43,16 +43,6 @@ export default function AuthPage({
             />
           </label>
           <button>登录</button>
-          <button
-            type="button"
-            className="ghost auth-switch-button"
-            onClick={() => {
-              setAuthMode('register');
-              setMessage('');
-            }}
-          >
-            注册
-          </button>
           {message && <p className="message">{message}</p>}
         </form>
       ) : (

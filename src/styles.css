@@ -1447,6 +1447,10 @@ th {
   color: #16324f;
 }
 
+.turnover-period-input span {
+  white-space: nowrap;
+}
+
 .turnover-period-input input {
   width: 76px;
   height: 36px;
@@ -1456,6 +1460,27 @@ th {
   text-align: center;
   font: inherit;
   background: #fff;
+}
+
+.turnover-filter-toolbar .filter-row {
+  flex-wrap: nowrap;
+}
+
+.turnover-filter-toolbar .multi-filter {
+  width: 140px;
+}
+
+.turnover-filter-toolbar .multi-filter-button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.turnover-filter-toolbar .turnover-period-input {
+  flex: 0 0 150px;
+}
+
+.turnover-filter-toolbar .turnover-period-input input {
+  width: 54px;
 }
 
 .turnover-period-shortcuts {
@@ -1524,7 +1549,11 @@ th {
 }
 
 .turnover-chart-heading {
-  min-height: 44px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  justify-items: start;
+  min-height: 58px;
 }
 
 .turnover-chart-heading h3,
@@ -1534,7 +1563,9 @@ th {
 
 .turnover-chart-heading h3 {
   flex: 1 1 auto;
+  font-size: 16px;
   line-height: 1.45;
+  white-space: nowrap;
 }
 
 .turnover-chart-heading > span {
@@ -1632,11 +1663,19 @@ th {
   }
 }
 
+@media (max-width: 1200px) {
+  .turnover-filter-toolbar .filter-row {
+    flex-wrap: wrap;
+  }
+
+  .turnover-filter-toolbar .multi-filter {
+    width: min(210px, 100%);
+  }
+}
+
 @media (max-width: 640px) {
-  .turnover-period-toolbar {
-    display: grid;
-    grid-template-columns: 1fr;
-    align-items: stretch;
+  .turnover-filter-toolbar .turnover-period-input {
+    flex-basis: 100%;
   }
 
   .turnover-comparison-row {
@@ -1644,8 +1683,11 @@ th {
   }
 
   .turnover-chart-heading {
-    align-items: flex-start;
-    flex-direction: column;
+    min-height: 54px;
+  }
+
+  .turnover-chart-heading h3 {
+    font-size: 13px;
   }
 
   .turnover-warning {

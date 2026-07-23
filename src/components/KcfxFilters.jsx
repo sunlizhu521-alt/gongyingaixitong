@@ -74,10 +74,24 @@ export function useDashboardFilters(rows, filters, { searchFields = [], searchVa
   };
 }
 
-export function FilterToolbar({ filters, optionsById, selections, openFilter, setOpenFilter, setFilterValue, resetFilters, searchValue, setSearchValue, searchPlaceholder = '搜索' }) {
+export function FilterToolbar({
+  filters,
+  optionsById,
+  selections,
+  openFilter,
+  setOpenFilter,
+  setFilterValue,
+  resetFilters,
+  searchValue,
+  setSearchValue,
+  searchPlaceholder = '搜索',
+  leadingContent = null,
+  className = ''
+}) {
   return (
-    <section className="toolbar filter-toolbar" onClick={(event) => event.stopPropagation()}>
+    <section className={`toolbar filter-toolbar ${className}`.trim()} onClick={(event) => event.stopPropagation()}>
       <div className="filter-row">
+        {leadingContent}
         {filters.map((filter) => (
           filter.type === 'month' ? (
             <MonthCalendarFilter
