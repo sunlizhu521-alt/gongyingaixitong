@@ -83,7 +83,7 @@ const COLUMNS = [
 
 export default function InventoryTurnoverPage({ user = null, kcfxData = null, onRefresh }) {
   const [endMonth, setEndMonth] = useState('');
-  const [periodMonths, setPeriodMonths] = useState(3);
+  const [periodMonths, setPeriodMonths] = useState(1);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
   const [openFilter, setOpenFilter] = useState('');
