@@ -547,9 +547,9 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.doesNotMatch(page, /未交付覆盖天数|inventoryTurnoverDays|undeliveredCoverageDays/);
   assert.match(page, /className="turnover-metric-scroll"[\s\S]*<MetricCards/);
   assert.match(page, /库存段周转汇总[\s\S]*payload\?\.segmentSummary[\s\S]*SEGMENT_SUMMARY_COLUMNS/);
-  assert.match(page, /inventorySegment', label: '库存段'[\s\S]*openingInventoryCost', label: '期初库存成本'[\s\S]*closingInventoryCost', label: '期末库存成本'[\s\S]*averageInventoryCost', label: '平均库存成本'[\s\S]*turnoverDays', label: '存货周转天数'[\s\S]*periodOperatingCost', label: '期间营业成本'/);
+  assert.match(page, /inventorySegment', label: '库存段'[\s\S]*openingInventoryCost', label: '期初库存成本'[\s\S]*closingInventoryCost', label: '期末库存成本'[\s\S]*averageInventoryCost', label: '平均库存成本'[\s\S]*periodOperatingCost', label: '期间营业成本'[\s\S]*turnoverDays', label: '存货周转天数'/);
   assert.match(page, /inventory-turnover\/segment-summary\/export[\s\S]*库存段周转汇总_/);
-  assert.match(routes, /库存段: row\.inventorySegment,[\s\S]*期初库存成本: row\.openingInventoryCost,[\s\S]*存货周转天数: row\.turnoverDays,[\s\S]*期间营业成本: row\.periodOperatingCost/);
+  assert.match(routes, /库存段: row\.inventorySegment,[\s\S]*期初库存成本: row\.openingInventoryCost,[\s\S]*期间营业成本: row\.periodOperatingCost,[\s\S]*存货周转天数: row\.turnoverDays/);
   assert.match(page, /turnover-segment-summary-formulas[\s\S]*存货周转天数[\s\S]*期间营业成本[\s\S]*平均库存成本[\s\S]*未交付存货周转天数/);
   assert.match(styles, /\.turnover-segment-summary-panel\s*\{[\s\S]*margin-top:\s*12px/);
   assert.match(styles, /\.turnover-segment-summary-panel \.kcfx-table-wrap tbody tr:last-child\s*\{[\s\S]*font-weight:\s*700/);

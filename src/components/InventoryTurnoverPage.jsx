@@ -88,8 +88,8 @@ const SEGMENT_SUMMARY_COLUMNS = [
   { key: 'openingInventoryCost', label: '期初库存成本', render: (row) => formatAmount(row.openingInventoryCost) },
   { key: 'closingInventoryCost', label: '期末库存成本', render: (row) => formatAmount(row.closingInventoryCost) },
   { key: 'averageInventoryCost', label: '平均库存成本', render: (row) => formatAmount(row.averageInventoryCost) },
-  { key: 'turnoverDays', label: '存货周转天数', render: (row) => formatDays(row.turnoverDays) },
-  { key: 'periodOperatingCost', label: '期间营业成本', render: (row) => formatAmount(row.periodOperatingCost) }
+  { key: 'periodOperatingCost', label: '期间营业成本', render: (row) => formatAmount(row.periodOperatingCost) },
+  { key: 'turnoverDays', label: '存货周转天数', render: (row) => formatDays(row.turnoverDays) }
 ];
 
 export default function InventoryTurnoverPage({ user = null, kcfxData = null, onRefresh }) {
