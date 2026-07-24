@@ -1451,7 +1451,8 @@ th {
   white-space: nowrap;
 }
 
-.turnover-period-input input {
+.turnover-period-input input,
+.turnover-period-input select {
   width: 76px;
   height: 36px;
   border: 1px solid #bfd0e3;
@@ -1488,7 +1489,8 @@ th {
   font-weight: 400;
 }
 
-.turnover-filter-toolbar .turnover-period-input input {
+.turnover-filter-toolbar .turnover-period-input input,
+.turnover-filter-toolbar .turnover-period-input select {
   width: 44px;
   height: 26px;
   border-color: rgba(255, 255, 255, 0.55);
@@ -1496,6 +1498,20 @@ th {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
   font-weight: 700;
+}
+
+.turnover-filter-toolbar .turnover-end-month-input {
+  flex-basis: 190px;
+}
+
+.turnover-filter-toolbar .turnover-end-month-input select {
+  width: 102px;
+  color-scheme: light;
+}
+
+.turnover-filter-toolbar .turnover-end-month-input option {
+  color: #16324f;
+  background: #fff;
 }
 
 .turnover-period-shortcuts {

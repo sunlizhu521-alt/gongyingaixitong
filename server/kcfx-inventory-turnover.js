@@ -13,7 +13,7 @@ import {
   rowsOf
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_TURNOVER_VERSION = 11;
+export const KCFX_INVENTORY_TURNOVER_VERSION = 12;
 export const INVENTORY_TURNOVER_PAGE_SIZE = 20;
 
 const GROUP_SEPARATOR = '\u001f';
@@ -899,8 +899,12 @@ export function queryInventoryTurnover(cache, input = {}) {
       pagination: { page: 1, pageSize: INVENTORY_TURNOVER_PAGE_SIZE, totalPages: 1, totalRows: 0 }
     };
   }
+  const requestedEndMonth = normalizeText(input.endMonth);
+  const endMonth = cache.commonMonths.includes(requestedEndMonth)
+    ? requestedEndMonth
+    : cache.latestCommonMonth;
   const period = inventoryTurnoverPeriod(
-    cache.latestCommonMonth,
+    endMonth,
     input.periodMonths,
     cache.earliestInventoryMonth
   );
@@ -937,7 +941,8 @@ export function queryInventoryTurnover(cache, input = {}) {
       openingTargetMonth: period.openingTargetMonth,
       openingSnapshotMonth,
       openingSnapshotLabel: monthLabel(openingSnapshotMonth),
-      openingApproximate
+      openingApproximate,
+      availableEndMonths: cache.commonMonths
     },
     metrics,
     charts: {

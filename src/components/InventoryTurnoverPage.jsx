@@ -42,6 +42,11 @@ function formatAmount(value) {
   return moneyWan(Number(value) || 0);
 }
 
+function formatMonthLabel(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})$/);
+  return match ? `${match[1]}年${Number(match[2])}月` : value;
+}
+
 const COLUMNS = [
   { key: 'department', label: '事业部' },
   { key: 'productLine', label: '产品线' },
@@ -73,6 +78,7 @@ const COLUMNS = [
 ];
 
 export default function InventoryTurnoverPage({ user = null, kcfxData = null, onRefresh }) {
+  const [endMonth, setEndMonth] = useState('');
   const [periodMonths, setPeriodMonths] = useState(3);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
@@ -95,13 +101,16 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
           method: 'POST',
           cache: 'no-store',
           headers: userHeaders(user, { 'Content-Type': 'application/json' }),
-          body: JSON.stringify({ periodMonths, filters, page, pageSize: PAGE_SIZE })
+          body: JSON.stringify({ endMonth, periodMonths, filters, page, pageSize: PAGE_SIZE })
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const result = await response.json();
         if (!result?.ok) throw new Error(result?.message || result?.error || '库存周转数据读取失败');
         if (cancelled) return;
         setPayload(result);
+        if (result.period?.endMonth && result.period.endMonth !== endMonth) {
+          setEndMonth(result.period.endMonth);
+        }
         if (result.period?.months && result.period.months !== periodMonths) {
           setPeriodMonths(result.period.months);
         }
@@ -118,7 +127,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [filterKey, filters, kcfxData?.savedAt, page, periodMonths, refreshVersion, user]);
+  }, [endMonth, filterKey, filters, kcfxData?.savedAt, page, periodMonths, refreshVersion, user]);
 
   const optionsById = useMemo(() => Object.fromEntries(FILTERS.map((filter) => [
     filter.id,
@@ -165,7 +174,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
       const response = await fetch(`${API}/api/kcfx-library/inventory-turnover/export`, {
         method: 'POST',
         headers: userHeaders(user, { 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ periodMonths, filters })
+        body: JSON.stringify({ endMonth, periodMonths, filters })
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
@@ -180,7 +189,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
     } finally {
       setExporting(false);
     }
-  }, [filters, periodMonths, user]);
+  }, [endMonth, filters, periodMonths, user]);
 
   const exportMissingPriceRows = useCallback(async () => {
     setExportingMissingPrice(true);
@@ -188,7 +197,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
       const response = await fetch(`${API}/api/kcfx-library/inventory-turnover/missing-price/export`, {
         method: 'POST',
         headers: userHeaders(user, { 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ periodMonths, filters })
+        body: JSON.stringify({ endMonth, periodMonths, filters })
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
@@ -203,7 +212,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
     } finally {
       setExportingMissingPrice(false);
     }
-  }, [filters, periodMonths, user]);
+  }, [endMonth, filters, periodMonths, user]);
 
   const period = payload?.period;
   const metrics = payload?.metrics || {};
@@ -237,21 +246,37 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
         resetFilters={resetFilters}
         className="turnover-filter-toolbar"
         leadingContent={(
-          <label className="turnover-period-input">
-            <span>期间（月）</span>
-            <input
-              type="number"
-              min="1"
-              max={maxMonths}
-              step="1"
-              value={periodMonths}
-              onChange={(event) => {
-                const next = Math.min(maxMonths, Math.max(1, Math.trunc(Number(event.target.value) || 1)));
-                setPeriodMonths(next);
-                setPage(1);
-              }}
-            />
-          </label>
+          <>
+            <label className="turnover-period-input turnover-end-month-input">
+              <span>截止月份</span>
+              <select
+                value={endMonth || period?.endMonth || ''}
+                onChange={(event) => {
+                  setEndMonth(event.target.value);
+                  setPage(1);
+                }}
+              >
+                {[...(period?.availableEndMonths || [])].reverse().map((month) => (
+                  <option key={month} value={month}>{formatMonthLabel(month)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="turnover-period-input">
+              <span>期间（月）</span>
+              <input
+                type="number"
+                min="1"
+                max={maxMonths}
+                step="1"
+                value={periodMonths}
+                onChange={(event) => {
+                  const next = Math.min(maxMonths, Math.max(1, Math.trunc(Number(event.target.value) || 1)));
+                  setPeriodMonths(next);
+                  setPage(1);
+                }}
+              />
+            </label>
+          </>
         )}
       />
 

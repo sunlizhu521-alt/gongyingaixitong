@@ -77,6 +77,28 @@ test('完整自然月期间正确处理大小月和闰年', () => {
   assert.equal(inventoryTurnoverPeriod('2024-03', 2, '2024-01').days, 60);
 });
 
+test('截止月份筛选使用共同可用月份并让无效月份回退到最新月', () => {
+  const records = sampleRecords();
+  records['inventory-age-2026-03'] = record([
+    { 库存组织: '组织A', 物料编码: '1001', 仓库: '销售仓', '数量(库存)': 55 },
+    { 库存组织: '组织A', 物料编码: '1001', 仓库: '海上仓', '数量(库存)': 35 }
+  ], 'inventory-age-2026-03');
+  const cache = buildInventoryTurnoverCache(records);
+  const march = queryInventoryTurnover(cache, { endMonth: '2026-03', periodMonths: 2 });
+  assert.equal(march.period.startMonth, '2026-02');
+  assert.equal(march.period.endMonth, '2026-03');
+  assert.equal(march.period.days, 59);
+  assert.deepEqual(march.period.availableEndMonths, ['2026-03', '2026-04']);
+  assert.equal(
+    exportInventoryTurnoverRows(cache, { endMonth: '2026-03', periodMonths: 2 })[0].period.endMonth,
+    '2026-03'
+  );
+  assert.equal(
+    queryInventoryTurnover(cache, { endMonth: '2026-12', periodMonths: 2 }).period.endMonth,
+    '2026-04'
+  );
+});
+
 test('周转图表按固定事业部和产品线业务顺序排列', () => {
   const rows = (names) => names.map((name) => ({ name }));
   assert.deepEqual(
@@ -471,6 +493,8 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(page, /导出缺少内部结算价明细/);
   assert.doesNotMatch(page, /近1月|近3月|近6月/);
   assert.match(page, /className="turnover-filter-toolbar"[\s\S]*leadingContent/);
+  assert.match(page, /截止月份[\s\S]*<select[\s\S]*availableEndMonths[\s\S]*期间（月）/);
+  assert.equal((page.match(/JSON\.stringify\(\{ endMonth, periodMonths, filters/g) || []).length, 3);
   assert.match(filters, /\{leadingContent\}[\s\S]*filters\.map/);
   assert.doesNotMatch(authPage, /setAuthMode\('register'\)/);
   assert.equal((authPage.match(/auth-switch-button/g) || []).length, 1);
