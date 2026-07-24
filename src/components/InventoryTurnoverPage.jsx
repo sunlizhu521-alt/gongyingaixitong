@@ -46,20 +46,26 @@ const COLUMNS = [
   { key: 'department', label: '事业部' },
   { key: 'productLine', label: '产品线' },
   { key: 'productSeries', label: '销售系列' },
-  { key: 'periodDays', label: '期间天数', render: (row) => formatNumber(row.periodDays) },
-  { key: 'openingOnHandInventoryCost', label: '期初在库库存成本', render: (row) => formatAmount(row.openingOnHandInventoryCost) },
-  { key: 'openingInTransitInventoryCost', label: '期初在途库存成本', render: (row) => formatAmount(row.openingInTransitInventoryCost) },
-  { key: 'closingOnHandInventoryCost', label: '期末在库库存成本', render: (row) => formatAmount(row.closingOnHandInventoryCost) },
-  { key: 'closingInTransitInventoryCost', label: '期末在途库存成本', render: (row) => formatAmount(row.closingInTransitInventoryCost) },
-  { key: 'averageOnHandInventoryCost', label: '平均在库库存成本', render: (row) => formatAmount(row.averageOnHandInventoryCost) },
-  { key: 'averageInTransitInventoryCost', label: '平均在途库存成本', render: (row) => formatAmount(row.averageInTransitInventoryCost) },
   { key: 'monthlyAverageSalesCost', label: '月均销售产品成本', render: (row) => formatAmount(row.monthlyAverageSalesCost) },
   { key: 'periodOperatingCost', label: '期间营业成本', render: (row) => formatAmount(row.periodOperatingCost) },
+  { key: 'periodDays', label: '期间天数', render: (row) => formatNumber(row.periodDays) },
+  { key: 'openingOnHandInventoryCost', label: '期初在库库存成本', render: (row) => formatAmount(row.openingOnHandInventoryCost) },
+  { key: 'closingOnHandInventoryCost', label: '期末在库库存成本', render: (row) => formatAmount(row.closingOnHandInventoryCost) },
+  { key: 'averageOnHandInventoryCost', label: '平均在库库存成本', render: (row) => formatAmount(row.averageOnHandInventoryCost) },
   { key: 'onHandInventoryTurnoverDays', label: '在库量存货周转天数', render: (row) => formatDays(row.onHandInventoryTurnoverDays) },
+  { key: 'openingInTransitInventoryCost', label: '期初在途库存成本', render: (row) => formatAmount(row.openingInTransitInventoryCost) },
+  { key: 'closingInTransitInventoryCost', label: '期末在途库存成本', render: (row) => formatAmount(row.closingInTransitInventoryCost) },
+  { key: 'averageInTransitInventoryCost', label: '平均在途库存成本', render: (row) => formatAmount(row.averageInTransitInventoryCost) },
   { key: 'inTransitInventoryTurnoverDays', label: '在途量存货周转天数', render: (row) => formatDays(row.inTransitInventoryTurnoverDays) },
+  { key: 'openingUndeliveredInventoryCost', label: '期初未交付库存成本', render: (row) => formatAmount(row.openingUndeliveredInventoryCost) },
+  { key: 'closingUndeliveredInventoryCost', label: '期末未交付库存成本', render: (row) => formatAmount(row.closingUndeliveredInventoryCost) },
+  { key: 'averageUndeliveredInventoryCost', label: '平均未交付库存成本', render: (row) => formatAmount(row.averageUndeliveredInventoryCost) },
+  { key: 'undeliveredTurnoverDays', label: '未交付存货周转天数', render: (row) => formatDays(row.undeliveredTurnoverDays) },
+  { key: 'openingInventoryTotalCost', label: '期初库存合计成本', render: (row) => formatAmount(row.openingInventoryTotalCost) },
+  { key: 'closingInventoryTotalCost', label: '期末库存合计成本', render: (row) => formatAmount(row.closingInventoryTotalCost) },
+  { key: 'averageInventoryTotalCost', label: '平均库存合计成本', render: (row) => formatAmount(row.averageInventoryTotalCost) },
+  { key: 'inventoryTotalTurnoverDays', label: '库存合计存货周转天数', render: (row) => formatDays(row.inventoryTotalTurnoverDays) },
   { key: 'undeliveredQty', label: '未交付总数量', render: (row) => formatNumber(row.undeliveredQty, 2) },
-  { key: 'undeliveredInventoryCost', label: '未交付库存成本', render: (row) => formatAmount(row.undeliveredInventoryCost) },
-  { key: 'undeliveredTurnoverDays', label: '未交付库存周转天数', render: (row) => formatDays(row.undeliveredTurnoverDays) },
   { key: 'onHandQty', label: '在库量', render: (row) => formatNumber(row.onHandQty, 2) },
   { key: 'inTransitQty', label: '在途量', render: (row) => formatNumber(row.inTransitQty, 2) },
   { key: 'inventoryTotalQty', label: '库存合计', render: (row) => formatNumber(row.inventoryTotalQty, 2) },
@@ -261,25 +267,52 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
       )}
 
       <div className="turnover-metric-scroll">
-        <MetricCards metrics={[
-          { label: '期初在库库存成本', value: formatAmount(metrics.openingOnHandInventoryCost) },
-          { label: '期初在途库存成本', value: formatAmount(metrics.openingInTransitInventoryCost) },
-          { label: '期末在库库存成本', value: formatAmount(metrics.closingOnHandInventoryCost) },
-          { label: '期末在途库存成本', value: formatAmount(metrics.closingInTransitInventoryCost) },
-          { label: '平均在库库存成本', value: formatAmount(metrics.averageOnHandInventoryCost) },
-          { label: '平均在途库存成本', value: formatAmount(metrics.averageInTransitInventoryCost) },
-          { label: '月均销售产品成本', value: formatAmount(metrics.monthlyAverageSalesCost) },
-          { label: '期间营业成本', value: formatAmount(metrics.periodOperatingCost) },
-          { label: '在库量存货周转天数', value: formatDays(metrics.onHandInventoryTurnoverDays) },
-          { label: '在途量存货周转天数', value: formatDays(metrics.inTransitInventoryTurnoverDays) },
-          { label: '未交付库存成本', value: formatAmount(metrics.undeliveredInventoryCost) },
-          { label: '未交付库存周转天数', value: formatDays(metrics.undeliveredTurnoverDays) }
-        ]} />
+        <div className="turnover-metric-rows">
+          <div className="turnover-metric-row turnover-metric-row-summary">
+            <MetricCards metrics={[
+              { label: '月均销售产品成本', value: formatAmount(metrics.monthlyAverageSalesCost) },
+              { label: '期间营业成本', value: formatAmount(metrics.periodOperatingCost) },
+              { label: '期间天数', value: `${formatNumber(period?.days || 0)}天` }
+            ]} />
+          </div>
+          <div className="turnover-metric-row">
+            <MetricCards metrics={[
+              { label: '期初在库库存成本', value: formatAmount(metrics.openingOnHandInventoryCost) },
+              { label: '期末在库库存成本', value: formatAmount(metrics.closingOnHandInventoryCost) },
+              { label: '平均在库库存成本', value: formatAmount(metrics.averageOnHandInventoryCost) },
+              { label: '在库量存货周转天数', value: formatDays(metrics.onHandInventoryTurnoverDays) }
+            ]} />
+          </div>
+          <div className="turnover-metric-row">
+            <MetricCards metrics={[
+              { label: '期初在途库存成本', value: formatAmount(metrics.openingInTransitInventoryCost) },
+              { label: '期末在途库存成本', value: formatAmount(metrics.closingInTransitInventoryCost) },
+              { label: '平均在途库存成本', value: formatAmount(metrics.averageInTransitInventoryCost) },
+              { label: '在途量存货周转天数', value: formatDays(metrics.inTransitInventoryTurnoverDays) }
+            ]} />
+          </div>
+          <div className="turnover-metric-row">
+            <MetricCards metrics={[
+              { label: '期初未交付库存成本', value: formatAmount(metrics.openingUndeliveredInventoryCost) },
+              { label: '期末未交付库存成本', value: formatAmount(metrics.closingUndeliveredInventoryCost) },
+              { label: '平均未交付库存成本', value: formatAmount(metrics.averageUndeliveredInventoryCost) },
+              { label: '未交付存货周转天数', value: formatDays(metrics.undeliveredTurnoverDays) }
+            ]} />
+          </div>
+          <div className="turnover-metric-row">
+            <MetricCards metrics={[
+              { label: '期初库存合计成本', value: formatAmount(metrics.openingInventoryTotalCost) },
+              { label: '期末库存合计成本', value: formatAmount(metrics.closingInventoryTotalCost) },
+              { label: '平均库存合计成本', value: formatAmount(metrics.averageInventoryTotalCost) },
+              { label: '库存合计存货周转天数', value: formatDays(metrics.inventoryTotalTurnoverDays) }
+            ]} />
+          </div>
+        </div>
       </div>
 
       <PanelGrid className="turnover-chart-grid">
-        <TurnoverComparison title="事业部在库量、在途量与未交付库存周转天数" rows={payload?.charts?.department || []} />
-        <TurnoverComparison title="产品线在库量、在途量与未交付库存周转天数" rows={payload?.charts?.productLine || []} />
+        <TurnoverComparison title="事业部在库量、在途量与未交付存货周转天数" rows={payload?.charts?.department || []} />
+        <TurnoverComparison title="产品线在库量、在途量与未交付存货周转天数" rows={payload?.charts?.productLine || []} />
       </PanelGrid>
 
       <section className="kcfx-panel turnover-detail-panel">
@@ -303,7 +336,8 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
             <p><strong>在库量存货周转天数</strong> = 期间天数 ×（平均在库库存成本 ÷ 期间营业成本）</p>
             <p><strong>在途量存货周转天数</strong> = 期间天数 ×（平均在途库存成本 ÷ 期间营业成本）</p>
             <p><strong>平均库存成本</strong> =（对应期初库存成本 + 对应期末库存成本）÷ 2</p>
-            <p><strong>未交付库存周转天数</strong> = 期间天数 ×（未交付库存成本 ÷ 期间营业成本）</p>
+            <p><strong>未交付存货周转天数</strong> = 期间天数 ×（平均未交付库存成本 ÷ 期间营业成本）</p>
+            <p><strong>库存合计存货周转天数</strong> = 期间天数 ×（平均库存合计成本 ÷ 期间营业成本）</p>
             <p><strong>销售成本</strong> = 应收数量 × 2026年结算价；<strong>未交付库存成本</strong> = 采购订单剩余入库数量 × 2026年结算价</p>
             <p><strong>库存合计</strong> = 在库量 + 在途量 + 未交付总数量</p>
           </div>
@@ -321,18 +355,21 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
               <strong>在库与在途存货周转天数：</strong>
               两项共用完整期间营业成本。在库量存货周转天数 = 期间天数 ×（平均在库库存成本 ÷ 期间营业成本）；
               在途量存货周转天数 = 期间天数 ×（平均在途库存成本 ÷ 期间营业成本）。
-              两项相加等于原存货周转天数。
+              两项相加为在库与在途部分的合计周转天数。
             </li>
             <li>
-              <strong>未交付库存周转天数：</strong>
+              <strong>未交付存货周转天数：</strong>
               采购订单当前快照的剩余入库数量乘以2026年内部结算价，得到未交付库存成本；
-              未交付库存周转天数 = 期间天数 ×（未交付库存成本 ÷ 期间营业成本）。
+              当前快照同时作为期初和期末未交付库存成本，因此平均未交付库存成本与当前快照成本相同；
+              未交付存货周转天数 = 期间天数 ×（平均未交付库存成本 ÷ 期间营业成本）。
               期间营业成本小于等于0时，对应周转天数显示“--”。
             </li>
             <li>
               <strong>页面及导出口径：</strong>
-              指标卡、库存周转明细和导出分别展示期初、期末、平均在库与在途库存成本，不再保留原总存货周转天数。
-              事业部和产品线图表每项显示在库量存货周转天数、在途量存货周转天数、未交付库存周转天数三条横柱。
+              指标卡、库存周转明细和导出分别展示期初、期末、平均在库、在途、未交付及库存合计成本。
+              库存合计成本包含在库、在途和未交付库存成本，库存合计存货周转天数使用平均库存合计成本计算。
+              在库量、在途量和未交付存货周转天数三项相加等于库存合计存货周转天数。
+              事业部和产品线图表每项显示在库量存货周转天数、在途量存货周转天数、未交付存货周转天数三条横柱。
             </li>
           </ol>
         </div>
@@ -358,7 +395,7 @@ function TurnoverComparison({ title, rows }) {
         <span>
           <i className="turnover-legend turnover-legend-on-hand" />在库量存货周转天数
           <i className="turnover-legend turnover-legend-in-transit" />在途量存货周转天数
-          <i className="turnover-legend turnover-legend-undelivered" />未交付库存周转天数
+          <i className="turnover-legend turnover-legend-undelivered" />未交付存货周转天数
         </span>
       </div>
       <div className="turnover-comparison-rows">

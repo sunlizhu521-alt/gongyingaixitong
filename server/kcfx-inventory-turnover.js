@@ -13,7 +13,7 @@ import {
   rowsOf
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_TURNOVER_VERSION = 10;
+export const KCFX_INVENTORY_TURNOVER_VERSION = 11;
 export const INVENTORY_TURNOVER_PAGE_SIZE = 20;
 
 const GROUP_SEPARATOR = '\u001f';
@@ -410,6 +410,18 @@ function calculateRow(
   const outboundQty = Number(sales?.outboundQty) || 0;
   const undeliveredQty = Number(undelivered?.undeliveredQty) || 0;
   const undeliveredInventoryCost = Number(undelivered?.undeliveredAmount) || 0;
+  const openingUndeliveredInventoryCost = undeliveredInventoryCost;
+  const closingUndeliveredInventoryCost = undeliveredInventoryCost;
+  const averageUndeliveredInventoryCost = undeliveredInventoryCost;
+  const openingInventoryTotalCost = openingOnHandInventoryCost
+    + openingInTransitInventoryCost
+    + openingUndeliveredInventoryCost;
+  const closingInventoryTotalCost = closingOnHandInventoryCost
+    + closingInTransitInventoryCost
+    + closingUndeliveredInventoryCost;
+  const averageInventoryTotalCost = (
+    openingInventoryTotalCost + closingInventoryTotalCost
+  ) / 2;
   const onHandQty = Number(closing?.onHandQty) || 0;
   const inTransitQty = Number(closing?.inTransitQty) || 0;
   const inventoryTotalQty = onHandQty + inTransitQty + undeliveredQty;
@@ -460,9 +472,18 @@ function calculateRow(
       : null,
     undeliveredQty,
     undeliveredInventoryCost,
+    openingUndeliveredInventoryCost,
+    closingUndeliveredInventoryCost,
+    averageUndeliveredInventoryCost,
+    openingInventoryTotalCost,
+    closingInventoryTotalCost,
+    averageInventoryTotalCost,
     outboundQty,
     undeliveredTurnoverDays: periodOperatingCost > 0
-      ? period.days * (undeliveredInventoryCost / periodOperatingCost)
+      ? period.days * (averageUndeliveredInventoryCost / periodOperatingCost)
+      : null,
+    inventoryTotalTurnoverDays: periodOperatingCost > 0
+      ? period.days * (averageInventoryTotalCost / periodOperatingCost)
       : null,
     onHandQty,
     inTransitQty,

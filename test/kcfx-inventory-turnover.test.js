@@ -135,8 +135,21 @@ test('在库、在途与未交付库存成本分别计算周转天数', () => {
   );
   assert.equal(result.metrics.undeliveredQty, 12);
   assert.equal(result.metrics.undeliveredInventoryCost, 120);
+  assert.equal(result.metrics.openingUndeliveredInventoryCost, 120);
+  assert.equal(result.metrics.closingUndeliveredInventoryCost, 120);
+  assert.equal(result.metrics.averageUndeliveredInventoryCost, 120);
+  assert.equal(result.metrics.openingInventoryTotalCost, 1120);
+  assert.equal(result.metrics.closingInventoryTotalCost, 920);
+  assert.equal(result.metrics.averageInventoryTotalCost, 1020);
   assert.equal(result.metrics.outboundQty, 24);
   assert.equal(result.metrics.undeliveredTurnoverDays, 89 * (120 / 300));
+  assert.equal(result.metrics.inventoryTotalTurnoverDays, 89 * (1020 / 300));
+  assert.ok(Math.abs(
+    result.metrics.onHandInventoryTurnoverDays
+      + result.metrics.inTransitInventoryTurnoverDays
+      + result.metrics.undeliveredTurnoverDays
+      - result.metrics.inventoryTotalTurnoverDays
+  ) < 1e-9);
   assert.equal(result.metrics.onHandQty, 50);
   assert.equal(result.metrics.inTransitQty, 30);
   assert.equal(result.metrics.inventoryTotalQty, 92);
@@ -422,12 +435,16 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(routes, /产品线: row\.productLine,[\s\S]*销售系列: row\.productSeries,[\s\S]*期间月数/);
   assert.match(page, /事业部＋产品线＋销售系列汇总明细/);
   assert.match(page, /在库量 = 非海上在途仓库库存；在途量 = 海上在途仓库存；未交付数量 = 采购订单剩余数量/);
-  assert.match(page, /在库量存货周转天数[\s\S]*在途量存货周转天数[\s\S]*未交付库存周转天数/);
-  assert.match(page, /key: 'undeliveredInventoryCost', label: '未交付库存成本'[\s\S]*key: 'undeliveredTurnoverDays', label: '未交付库存周转天数'[\s\S]*key: 'onHandQty', label: '在库量'[\s\S]*key: 'inTransitQty', label: '在途量'[\s\S]*key: 'inventoryTotalQty', label: '库存合计'/);
+  assert.match(page, /在库量存货周转天数[\s\S]*在途量存货周转天数[\s\S]*未交付存货周转天数[\s\S]*库存合计存货周转天数/);
+  assert.match(page, /key: 'openingUndeliveredInventoryCost', label: '期初未交付库存成本'[\s\S]*key: 'averageUndeliveredInventoryCost', label: '平均未交付库存成本'[\s\S]*key: 'undeliveredTurnoverDays', label: '未交付存货周转天数'[\s\S]*key: 'openingInventoryTotalCost', label: '期初库存合计成本'[\s\S]*key: 'inventoryTotalTurnoverDays', label: '库存合计存货周转天数'/);
   assert.doesNotMatch(page, /未交付覆盖天数|inventoryTurnoverDays|undeliveredCoverageDays/);
   assert.match(page, /className="turnover-metric-scroll"[\s\S]*<MetricCards/);
   assert.match(styles, /\.turnover-metric-scroll\s*\{[\s\S]*overflow-x:\s*auto/);
-  assert.match(styles, /\.turnover-metric-scroll \.kcfx-metric-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(6,/);
+  assert.match(page, /turnover-metric-row-summary[\s\S]*月均销售产品成本[\s\S]*期间营业成本[\s\S]*期间天数/);
+  assert.equal((page.match(/className="turnover-metric-row(?: |")/g) || []).length, 5);
+  assert.match(styles, /\.turnover-metric-row \.kcfx-metric-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,/);
+  assert.match(styles, /\.turnover-metric-row-summary \.kcfx-metric-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,/);
+  assert.match(styles, /\.turnover-metric-scroll \.kcfx-metric-card span,[\s\S]*white-space:\s*nowrap/);
   assert.match(page, /库存周转明细[\s\S]*TablePagination[\s\S]*详细计算逻辑[\s\S]*className="turnover-detail-formulas"/);
   assert.doesNotMatch(page, /className="turnover-formulas"/);
   assert.match(styles, /\.turnover-detail-formulas\s*\{[\s\S]*grid-template-columns:/);
@@ -439,14 +456,15 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(page, /按仓库维表二级仓库分类拆分库存成本[\s\S]*“海上在途”计入在途库存成本[\s\S]*其他有效库存计入在库库存成本/);
   assert.match(page, /平均在库库存成本 =（期初在库库存成本 \+ 期末在库库存成本）÷ 2/);
   assert.match(page, /平均在途库存成本 =（期初在途库存成本 \+ 期末在途库存成本）÷ 2/);
-  assert.match(page, /两项相加等于原存货周转天数/);
+  assert.match(page, /在库量、在途量和未交付存货周转天数三项相加等于库存合计存货周转天数/);
   assert.match(page, /未交付库存成本<\/strong> = 采购订单剩余入库数量 × 2026年结算价/);
-  assert.match(page, /未交付库存周转天数 = 期间天数 ×（未交付库存成本 ÷ 期间营业成本）/);
+  assert.match(page, /未交付存货周转天数 = 期间天数 ×（平均未交付库存成本 ÷ 期间营业成本）/);
+  assert.match(page, /库存合计存货周转天数<\/strong> = 期间天数 ×（平均库存合计成本 ÷ 期间营业成本）/);
   assert.match(page, /期间营业成本小于等于0时，对应周转天数显示“--”/);
   assert.match(styles, /\.turnover-calculation-details\s*\{[\s\S]*border-top:/);
   assert.match(routes, /期初在库库存成本: row\.openingOnHandInventoryCost[\s\S]*期初在途库存成本: row\.openingInTransitInventoryCost/);
-  assert.match(routes, /在库量存货周转天数: row\.onHandInventoryTurnoverDays[\s\S]*在途量存货周转天数: row\.inTransitInventoryTurnoverDays[\s\S]*未交付库存成本: row\.undeliveredInventoryCost[\s\S]*未交付库存周转天数: row\.undeliveredTurnoverDays/);
-  assert.match(routes, /未交付库存周转天数: row\.undeliveredTurnoverDays,[\s\S]*在库量: row\.onHandQty,[\s\S]*在途量: row\.inTransitQty,[\s\S]*库存合计: row\.inventoryTotalQty/);
+  assert.match(routes, /期初未交付库存成本: row\.openingUndeliveredInventoryCost[\s\S]*平均未交付库存成本: row\.averageUndeliveredInventoryCost[\s\S]*期初库存合计成本: row\.openingInventoryTotalCost[\s\S]*平均库存合计成本: row\.averageInventoryTotalCost/);
+  assert.match(routes, /未交付存货周转天数: row\.undeliveredTurnoverDays,[\s\S]*库存合计存货周转天数: row\.inventoryTotalTurnoverDays,[\s\S]*在库量: row\.onHandQty/);
   assert.match(page, /库存合计<\/strong> = 在库量 \+ 在途量 \+ 未交付总数量/);
   assert.match(page, /导出缺少内部结算价明细/);
   assert.doesNotMatch(page, /近1月|近3月|近6月/);

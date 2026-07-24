@@ -1534,13 +1534,28 @@ th {
   overflow-y: hidden;
 }
 
-.turnover-metric-scroll .kcfx-metric-grid {
-  width: max(100%, 1020px);
-  grid-template-columns: repeat(6, minmax(150px, 1fr));
+.turnover-metric-rows {
+  display: grid;
+  gap: 10px;
+  min-width: 1000px;
+}
+
+.turnover-metric-row .kcfx-metric-grid {
+  width: 100%;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+}
+
+.turnover-metric-row-summary .kcfx-metric-grid {
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
 }
 
 .turnover-metric-scroll .kcfx-metric-card {
   min-width: 0;
+}
+
+.turnover-metric-scroll .kcfx-metric-card span,
+.turnover-metric-scroll .kcfx-metric-card strong {
+  white-space: nowrap;
 }
 
 .kcfx-react-page .dashboard-grid.receipt-chart-grid.turnover-chart-grid {
