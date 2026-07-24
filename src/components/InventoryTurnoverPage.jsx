@@ -468,6 +468,16 @@ function TurnoverComparison({ title, rows, showSummaryTable = false }) {
                   <em>{formatDays(row.undeliveredTurnoverDays)}</em>
                 </div>
               </div>
+              <div
+                className="turnover-comparison-total"
+                title={`${row.name} 合计周转天数：${formatDays(row.inventoryTotalTurnoverDays)}`}
+              >
+                <span aria-hidden="true">{'}'}</span>
+                <strong>
+                  <small>合计周转天数</small>
+                  <b>{formatDays(row.inventoryTotalTurnoverDays)}</b>
+                </strong>
+              </div>
             </div>
           )) : <div className="empty">暂无数据</div>}
         </div>

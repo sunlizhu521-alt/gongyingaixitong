@@ -1662,7 +1662,7 @@ th {
 
 .turnover-comparison-row {
   display: grid;
-  grid-template-columns: minmax(86px, 150px) minmax(0, 1fr);
+  grid-template-columns: minmax(86px, 150px) minmax(0, 1fr) 138px;
   align-items: center;
   gap: 12px;
   min-height: 86px;
@@ -1730,6 +1730,41 @@ th {
   font-style: normal;
   font-weight: 700;
   text-align: right;
+}
+
+.turnover-comparison-total {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+  color: #17334d;
+}
+
+.turnover-comparison-total > span {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 70px;
+  font-weight: 400;
+  line-height: 58px;
+  transform: scaleX(0.72);
+  transform-origin: center;
+}
+
+.turnover-comparison-total > strong {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.turnover-comparison-total small {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.turnover-comparison-total b {
+  color: #0f4f91;
+  font-size: 14px;
 }
 
 .turnover-department-summary-table {
@@ -1889,7 +1924,23 @@ th {
   }
 
   .turnover-comparison-row {
-    grid-template-columns: minmax(82px, 105px) minmax(0, 1fr);
+    grid-template-columns: minmax(82px, 105px) minmax(0, 1fr) 104px;
+  }
+
+  .turnover-comparison-total {
+    grid-template-columns: 25px minmax(0, 1fr);
+  }
+
+  .turnover-comparison-total > span {
+    font-size: 60px;
+  }
+
+  .turnover-comparison-total small {
+    font-size: 9px;
+  }
+
+  .turnover-comparison-total b {
+    font-size: 12px;
   }
 
   .turnover-chart-heading {

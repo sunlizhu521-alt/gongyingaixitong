@@ -501,6 +501,10 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(page, /turnoverBarTitle\([\s\S]*期末未交付库存成本[\s\S]*closingUndeliveredInventoryCost/);
   assert.match(page, /事业部在库量、在途量与未交付存货周转天数[\s\S]*showSummaryTable/);
   assert.match(page, /turnover-department-summary-table[\s\S]*期初库存合计成本[\s\S]*期末库存合计成本[\s\S]*平均库存合计成本[\s\S]*库存合计存货周转天数/);
+  assert.match(page, /turnover-comparison-total[\s\S]*合计周转天数[\s\S]*row\.inventoryTotalTurnoverDays/);
+  assert.match(styles, /\.turnover-comparison-row\s*\{[\s\S]*grid-template-columns:\s*minmax\(86px,\s*150px\) minmax\(0,\s*1fr\) 138px/);
+  assert.match(styles, /\.turnover-comparison-total\s*\{[\s\S]*grid-template-columns:\s*32px minmax\(0,\s*1fr\)/);
+  assert.match(styles, /\.turnover-comparison-total > span\s*\{[\s\S]*font-size:\s*70px/);
   assert.match(styles, /\.turnover-comparison-content\.with-summary-table\s*\{[\s\S]*grid-template-rows:\s*minmax\(0,\s*1fr\) auto/);
   assert.match(styles, /\.turnover-department-summary-table\s*\{[\s\S]*max-height:\s*238px[\s\S]*overflow:\s*auto/);
   assert.match(page, /导出缺少内部结算价明细/);
