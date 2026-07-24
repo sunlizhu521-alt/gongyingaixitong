@@ -1600,6 +1600,22 @@ th {
   font-weight: 700;
 }
 
+.turnover-segment-summary-formulas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-top: 1px solid #d8e3ef;
+  color: #29445c;
+  font-size: 13px;
+}
+
+.turnover-segment-summary-formulas p {
+  margin: 0;
+  line-height: 1.5;
+}
+
 .kcfx-react-page .dashboard-grid.receipt-chart-grid.turnover-chart-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -2736,6 +2752,10 @@ th {
 }
 
 @media (max-width: 760px) {
+  .turnover-segment-summary-formulas {
+    grid-template-columns: 1fr;
+  }
+
   .warehouse-flow-trend-panel .table-title-row {
     flex-wrap: wrap;
   }

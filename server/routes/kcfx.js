@@ -730,7 +730,8 @@ app.post('/api/kcfx-library/inventory-turnover/segment-summary/export', async (r
       期初库存成本: row.openingInventoryCost,
       期末库存成本: row.closingInventoryCost,
       平均库存成本: row.averageInventoryCost,
-      存货周转天数: row.turnoverDays
+      存货周转天数: row.turnoverDays,
+      期间营业成本: row.periodOperatingCost
     }));
     const exportRows = data.length ? data : [{ 提示: '暂无数据' }];
     const workbook = createStyledWorkbook(ExcelJS, [{

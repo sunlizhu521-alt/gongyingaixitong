@@ -37,8 +37,8 @@ function sampleRecords() {
       { 客户名称: '客户A', 店铺简称: '店铺A' }
     ]),
     'purchase-order-data': record([
-      { 关闭状态: '未关闭', 剩余入库数量: 12, 事业部: '国内事业部*补充说明', 物料编码: '1001' },
-      { 关闭状态: '已关闭', 剩余入库数量: 100, 事业部: '国内事业部', 物料编码: '1001' }
+      { 采购组织: '组织A', 关闭状态: '未关闭', 剩余入库数量: 12, 事业部: '国内事业部*补充说明', 物料编码: '1001' },
+      { 采购组织: '组织A', 关闭状态: '已关闭', 剩余入库数量: 100, 事业部: '国内事业部', 物料编码: '1001' }
     ])
   };
   records['inventory-age-2026-01'] = record([
@@ -184,14 +184,16 @@ test('在库、在途与未交付库存成本分别计算周转天数', () => {
     openingInventoryCost: 120,
     closingInventoryCost: 120,
     averageInventoryCost: 120,
-    turnoverDays: 89 * (120 / 300)
+    turnoverDays: 89 * (120 / 300),
+    periodOperatingCost: 300
   });
   assert.deepEqual(result.segmentSummary[3], {
     inventorySegment: '合计',
     openingInventoryCost: 1120,
     closingInventoryCost: 920,
     averageInventoryCost: 1020,
-    turnoverDays: 89 * (1020 / 300)
+    turnoverDays: 89 * (1020 / 300),
+    periodOperatingCost: 300
   });
   assert.equal(result.charts.department[0].openingInventoryTotalCost, 1120);
   assert.equal(result.charts.department[0].closingInventoryTotalCost, 920);
@@ -204,6 +206,65 @@ test('在库、在途与未交付库存成本分别计算周转天数', () => {
   assert.equal(result.pagination.pageSize, 20);
   assert.equal(result.rows.length, 1);
   assert.equal(exportInventoryTurnoverRows(cache, { periodMonths: 3 }).length, 1);
+});
+
+test('库存组织与采购组织按同一采购主体筛选且销售分母不重复分摊', () => {
+  const records = sampleRecords();
+  records['dim-warehouse-material'].rows.push(
+    { 库存组织: '组织B', 仓库名称: '销售仓', 物料编码: '1001', 事业部: '国内事业部' },
+    { 库存组织: '组织B', 仓库名称: '海上仓', 物料编码: '1001', 事业部: '国内事业部' }
+  );
+  records['inventory-age-2026-01'].rows.push(
+    { 库存组织: '组织B', 物料编码: '1001', 仓库: '销售仓', '数量(库存)': 20 },
+    { 库存组织: '组织B', 物料编码: '1001', 仓库: '海上仓', '数量(库存)': 10 }
+  );
+  records['inventory-age-2026-04'].rows.push(
+    { 库存组织: '组织B', 物料编码: '1001', 仓库: '销售仓', '数量(库存)': 10 },
+    { 库存组织: '组织B', 物料编码: '1001', 仓库: '海上仓', '数量(库存)': 5 }
+  );
+  records['purchase-order-data'].rows.push({
+    采购组织: '组织B',
+    关闭状态: '未关闭',
+    剩余入库数量: 5,
+    事业部: '国内事业部',
+    物料编码: '1001'
+  });
+  const cache = buildInventoryTurnoverCache(records);
+  const all = queryInventoryTurnover(cache, { periodMonths: 3 });
+  assert.equal(all.metrics.openingOnHandInventoryCost, 800);
+  assert.equal(all.metrics.closingOnHandInventoryCost, 600);
+  assert.equal(all.metrics.undeliveredInventoryCost, 170);
+  assert.equal(all.metrics.periodOperatingCost, 300);
+  assert.deepEqual(all.options.inventoryOrganization, ['组织A', '组织B']);
+
+  const organizationA = queryInventoryTurnover(cache, {
+    periodMonths: 3,
+    filters: {
+      inventoryOrganization: ['组织A'],
+      nonInternalTransactionStatus: ['非内部交易'],
+      finishedGoodsStatus: ['成品'],
+      hasSalesData: ['有销售数据']
+    }
+  });
+  assert.equal(organizationA.metrics.openingOnHandInventoryCost, 600);
+  assert.equal(organizationA.metrics.closingOnHandInventoryCost, 500);
+  assert.equal(organizationA.metrics.undeliveredInventoryCost, 120);
+  assert.equal(organizationA.metrics.periodOperatingCost, 300);
+
+  const organizationB = queryInventoryTurnover(cache, {
+    periodMonths: 3,
+    filters: {
+      inventoryOrganization: ['组织B'],
+      nonInternalTransactionStatus: ['非内部交易'],
+      finishedGoodsStatus: ['成品'],
+      hasSalesData: ['有销售数据']
+    }
+  });
+  assert.equal(organizationB.metrics.openingOnHandInventoryCost, 200);
+  assert.equal(organizationB.metrics.closingOnHandInventoryCost, 100);
+  assert.equal(organizationB.metrics.undeliveredInventoryCost, 50);
+  assert.equal(organizationB.metrics.periodOperatingCost, 300);
+  assert.equal(organizationB.pagination.totalRows, 1);
 });
 
 test('库存段筛选按所选段裁剪成本和未交付库存并保留营业成本分母', () => {
@@ -473,8 +534,9 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(routes, /\/api\/kcfx-library\/inventory-turnover\/export/);
   assert.match(routes, /\/api\/kcfx-library\/inventory-turnover\/segment-summary\/export/);
   assert.match(routes, /\/api\/kcfx-library\/inventory-turnover\/missing-price\/export/);
-  assert.match(page, /inventorySegment[\s\S]*productSeries[\s\S]*nonInternalTransactionStatus[\s\S]*finishedGoodsStatus[\s\S]*hasSalesData/);
+  assert.match(page, /inventorySegment[\s\S]*inventoryOrganization[\s\S]*department[\s\S]*productSeries[\s\S]*nonInternalTransactionStatus[\s\S]*finishedGoodsStatus[\s\S]*hasSalesData/);
   assert.match(page, /allLabel: '全部库存段'/);
+  assert.match(page, /allLabel: '全部库存组织'/);
   assert.match(page, /payload\?\.options[\s\S]*currentValues\.filter\(\(value\) => allowed\.has\(value\)\)/);
   assert.match(page, /key: 'productLine', label: '产品线' \},[\s\S]*key: 'productSeries', label: '销售系列'/);
   assert.match(routes, /产品线: row\.productLine,[\s\S]*销售系列: row\.productSeries,[\s\S]*期间月数/);
@@ -485,9 +547,10 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.doesNotMatch(page, /未交付覆盖天数|inventoryTurnoverDays|undeliveredCoverageDays/);
   assert.match(page, /className="turnover-metric-scroll"[\s\S]*<MetricCards/);
   assert.match(page, /库存段周转汇总[\s\S]*payload\?\.segmentSummary[\s\S]*SEGMENT_SUMMARY_COLUMNS/);
-  assert.match(page, /inventorySegment', label: '库存段'[\s\S]*openingInventoryCost', label: '期初库存成本'[\s\S]*closingInventoryCost', label: '期末库存成本'[\s\S]*averageInventoryCost', label: '平均库存成本'[\s\S]*turnoverDays', label: '存货周转天数'/);
+  assert.match(page, /inventorySegment', label: '库存段'[\s\S]*openingInventoryCost', label: '期初库存成本'[\s\S]*closingInventoryCost', label: '期末库存成本'[\s\S]*averageInventoryCost', label: '平均库存成本'[\s\S]*turnoverDays', label: '存货周转天数'[\s\S]*periodOperatingCost', label: '期间营业成本'/);
   assert.match(page, /inventory-turnover\/segment-summary\/export[\s\S]*库存段周转汇总_/);
-  assert.match(routes, /库存段: row\.inventorySegment,[\s\S]*期初库存成本: row\.openingInventoryCost,[\s\S]*存货周转天数: row\.turnoverDays/);
+  assert.match(routes, /库存段: row\.inventorySegment,[\s\S]*期初库存成本: row\.openingInventoryCost,[\s\S]*存货周转天数: row\.turnoverDays,[\s\S]*期间营业成本: row\.periodOperatingCost/);
+  assert.match(page, /turnover-segment-summary-formulas[\s\S]*存货周转天数[\s\S]*期间营业成本[\s\S]*平均库存成本[\s\S]*未交付存货周转天数/);
   assert.match(styles, /\.turnover-segment-summary-panel\s*\{[\s\S]*margin-top:\s*12px/);
   assert.match(styles, /\.turnover-segment-summary-panel \.kcfx-table-wrap tbody tr:last-child\s*\{[\s\S]*font-weight:\s*700/);
   assert.match(styles, /\.turnover-metric-scroll\s*\{[\s\S]*overflow-x:\s*auto/);

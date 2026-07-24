@@ -7,6 +7,7 @@ import { TablePagination } from './TablePagination.jsx';
 
 const FILTERS = [
   { id: 'inventorySegment', field: 'inventorySegment', allLabel: '全部库存段' },
+  { id: 'inventoryOrganization', field: 'inventoryOrganization', allLabel: '全部库存组织' },
   { id: 'department', field: 'department', allLabel: '全部事业部' },
   { id: 'productLine', field: 'productLine', allLabel: '全部产品线' },
   { id: 'productSeries', field: 'productSeries', allLabel: '全部销售系列' },
@@ -16,6 +17,7 @@ const FILTERS = [
 ];
 const DEFAULT_FILTERS = {
   inventorySegment: [],
+  inventoryOrganization: [],
   department: [],
   productLine: [],
   productSeries: [],
@@ -86,7 +88,8 @@ const SEGMENT_SUMMARY_COLUMNS = [
   { key: 'openingInventoryCost', label: '期初库存成本', render: (row) => formatAmount(row.openingInventoryCost) },
   { key: 'closingInventoryCost', label: '期末库存成本', render: (row) => formatAmount(row.closingInventoryCost) },
   { key: 'averageInventoryCost', label: '平均库存成本', render: (row) => formatAmount(row.averageInventoryCost) },
-  { key: 'turnoverDays', label: '存货周转天数', render: (row) => formatDays(row.turnoverDays) }
+  { key: 'turnoverDays', label: '存货周转天数', render: (row) => formatDays(row.turnoverDays) },
+  { key: 'periodOperatingCost', label: '期间营业成本', render: (row) => formatAmount(row.periodOperatingCost) }
 ];
 
 export default function InventoryTurnoverPage({ user = null, kcfxData = null, onRefresh }) {
@@ -351,6 +354,12 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
           columns={SEGMENT_SUMMARY_COLUMNS}
           paginated={false}
         />
+        <div className="turnover-segment-summary-formulas" aria-label="库存段周转汇总计算说明">
+          <p><strong>存货周转天数</strong> = 期间天数 ×（平均存货成本 ÷ 期间营业成本）</p>
+          <p><strong>期间营业成本</strong> = 月均销售产品成本 × 月数</p>
+          <p><strong>平均库存成本</strong> =（对应期初库存成本 + 对应期末库存成本）÷ 2</p>
+          <p><strong>未交付存货周转天数</strong> = 期间天数 ×（平均未交付库存成本 ÷ 期间营业成本）</p>
+        </div>
       </section>
 
       <PanelGrid className="turnover-chart-grid">

@@ -13,12 +13,13 @@ import {
   rowsOf
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_TURNOVER_VERSION = 12;
+export const KCFX_INVENTORY_TURNOVER_VERSION = 13;
 export const INVENTORY_TURNOVER_PAGE_SIZE = 20;
 
 const GROUP_SEPARATOR = '\u001f';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const INVENTORY_SEGMENTS = ['在库量', '在途量', '未交付数量'];
+const UNMATCHED_INVENTORY_ORGANIZATION = '未匹配库存组织';
 const TURNOVER_CHART_ORDERS = {
   department: [
     '海外事业一部',
@@ -57,6 +58,29 @@ function groupKey(department, productLine, productSeries = '') {
 function groupIdentity(key) {
   const [department = '', productLine = '', productSeries = ''] = String(key || '').split(GROUP_SEPARATOR);
   return { department, productLine, productSeries };
+}
+
+function normalizeInventoryOrganization(value) {
+  return normalizeText(value) || UNMATCHED_INVENTORY_ORGANIZATION;
+}
+
+function procurementGroupKey(inventoryOrganization, department, productLine, productSeries = '') {
+  return [
+    inventoryOrganization,
+    department,
+    productLine,
+    productSeries
+  ].map(normalizeText).join(GROUP_SEPARATOR);
+}
+
+function procurementGroupIdentity(key) {
+  const [
+    inventoryOrganization = '',
+    department = '',
+    productLine = '',
+    productSeries = ''
+  ] = String(key || '').split(GROUP_SEPARATOR);
+  return { inventoryOrganization, department, productLine, productSeries };
 }
 
 function salesGroupKey(department, productLine, productSeries, nonInternalTransactionStatus, finishedGoodsStatus) {
@@ -198,7 +222,13 @@ function buildInventorySnapshots(records, productMap, warehouseMap, departmentMa
       const productLine = normalizeText(product.productLine) || '未匹配产品线';
       const productSeries = normalizeText(product.productSeries) || '未匹配销售系列';
       const settlementPrice = Number(product.settlementPrice) || 0;
-      const key = groupKey(department, productLine, productSeries);
+      const inventoryOrganization = normalizeInventoryOrganization(identity.organization);
+      const key = procurementGroupKey(
+        inventoryOrganization,
+        department,
+        productLine,
+        productSeries
+      );
       const scope = warehouse.location === '海上在途' ? 'inTransit' : 'onHand';
       addMetric(totals, key, {
         qty,
@@ -218,7 +248,7 @@ function buildInventorySnapshots(records, productMap, warehouseMap, departmentMa
           materialCode: identity.materialCode,
           sku: normalizeText(product.sku),
           materialName: normalizeText(product.materialName),
-          organization: identity.organization,
+          organization: inventoryOrganization,
           warehouse: identity.warehouse,
           inventorySegment: scope === 'inTransit' ? '在途量' : '在库量',
           quantity: qty
@@ -307,11 +337,24 @@ function buildUndelivered(records, productMap) {
     const qty = firstNumber([valueByHeader(row, ['剩余入库数量'])]);
     if (!(qty > 0)) continue;
     const product = productMap.get(materialCode) || {};
+    const inventoryOrganization = normalizeInventoryOrganization(valueByHeader(row, [
+      '采购组织',
+      '采购主体',
+      '库存组织',
+      '使用组织',
+      '组织',
+      '主体名称'
+    ]));
     const department = splitPurchaseDepartment(valueByHeader(row, ['事业部']));
     const productLine = normalizeText(product.productLine) || '未匹配产品线';
     const productSeries = normalizeText(product.productSeries) || '未匹配销售系列';
     const settlementPrice = Number(product.settlementPrice) || 0;
-    addMetric(totals, groupKey(department, productLine, productSeries), {
+    addMetric(totals, procurementGroupKey(
+      inventoryOrganization,
+      department,
+      productLine,
+      productSeries
+    ), {
       undeliveredQty: qty,
       undeliveredAmount: qty * settlementPrice,
       undeliveredMissingPriceRows: settlementPrice ? 0 : 1,
@@ -323,6 +366,7 @@ function buildUndelivered(records, productMap) {
         department,
         productLine,
         productSeries,
+        organization: inventoryOrganization,
         materialCode,
         sku: normalizeText(product.sku),
         materialName: normalizeText(product.materialName),
@@ -652,8 +696,13 @@ function matchesFilters(identity, filters, fields) {
 function aggregateInventoryComponents(source, filters) {
   const target = new Map();
   for (const [key, values] of source || []) {
-    const identity = groupIdentity(key);
-    if (!matchesFilters(identity, filters, ['department', 'productLine', 'productSeries'])) continue;
+    const identity = procurementGroupIdentity(key);
+    if (!matchesFilters(identity, filters, [
+      'inventoryOrganization',
+      'department',
+      'productLine',
+      'productSeries'
+    ])) continue;
     addMetric(target, groupKey(identity.department, identity.productLine, identity.productSeries), values);
   }
   return target;
@@ -700,6 +749,12 @@ function missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, 
   const inventorySegments = inventorySegmentSelection(filters);
   return (cache.missingPriceRecords || []).filter((row) => {
     if (!matchesFilters(row, filters, ['department', 'productLine', 'productSeries'])) return false;
+    if (
+      (row.sourceType === '库存快照' || row.sourceType === '采购订单')
+      && !matchesFilters({
+        inventoryOrganization: normalizeInventoryOrganization(row.organization)
+      }, filters, ['inventoryOrganization'])
+    ) return false;
     const key = groupKey(row.department, row.productLine, row.productSeries);
     if (eligibleKeys && !eligibleKeys.has(key)) return false;
     const hasSalesData = sales.has(groupKey(row.department, row.productLine, row.productSeries))
@@ -757,10 +812,11 @@ function calculatedRowsForFilters(
   const sales = aggregateSalesComponents(cache, period, filters);
   const undelivered = aggregateInventoryComponents(cache.undelivered, filters);
   const selectedKeys = inventorySegmentKeys(opening, closing, undelivered, filters);
+  const hasInventoryOrganizationFilter = selected(filters, 'inventoryOrganization').length > 0;
   const keys = selectedKeys || new Set([
     ...opening.keys(),
     ...closing.keys(),
-    ...sales.keys(),
+    ...(hasInventoryOrganizationFilter ? [] : sales.keys()),
     ...undelivered.keys()
   ]);
   const missingPriceRows = includeMissingPrices
@@ -786,10 +842,16 @@ function calculatedRowsForFilters(
   return { rows, sales, missingPriceRows };
 }
 
-function linkedSalesStatusOptions(cache, period, filters, targetField) {
+function linkedSalesStatusOptions(cache, period, filters, targetField, openingSnapshotMonth) {
   const hasSalesSelection = selected(filters, 'hasSalesData');
   if (hasSalesSelection.length && !hasSalesSelection.includes('有销售数据')) return [];
   const effectiveFilters = withoutFilter(filters, targetField);
+  const eligibleKeys = procurementEligibleBusinessKeys(
+    cache,
+    effectiveFilters,
+    openingSnapshotMonth,
+    period.endMonth
+  );
   const values = new Set();
   for (const month of period.monthList) {
     for (const key of cache.salesMonths.get(month)?.keys() || []) {
@@ -801,6 +863,11 @@ function linkedSalesStatusOptions(cache, period, filters, targetField) {
         'nonInternalTransactionStatus',
         'finishedGoodsStatus'
       ])) continue;
+      if (eligibleKeys && !eligibleKeys.has(groupKey(
+        identity.department,
+        identity.productLine,
+        identity.productSeries
+      ))) continue;
       values.add(identity[targetField]);
     }
   }
@@ -808,6 +875,71 @@ function linkedSalesStatusOptions(cache, period, filters, targetField) {
     ? ['非内部交易', '内部交易', '未匹配']
     : ['成品', '非成品', '未匹配'];
   return sortPreferredOptions(values, order);
+}
+
+function procurementEligibleBusinessKeys(cache, filters, openingSnapshotMonth, closingSnapshotMonth) {
+  if (!selected(filters, 'inventoryOrganization').length) return null;
+  const keys = new Set();
+  const segments = inventorySegmentSelection(filters);
+  for (const source of [
+    cache.inventorySnapshots.get(openingSnapshotMonth),
+    cache.inventorySnapshots.get(closingSnapshotMonth),
+    cache.undelivered
+  ]) {
+    for (const [key, values] of source || []) {
+      const identity = procurementGroupIdentity(key);
+      if (!matchesFilters(identity, filters, [
+        'inventoryOrganization',
+        'department',
+        'productLine',
+        'productSeries'
+      ])) continue;
+      if (
+        segments.size
+        && ![...segments].some((segment) => inventorySegmentHasData(values, segment))
+      ) continue;
+      keys.add(groupKey(identity.department, identity.productLine, identity.productSeries));
+    }
+  }
+  return keys;
+}
+
+function linkedInventoryOrganizationOptions(
+  cache,
+  period,
+  filters,
+  openingSnapshotMonth
+) {
+  const effectiveFilters = withoutFilter(filters, 'inventoryOrganization');
+  const sales = aggregateSalesComponents(cache, period, effectiveFilters);
+  const segments = inventorySegmentSelection(effectiveFilters);
+  const values = new Set();
+  for (const source of [
+    cache.inventorySnapshots.get(openingSnapshotMonth),
+    cache.inventorySnapshots.get(period.endMonth),
+    cache.undelivered
+  ]) {
+    for (const [key, metrics] of source || []) {
+      const identity = procurementGroupIdentity(key);
+      if (!matchesFilters(identity, effectiveFilters, [
+        'department',
+        'productLine',
+        'productSeries'
+      ])) continue;
+      if (
+        segments.size
+        && ![...segments].some((segment) => inventorySegmentHasData(metrics, segment))
+      ) continue;
+      const hasSalesData = sales.has(groupKey(
+        identity.department,
+        identity.productLine,
+        identity.productSeries
+      )) ? '有销售数据' : '无销售数据';
+      if (!matchesFilters({ hasSalesData }, effectiveFilters, ['hasSalesData'])) continue;
+      values.add(identity.inventoryOrganization);
+    }
+  }
+  return sortTextOptions(values);
 }
 
 function linkedInventoryTurnoverOptions(cache, period, filters, openingSnapshotMonth, openingApproximate) {
@@ -847,17 +979,25 @@ function linkedInventoryTurnoverOptions(cache, period, filters, openingSnapshotM
           : row.hasUndeliveredInventory
     ))
   ));
+  options.inventoryOrganization = linkedInventoryOrganizationOptions(
+    cache,
+    period,
+    filters,
+    openingSnapshotMonth
+  );
   options.nonInternalTransactionStatus = linkedSalesStatusOptions(
     cache,
     period,
     filters,
-    'nonInternalTransactionStatus'
+    'nonInternalTransactionStatus',
+    openingSnapshotMonth
   );
   options.finishedGoodsStatus = linkedSalesStatusOptions(
     cache,
     period,
     filters,
-    'finishedGoodsStatus'
+    'finishedGoodsStatus',
+    openingSnapshotMonth
   );
   return options;
 }
@@ -894,28 +1034,32 @@ export function inventoryTurnoverSegmentSummary(metrics = {}) {
       openingInventoryCost: Number(metrics.openingUndeliveredInventoryCost) || 0,
       closingInventoryCost: Number(metrics.closingUndeliveredInventoryCost) || 0,
       averageInventoryCost: Number(metrics.averageUndeliveredInventoryCost) || 0,
-      turnoverDays: metrics.undeliveredTurnoverDays
+      turnoverDays: metrics.undeliveredTurnoverDays,
+      periodOperatingCost: Number(metrics.periodOperatingCost) || 0
     },
     {
       inventorySegment: '在途量',
       openingInventoryCost: Number(metrics.openingInTransitInventoryCost) || 0,
       closingInventoryCost: Number(metrics.closingInTransitInventoryCost) || 0,
       averageInventoryCost: Number(metrics.averageInTransitInventoryCost) || 0,
-      turnoverDays: metrics.inTransitInventoryTurnoverDays
+      turnoverDays: metrics.inTransitInventoryTurnoverDays,
+      periodOperatingCost: Number(metrics.periodOperatingCost) || 0
     },
     {
       inventorySegment: '在库量',
       openingInventoryCost: Number(metrics.openingOnHandInventoryCost) || 0,
       closingInventoryCost: Number(metrics.closingOnHandInventoryCost) || 0,
       averageInventoryCost: Number(metrics.averageOnHandInventoryCost) || 0,
-      turnoverDays: metrics.onHandInventoryTurnoverDays
+      turnoverDays: metrics.onHandInventoryTurnoverDays,
+      periodOperatingCost: Number(metrics.periodOperatingCost) || 0
     },
     {
       inventorySegment: '合计',
       openingInventoryCost: Number(metrics.openingInventoryTotalCost) || 0,
       closingInventoryCost: Number(metrics.closingInventoryTotalCost) || 0,
       averageInventoryCost: Number(metrics.averageInventoryTotalCost) || 0,
-      turnoverDays: metrics.inventoryTotalTurnoverDays
+      turnoverDays: metrics.inventoryTotalTurnoverDays,
+      periodOperatingCost: Number(metrics.periodOperatingCost) || 0
     }
   ];
 }
@@ -928,7 +1072,16 @@ export function queryInventoryTurnover(cache, input = {}) {
       source: cache?.source || 'server-inventory-turnover',
       message: '没有同时包含库存快照和销售数据的月份',
       rows: [],
-      options: { department: [], productLine: [] },
+      options: {
+        inventorySegment: [],
+        inventoryOrganization: [],
+        department: [],
+        productLine: [],
+        productSeries: [],
+        nonInternalTransactionStatus: [],
+        finishedGoodsStatus: [],
+        hasSalesData: []
+      },
       pagination: { page: 1, pageSize: INVENTORY_TURNOVER_PAGE_SIZE, totalPages: 1, totalRows: 0 }
     };
   }
