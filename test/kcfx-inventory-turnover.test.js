@@ -490,6 +490,9 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(routes, /期初未交付库存成本: row\.openingUndeliveredInventoryCost[\s\S]*平均未交付库存成本: row\.averageUndeliveredInventoryCost[\s\S]*期初库存合计成本: row\.openingInventoryTotalCost[\s\S]*平均库存合计成本: row\.averageInventoryTotalCost/);
   assert.match(routes, /未交付存货周转天数: row\.undeliveredTurnoverDays,[\s\S]*库存合计存货周转天数: row\.inventoryTotalTurnoverDays,[\s\S]*在库量: row\.onHandQty/);
   assert.match(page, /库存合计<\/strong> = 在库量 \+ 在途量 \+ 未交付总数量/);
+  assert.match(page, /turnoverBarTitle\([\s\S]*期末在库库存成本[\s\S]*closingOnHandInventoryCost/);
+  assert.match(page, /turnoverBarTitle\([\s\S]*期末在途库存成本[\s\S]*closingInTransitInventoryCost/);
+  assert.match(page, /turnoverBarTitle\([\s\S]*期末未交付库存成本[\s\S]*closingUndeliveredInventoryCost/);
   assert.match(page, /导出缺少内部结算价明细/);
   assert.doesNotMatch(page, /近1月|近3月|近6月/);
   assert.match(page, /className="turnover-filter-toolbar"[\s\S]*leadingContent/);

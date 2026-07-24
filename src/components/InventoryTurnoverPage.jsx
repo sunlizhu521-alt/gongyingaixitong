@@ -47,6 +47,10 @@ function formatMonthLabel(value) {
   return match ? `${match[1]}年${Number(match[2])}月` : value;
 }
 
+function turnoverBarTitle(name, turnoverLabel, days, costLabel, closingCost) {
+  return `${name}｜${turnoverLabel}：${formatDays(days)}｜${costLabel}：${formatAmount(closingCost)}`;
+}
+
 const COLUMNS = [
   { key: 'department', label: '事业部' },
   { key: 'productLine', label: '产品线' },
@@ -428,15 +432,33 @@ function TurnoverComparison({ title, rows }) {
           <div className="turnover-comparison-row" key={row.name}>
             <strong title={row.name}>{row.name}</strong>
             <div className="turnover-comparison-bars">
-              <div>
+              <div title={turnoverBarTitle(
+                row.name,
+                '在库量存货周转天数',
+                row.onHandInventoryTurnoverDays,
+                '期末在库库存成本',
+                row.closingOnHandInventoryCost
+              )}>
                 <span className="turnover-bar on-hand" style={{ width: `${Math.max(2, ((Number(row.onHandInventoryTurnoverDays) || 0) / max) * 100)}%` }} />
                 <em>{formatDays(row.onHandInventoryTurnoverDays)}</em>
               </div>
-              <div>
+              <div title={turnoverBarTitle(
+                row.name,
+                '在途量存货周转天数',
+                row.inTransitInventoryTurnoverDays,
+                '期末在途库存成本',
+                row.closingInTransitInventoryCost
+              )}>
                 <span className="turnover-bar in-transit" style={{ width: `${Math.max(2, ((Number(row.inTransitInventoryTurnoverDays) || 0) / max) * 100)}%` }} />
                 <em>{formatDays(row.inTransitInventoryTurnoverDays)}</em>
               </div>
-              <div>
+              <div title={turnoverBarTitle(
+                row.name,
+                '未交付存货周转天数',
+                row.undeliveredTurnoverDays,
+                '期末未交付库存成本',
+                row.closingUndeliveredInventoryCost
+              )}>
                 <span className="turnover-bar undelivered" style={{ width: `${Math.max(2, ((Number(row.undeliveredTurnoverDays) || 0) / max) * 100)}%` }} />
                 <em>{formatDays(row.undeliveredTurnoverDays)}</em>
               </div>
