@@ -336,38 +336,6 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
               { label: '期间天数', value: `${formatNumber(period?.days || 0)}天` }
             ]} />
           </div>
-          <div className="turnover-metric-row">
-            <MetricCards metrics={[
-              { label: '期初在库库存成本', value: formatAmount(metrics.openingOnHandInventoryCost) },
-              { label: '期末在库库存成本', value: formatAmount(metrics.closingOnHandInventoryCost) },
-              { label: '平均在库库存成本', value: formatAmount(metrics.averageOnHandInventoryCost) },
-              { label: '在库量存货周转天数', value: formatDays(metrics.onHandInventoryTurnoverDays) }
-            ]} />
-          </div>
-          <div className="turnover-metric-row">
-            <MetricCards metrics={[
-              { label: '期初在途库存成本', value: formatAmount(metrics.openingInTransitInventoryCost) },
-              { label: '期末在途库存成本', value: formatAmount(metrics.closingInTransitInventoryCost) },
-              { label: '平均在途库存成本', value: formatAmount(metrics.averageInTransitInventoryCost) },
-              { label: '在途量存货周转天数', value: formatDays(metrics.inTransitInventoryTurnoverDays) }
-            ]} />
-          </div>
-          <div className="turnover-metric-row">
-            <MetricCards metrics={[
-              { label: '期初未交付库存成本', value: formatAmount(metrics.openingUndeliveredInventoryCost) },
-              { label: '期末未交付库存成本', value: formatAmount(metrics.closingUndeliveredInventoryCost) },
-              { label: '平均未交付库存成本', value: formatAmount(metrics.averageUndeliveredInventoryCost) },
-              { label: '未交付存货周转天数', value: formatDays(metrics.undeliveredTurnoverDays) }
-            ]} />
-          </div>
-          <div className="turnover-metric-row">
-            <MetricCards metrics={[
-              { label: '期初库存合计成本', value: formatAmount(metrics.openingInventoryTotalCost) },
-              { label: '期末库存合计成本', value: formatAmount(metrics.closingInventoryTotalCost) },
-              { label: '平均库存合计成本', value: formatAmount(metrics.averageInventoryTotalCost) },
-              { label: '库存合计存货周转天数', value: formatDays(metrics.inventoryTotalTurnoverDays) }
-            ]} />
-          </div>
         </div>
       </div>
 

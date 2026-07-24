@@ -492,7 +492,8 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(styles, /\.turnover-segment-summary-panel \.kcfx-table-wrap tbody tr:last-child\s*\{[\s\S]*font-weight:\s*700/);
   assert.match(styles, /\.turnover-metric-scroll\s*\{[\s\S]*overflow-x:\s*auto/);
   assert.match(page, /turnover-metric-row-summary[\s\S]*月均销售产品成本[\s\S]*期间营业成本[\s\S]*期间天数/);
-  assert.equal((page.match(/className="turnover-metric-row(?: |")/g) || []).length, 5);
+  assert.equal((page.match(/className="turnover-metric-row(?: |")/g) || []).length, 1);
+  assert.doesNotMatch(page, /\{ label: '期初在库库存成本'|\{ label: '期初在途库存成本'|\{ label: '期初未交付库存成本'|\{ label: '期初库存合计成本'/);
   assert.match(styles, /\.turnover-metric-row \.kcfx-metric-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(4,/);
   assert.match(styles, /\.turnover-metric-row-summary \.kcfx-metric-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,/);
   assert.match(styles, /\.turnover-metric-scroll \.kcfx-metric-card span,[\s\S]*white-space:\s*nowrap/);
