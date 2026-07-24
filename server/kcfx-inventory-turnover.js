@@ -13,7 +13,7 @@ import {
   rowsOf
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_TURNOVER_VERSION = 9;
+export const KCFX_INVENTORY_TURNOVER_VERSION = 10;
 export const INVENTORY_TURNOVER_PAGE_SIZE = 20;
 
 const GROUP_SEPARATOR = '\u001f';
@@ -165,6 +165,8 @@ function addMetric(map, key, values) {
     receivableQty: 0,
     outboundQty: 0,
     undeliveredQty: 0,
+    undeliveredAmount: 0,
+    undeliveredMissingPriceRows: 0,
     missingPriceRows: 0
   };
   for (const [field, value] of Object.entries(values)) {
@@ -297,6 +299,7 @@ function splitPurchaseDepartment(value) {
 
 function buildUndelivered(records, productMap) {
   const totals = new Map();
+  const missingPriceRecords = [];
   for (const row of rowsOf(records['purchase-order-data'])) {
     const materialCode = normalizeMaterialCode(valueByHeader(row, ['物料编码', '货品编码', '商品编码']));
     if (!materialCode) continue;
@@ -307,9 +310,28 @@ function buildUndelivered(records, productMap) {
     const department = splitPurchaseDepartment(valueByHeader(row, ['事业部']));
     const productLine = normalizeText(product.productLine) || '未匹配产品线';
     const productSeries = normalizeText(product.productSeries) || '未匹配销售系列';
-    addMetric(totals, groupKey(department, productLine, productSeries), { undeliveredQty: qty });
+    const settlementPrice = Number(product.settlementPrice) || 0;
+    addMetric(totals, groupKey(department, productLine, productSeries), {
+      undeliveredQty: qty,
+      undeliveredAmount: qty * settlementPrice,
+      undeliveredMissingPriceRows: settlementPrice ? 0 : 1,
+      missingPriceRows: settlementPrice ? 0 : 1
+    });
+    if (!settlementPrice) {
+      missingPriceRecords.push({
+        sourceType: '采购订单',
+        department,
+        productLine,
+        productSeries,
+        materialCode,
+        sku: normalizeText(product.sku),
+        materialName: normalizeText(product.materialName),
+        inventorySegment: '未交付数量',
+        quantity: qty
+      });
+    }
   }
-  return totals;
+  return { totals, missingPriceRecords };
 }
 
 export function buildInventoryTurnoverCache(records = {}, savedAt = '') {
@@ -318,6 +340,7 @@ export function buildInventoryTurnoverCache(records = {}, savedAt = '') {
   const departmentMap = mapDepartments(rowsOf(records['dim-warehouse-material']));
   const inventory = buildInventorySnapshots(records, productMap, warehouseMap, departmentMap);
   const sales = buildSalesMonths(records, productMap);
+  const undelivered = buildUndelivered(records, productMap);
   const inventoryMonths = [...inventory.snapshots.keys()].sort();
   const commonMonths = inventoryMonths.filter((month) => sales.allMonths.has(month));
   return {
@@ -332,9 +355,10 @@ export function buildInventoryTurnoverCache(records = {}, savedAt = '') {
     allSalesMonths: sales.allMonths,
     missingPriceRecords: [
       ...inventory.missingPriceRecords,
-      ...sales.missingPriceRecords
+      ...sales.missingPriceRecords,
+      ...undelivered.missingPriceRecords
     ],
-    undelivered: buildUndelivered(records, productMap),
+    undelivered: undelivered.totals,
     inventoryMonths,
     commonMonths,
     latestCommonMonth: commonMonths.at(-1) || '',
@@ -385,21 +409,28 @@ function calculateRow(
   const monthlyAverageSalesCost = periodOperatingCost / period.months;
   const outboundQty = Number(sales?.outboundQty) || 0;
   const undeliveredQty = Number(undelivered?.undeliveredQty) || 0;
+  const undeliveredInventoryCost = Number(undelivered?.undeliveredAmount) || 0;
   const onHandQty = Number(closing?.onHandQty) || 0;
   const inTransitQty = Number(closing?.inTransitQty) || 0;
   const inventoryTotalQty = onHandQty + inTransitQty + undeliveredQty;
   const openingMissingPriceRows = Number(opening?.missingPriceRows) || 0;
   const closingMissingPriceRows = Number(closing?.missingPriceRows) || 0;
   const salesMissingPriceRows = Number(sales?.missingPriceRows) || 0;
-  const missingPriceRows = openingMissingPriceRows + closingMissingPriceRows + salesMissingPriceRows;
+  const undeliveredMissingPriceRows = Number(undelivered?.undeliveredMissingPriceRows) || 0;
+  const missingPriceRows = openingMissingPriceRows
+    + closingMissingPriceRows
+    + salesMissingPriceRows
+    + undeliveredMissingPriceRows;
   const openingMissingPriceMaterialCodes = uniqueMaterialCodes(missingPriceCodes.opening);
   const closingMissingPriceMaterialCodes = uniqueMaterialCodes(missingPriceCodes.closing);
   const salesMissingPriceMaterialCodes = uniqueMaterialCodes(missingPriceCodes.sales);
+  const undeliveredMissingPriceMaterialCodes = uniqueMaterialCodes(missingPriceCodes.undelivered);
   const statusDetails = [
     openingApproximate ? `缺少${period.openingTargetMonth}期初库存快照，使用最早可用快照` : '',
     missingPriceStatus('期初库存', openingMissingPriceRows, openingMissingPriceMaterialCodes),
     missingPriceStatus('期末库存', closingMissingPriceRows, closingMissingPriceMaterialCodes),
-    missingPriceStatus('销售数据', salesMissingPriceRows, salesMissingPriceMaterialCodes)
+    missingPriceStatus('销售数据', salesMissingPriceRows, salesMissingPriceMaterialCodes),
+    missingPriceStatus('采购订单未交付库存', undeliveredMissingPriceRows, undeliveredMissingPriceMaterialCodes)
   ].filter(Boolean);
   return {
     ...identity,
@@ -428,9 +459,10 @@ function calculateRow(
       ? period.days * (averageInTransitInventoryCost / periodOperatingCost)
       : null,
     undeliveredQty,
+    undeliveredInventoryCost,
     outboundQty,
-    undeliveredTurnoverDays: outboundQty > 0
-      ? period.days * (undeliveredQty / outboundQty)
+    undeliveredTurnoverDays: periodOperatingCost > 0
+      ? period.days * (undeliveredInventoryCost / periodOperatingCost)
       : null,
     onHandQty,
     inTransitQty,
@@ -438,10 +470,12 @@ function calculateRow(
     openingMissingPriceRows,
     closingMissingPriceRows,
     salesMissingPriceRows,
+    undeliveredMissingPriceRows,
     missingPriceRows,
     openingMissingPriceMaterialCodes,
     closingMissingPriceMaterialCodes,
     salesMissingPriceMaterialCodes,
+    undeliveredMissingPriceMaterialCodes,
     dataStatus: statusDetails.length ? statusDetails.join('；') : '完整'
   };
 }
@@ -457,10 +491,12 @@ function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
     periodOperatingCost: result.periodOperatingCost + row.periodOperatingCost,
     salesRecordRows: result.salesRecordRows + row.salesRecordRows,
     undeliveredQty: result.undeliveredQty + row.undeliveredQty,
+    undeliveredInventoryCost: result.undeliveredInventoryCost + row.undeliveredInventoryCost,
     outboundQty: result.outboundQty + row.outboundQty,
     openingMissingPriceRows: result.openingMissingPriceRows + row.openingMissingPriceRows,
     closingMissingPriceRows: result.closingMissingPriceRows + row.closingMissingPriceRows,
-    salesMissingPriceRows: result.salesMissingPriceRows + row.salesMissingPriceRows
+    salesMissingPriceRows: result.salesMissingPriceRows + row.salesMissingPriceRows,
+    undeliveredMissingPriceRows: result.undeliveredMissingPriceRows + row.undeliveredMissingPriceRows
   }), {
     openingOnHandInventoryCost: 0,
     openingInTransitInventoryCost: 0,
@@ -471,15 +507,18 @@ function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
     periodOperatingCost: 0,
     salesRecordRows: 0,
     undeliveredQty: 0,
+    undeliveredInventoryCost: 0,
     outboundQty: 0,
     openingMissingPriceRows: 0,
     closingMissingPriceRows: 0,
-    salesMissingPriceRows: 0
+    salesMissingPriceRows: 0,
+    undeliveredMissingPriceRows: 0
   });
   const missingPriceCodes = {
     opening: uniqueMaterialCodes(rows.flatMap((row) => row.openingMissingPriceMaterialCodes || [])),
     closing: uniqueMaterialCodes(rows.flatMap((row) => row.closingMissingPriceMaterialCodes || [])),
-    sales: uniqueMaterialCodes(rows.flatMap((row) => row.salesMissingPriceMaterialCodes || []))
+    sales: uniqueMaterialCodes(rows.flatMap((row) => row.salesMissingPriceMaterialCodes || [])),
+    undelivered: uniqueMaterialCodes(rows.flatMap((row) => row.undeliveredMissingPriceMaterialCodes || []))
   };
   return calculateRow(identity, {
     onHandAmount: totals.openingOnHandInventoryCost,
@@ -497,7 +536,9 @@ function aggregateCalculatedRows(rows, identity, period, openingApproximate) {
     outboundQty: totals.outboundQty,
     missingPriceRows: totals.salesMissingPriceRows
   }, {
-    undeliveredQty: totals.undeliveredQty
+    undeliveredQty: totals.undeliveredQty,
+    undeliveredAmount: totals.undeliveredInventoryCost,
+    undeliveredMissingPriceRows: totals.undeliveredMissingPriceRows
   }, period, openingApproximate, missingPriceCodes);
 }
 
@@ -562,7 +603,13 @@ function filterUndeliveredMetrics(values, filters) {
   if (!values) return values;
   const segments = inventorySegmentSelection(filters);
   if (!segments.size || segments.has('未交付数量')) return values;
-  return { ...values, undeliveredQty: 0 };
+  return {
+    ...values,
+    undeliveredQty: 0,
+    undeliveredAmount: 0,
+    undeliveredMissingPriceRows: 0,
+    missingPriceRows: 0
+  };
 }
 
 function inputFilters(input) {
@@ -642,6 +689,9 @@ function missingPriceRowsForQuery(cache, period, filters, openingSnapshotMonth, 
       return inventoryMonths.has(row.month)
         && (!inventorySegments.size || inventorySegments.has(row.inventorySegment));
     }
+    if (row.sourceType === '采购订单') {
+      return !inventorySegments.size || inventorySegments.has('未交付数量');
+    }
     return salesMonths.has(row.month)
       && matchesFilters(row, filters, ['nonInternalTransactionStatus', 'finishedGoodsStatus']);
   });
@@ -651,8 +701,12 @@ function missingPriceCodesByGroup(rows, openingSnapshotMonth, closingSnapshotMon
   const groups = new Map();
   for (const row of rows) {
     const key = groupKey(row.department, row.productLine, row.productSeries);
-    if (!groups.has(key)) groups.set(key, { opening: [], closing: [], sales: [] });
+    if (!groups.has(key)) groups.set(key, { opening: [], closing: [], sales: [], undelivered: [] });
     const group = groups.get(key);
+    if (row.sourceType === '采购订单') {
+      group.undelivered.push(row.materialCode);
+      continue;
+    }
     if (row.sourceType === '销售数据') {
       group.sales.push(row.materialCode);
       continue;
@@ -664,6 +718,7 @@ function missingPriceCodesByGroup(rows, openingSnapshotMonth, closingSnapshotMon
     group.opening = uniqueMaterialCodes(group.opening);
     group.closing = uniqueMaterialCodes(group.closing);
     group.sales = uniqueMaterialCodes(group.sales);
+    group.undelivered = uniqueMaterialCodes(group.undelivered);
   }
   return groups;
 }

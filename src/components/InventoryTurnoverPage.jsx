@@ -58,8 +58,8 @@ const COLUMNS = [
   { key: 'onHandInventoryTurnoverDays', label: '在库量存货周转天数', render: (row) => formatDays(row.onHandInventoryTurnoverDays) },
   { key: 'inTransitInventoryTurnoverDays', label: '在途量存货周转天数', render: (row) => formatDays(row.inTransitInventoryTurnoverDays) },
   { key: 'undeliveredQty', label: '未交付总数量', render: (row) => formatNumber(row.undeliveredQty, 2) },
-  { key: 'outboundQty', label: '期间销售出库总数量', render: (row) => formatNumber(row.outboundQty, 2) },
-  { key: 'undeliveredTurnoverDays', label: '未交付周转天数', render: (row) => formatDays(row.undeliveredTurnoverDays) },
+  { key: 'undeliveredInventoryCost', label: '未交付库存成本', render: (row) => formatAmount(row.undeliveredInventoryCost) },
+  { key: 'undeliveredTurnoverDays', label: '未交付库存周转天数', render: (row) => formatDays(row.undeliveredTurnoverDays) },
   { key: 'onHandQty', label: '在库量', render: (row) => formatNumber(row.onHandQty, 2) },
   { key: 'inTransitQty', label: '在途量', render: (row) => formatNumber(row.inTransitQty, 2) },
   { key: 'inventoryTotalQty', label: '库存合计', render: (row) => formatNumber(row.inventoryTotalQty, 2) },
@@ -272,14 +272,14 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
           { label: '期间营业成本', value: formatAmount(metrics.periodOperatingCost) },
           { label: '在库量存货周转天数', value: formatDays(metrics.onHandInventoryTurnoverDays) },
           { label: '在途量存货周转天数', value: formatDays(metrics.inTransitInventoryTurnoverDays) },
-          { label: '未交付总数量', value: formatNumber(metrics.undeliveredQty, 2) },
-          { label: '未交付周转天数', value: formatDays(metrics.undeliveredTurnoverDays) }
+          { label: '未交付库存成本', value: formatAmount(metrics.undeliveredInventoryCost) },
+          { label: '未交付库存周转天数', value: formatDays(metrics.undeliveredTurnoverDays) }
         ]} />
       </div>
 
       <PanelGrid className="turnover-chart-grid">
-        <TurnoverComparison title="事业部在库量、在途量存货周转天数与未交付周转天数" rows={payload?.charts?.department || []} />
-        <TurnoverComparison title="产品线在库量、在途量存货周转天数与未交付周转天数" rows={payload?.charts?.productLine || []} />
+        <TurnoverComparison title="事业部在库量、在途量与未交付库存周转天数" rows={payload?.charts?.department || []} />
+        <TurnoverComparison title="产品线在库量、在途量与未交付库存周转天数" rows={payload?.charts?.productLine || []} />
       </PanelGrid>
 
       <section className="kcfx-panel turnover-detail-panel">
@@ -303,8 +303,8 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
             <p><strong>在库量存货周转天数</strong> = 期间天数 ×（平均在库库存成本 ÷ 期间营业成本）</p>
             <p><strong>在途量存货周转天数</strong> = 期间天数 ×（平均在途库存成本 ÷ 期间营业成本）</p>
             <p><strong>平均库存成本</strong> =（对应期初库存成本 + 对应期末库存成本）÷ 2</p>
-            <p><strong>未交付周转天数</strong> = 期间天数 ×（未交付总数量 ÷ 期间销售出库总数量）</p>
-            <p><strong>成本计算</strong> = 应收数量 × 2026年结算价；<strong>未交付数量</strong> = 采购订单剩余入库数量</p>
+            <p><strong>未交付库存周转天数</strong> = 期间天数 ×（未交付库存成本 ÷ 期间营业成本）</p>
+            <p><strong>销售成本</strong> = 应收数量 × 2026年结算价；<strong>未交付库存成本</strong> = 采购订单剩余入库数量 × 2026年结算价</p>
             <p><strong>库存合计</strong> = 在库量 + 在途量 + 未交付总数量</p>
           </div>
           <ol>
@@ -324,14 +324,15 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
               两项相加等于原存货周转天数。
             </li>
             <li>
-              <strong>未交付周转天数：</strong>
-              期间天数 ×（未交付总数量 ÷ 期间销售出库总数量）。
-              期间营业成本或期间销售出库总数量小于等于0时，对应周转天数显示“--”。
+              <strong>未交付库存周转天数：</strong>
+              采购订单当前快照的剩余入库数量乘以2026年内部结算价，得到未交付库存成本；
+              未交付库存周转天数 = 期间天数 ×（未交付库存成本 ÷ 期间营业成本）。
+              期间营业成本小于等于0时，对应周转天数显示“--”。
             </li>
             <li>
               <strong>页面及导出口径：</strong>
               指标卡、库存周转明细和导出分别展示期初、期末、平均在库与在途库存成本，不再保留原总存货周转天数。
-              事业部和产品线图表每项显示在库量存货周转天数、在途量存货周转天数、未交付周转天数三条横柱。
+              事业部和产品线图表每项显示在库量存货周转天数、在途量存货周转天数、未交付库存周转天数三条横柱。
             </li>
           </ol>
         </div>
@@ -357,7 +358,7 @@ function TurnoverComparison({ title, rows }) {
         <span>
           <i className="turnover-legend turnover-legend-on-hand" />在库量存货周转天数
           <i className="turnover-legend turnover-legend-in-transit" />在途量存货周转天数
-          <i className="turnover-legend turnover-legend-undelivered" />未交付周转天数
+          <i className="turnover-legend turnover-legend-undelivered" />未交付库存周转天数
         </span>
       </div>
       <div className="turnover-comparison-rows">
