@@ -144,6 +144,10 @@ test('builds, filters, paginates and exports age analysis rows', () => {
     { month: '2026-01', monthLabel: '2026年1月', name: '系列A', qty: 5, amount: 50 },
     { month: '2026-02', monthLabel: '2026年2月', name: '系列A', qty: 6, amount: 60 }
   ]);
+  assert.deepEqual(result.dimensionTrends.warehouseLocation, [
+    { month: '2026-01', monthLabel: '2026年1月', name: '国内', qty: 5, amount: 50 },
+    { month: '2026-02', monthLabel: '2026年2月', name: '国内', qty: 6, amount: 60 }
+  ]);
   const panorama = queryAgeAnalysis(cache, {});
   const monthOnly = queryAgeAnalysis(cache, { filters: { month: ['2026-02'] } });
   assert.deepEqual(monthOnly.dimensionTrends, panorama.dimensionTrends);
@@ -158,6 +162,7 @@ test('builds, filters, paginates and exports age analysis rows', () => {
   assert.equal(searchedDimensions.dimensionTrends.department.length, 1);
   assert.equal(searchedDimensions.dimensionTrends.productLine[0].name, '产品线B');
   assert.equal(searchedDimensions.dimensionTrends.productSeries[0].name, '系列B');
+  assert.equal(searchedDimensions.dimensionTrends.warehouseLocation[0].name, '海外');
   assert.deepEqual(result.ageTrend, panorama.ageTrend);
   assert.deepEqual(result.warehouseTypeTrend, panorama.warehouseTypeTrend);
   assert.deepEqual(result.salesOutboundWarehouseLocationTrend, panorama.salesOutboundWarehouseLocationTrend);
@@ -394,4 +399,10 @@ test('age-analysis department-missing endpoint is protected by the error-page pe
   assert.match(source, /age-analysis\/department-missing/);
   assert.match(source, /getKcfxAgeAnalysisDepartmentMissing\(\)/);
   assert.match(source, /maintenanceLibrary\.errors/);
+});
+
+test('age-analysis page exposes the warehouse-location dimension trend', async () => {
+  const source = await readFile(new URL('../src/components/AgeAnalysisPage.jsx', import.meta.url), 'utf8');
+  assert.match(source, /\{ id: 'warehouseLocation', label: '仓库位置变化趋势' \}/);
+  assert.match(source, /dimensionTrends\?\.\[activeDimensionTrend\.id\]/);
 });

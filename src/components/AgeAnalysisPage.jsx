@@ -29,7 +29,8 @@ const EMPTY_SELECTIONS = Object.fromEntries(FILTERS.map((filter) => [filter.id, 
 const DIMENSION_TREND_VIEWS = [
   { id: 'department', label: '事业部变化趋势' },
   { id: 'productLine', label: '销售产品线变化趋势' },
-  { id: 'productSeries', label: '销售系列变化趋势' }
+  { id: 'productSeries', label: '销售系列变化趋势' },
+  { id: 'warehouseLocation', label: '仓库位置变化趋势' }
 ];
 const AGE_TREND_COLORS = [
   '#007aff',
@@ -234,7 +235,7 @@ export default function AgeAnalysisPage({ user = null, kcfxData = null, onRefres
 
       <AgeAnalysisZone
         title="维度变化趋势"
-        subtitle="切换查看事业部、销售产品线或销售系列的跨月表现"
+        subtitle="切换查看事业部、销售产品线、销售系列或仓库位置的跨月表现"
         tone="dimension"
         actions={(
           <div className="dimension-trend-switch" role="tablist" aria-label="维度变化趋势">

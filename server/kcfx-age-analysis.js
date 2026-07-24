@@ -560,7 +560,8 @@ export function queryAgeAnalysis(cache, request = {}) {
     dimensionTrends: {
       department: dimensionSeries(trendRows, 'department'),
       productLine: dimensionSeries(trendRows, 'productLine'),
-      productSeries: dimensionSeries(trendRows, 'productSeries')
+      productSeries: dimensionSeries(trendRows, 'productSeries'),
+      warehouseLocation: dimensionSeries(trendRows, 'warehouseLocation')
     },
     ageTrend: ageSeries(panoramaRows),
     warehouseTypeTrend: warehouseTypeSeries(panoramaRows),
