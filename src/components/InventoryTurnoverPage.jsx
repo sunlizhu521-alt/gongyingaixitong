@@ -343,8 +343,14 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
       </div>
 
       <section className="kcfx-panel turnover-segment-summary-panel">
-        <div className="panel-title-row">
+        <div className="panel-title-row turnover-segment-summary-heading">
           <h3>库存段周转汇总</h3>
+          <div className="turnover-segment-summary-formulas" aria-label="库存段周转汇总计算说明">
+            <p><strong>存货周转天数</strong> = 期间天数 ×（平均存货成本 ÷ 期间营业成本）</p>
+            <p><strong>期间营业成本</strong> = 月均销售产品成本 × 月数</p>
+            <p><strong>平均库存成本</strong> =（对应期初库存成本 + 对应期末库存成本）÷ 2</p>
+            <p><strong>未交付存货周转天数</strong> = 期间天数 ×（平均未交付库存成本 ÷ 期间营业成本）</p>
+          </div>
           <button type="button" onClick={exportSegmentSummary} disabled={exportingSegmentSummary}>
             {exportingSegmentSummary ? '导出中...' : '导出'}
           </button>
@@ -354,12 +360,6 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
           columns={SEGMENT_SUMMARY_COLUMNS}
           paginated={false}
         />
-        <div className="turnover-segment-summary-formulas" aria-label="库存段周转汇总计算说明">
-          <p><strong>存货周转天数</strong> = 期间天数 ×（平均存货成本 ÷ 期间营业成本）</p>
-          <p><strong>期间营业成本</strong> = 月均销售产品成本 × 月数</p>
-          <p><strong>平均库存成本</strong> =（对应期初库存成本 + 对应期末库存成本）÷ 2</p>
-          <p><strong>未交付存货周转天数</strong> = 期间天数 ×（平均未交付库存成本 ÷ 期间营业成本）</p>
-        </div>
       </section>
 
       <PanelGrid className="turnover-chart-grid">

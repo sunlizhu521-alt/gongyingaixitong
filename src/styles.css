@@ -1584,6 +1584,13 @@ th {
   margin-bottom: 10px;
 }
 
+.turnover-segment-summary-heading {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: start;
+  gap: 12px;
+}
+
 .turnover-segment-summary-panel .kcfx-table-wrap table {
   min-width: 720px;
   table-layout: fixed;
@@ -1603,12 +1610,12 @@ th {
 .turnover-segment-summary-formulas {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 16px;
-  margin-top: 12px;
-  padding: 12px 14px;
-  border-top: 1px solid #d8e3ef;
+  gap: 4px 16px;
+  min-width: 0;
+  padding: 0 12px;
+  border-left: 1px solid #d8e3ef;
   color: #29445c;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .turnover-segment-summary-formulas p {
@@ -2752,8 +2759,17 @@ th {
 }
 
 @media (max-width: 760px) {
+  .turnover-segment-summary-heading {
+    grid-template-columns: 1fr auto;
+  }
+
   .turnover-segment-summary-formulas {
+    grid-column: 1 / -1;
+    grid-row: 2;
     grid-template-columns: 1fr;
+    padding: 8px 0 0;
+    border-top: 1px solid #d8e3ef;
+    border-left: 0;
   }
 
   .warehouse-flow-trend-panel .table-title-row {
