@@ -1608,7 +1608,7 @@ th {
 .turnover-comparison-rows {
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: 8px;
   margin-top: 14px;
 }
 
@@ -1616,27 +1616,41 @@ th {
   display: grid;
   grid-template-columns: minmax(86px, 150px) minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  min-height: 86px;
+  padding: 9px 10px 9px 12px;
+  border: 1px solid #d8e3ee;
+  border-left: 4px solid #8eb8e8;
+  border-radius: 4px;
+  background: #f7faff;
+}
+
+.turnover-comparison-row:nth-child(even) {
+  border-left-color: #65b8b2;
+  background: #eef7f7;
 }
 
 .turnover-comparison-row > strong {
   overflow: hidden;
   color: #1d3850;
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .turnover-comparison-bars {
   display: grid;
-  gap: 4px;
+  gap: 5px;
 }
 
 .turnover-comparison-bars > div {
   position: relative;
-  height: 18px;
+  height: 19px;
+  border: 1px solid rgba(135, 159, 184, 0.28);
   border-radius: 3px;
-  background: #e8eef5;
+  background: rgba(219, 229, 239, 0.82);
   overflow: hidden;
 }
 

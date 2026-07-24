@@ -447,6 +447,8 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(styles, /\.turnover-chart-heading h3[\s\S]*white-space:\s*nowrap/);
   assert.match(styles, /\.turnover-comparison-panel\s*\{[\s\S]*grid-template-rows:\s*auto minmax\(0,\s*1fr\)/);
   assert.match(styles, /\.turnover-comparison-rows\s*\{[\s\S]*align-content:\s*start/);
+  assert.match(styles, /\.turnover-comparison-row\s*\{[\s\S]*border-left:\s*4px solid[\s\S]*background:/);
+  assert.match(styles, /\.turnover-comparison-row:nth-child\(even\)\s*\{[\s\S]*background:/);
 });
 
 function rowsForMonth(qty) {
