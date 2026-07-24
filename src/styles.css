@@ -1501,11 +1501,13 @@ th {
 }
 
 .turnover-filter-toolbar .turnover-end-month-input {
-  flex-basis: 190px;
+  flex-basis: 218px;
 }
 
 .turnover-filter-toolbar .turnover-end-month-input select {
-  width: 102px;
+  width: 126px;
+  min-width: 126px;
+  padding: 0 30px 0 10px;
   color-scheme: light;
 }
 
