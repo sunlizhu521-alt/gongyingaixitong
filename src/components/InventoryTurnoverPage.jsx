@@ -81,6 +81,14 @@ const COLUMNS = [
   { key: 'dataStatus', label: '数据状态' }
 ];
 
+const SEGMENT_SUMMARY_COLUMNS = [
+  { key: 'inventorySegment', label: '库存段' },
+  { key: 'openingInventoryCost', label: '期初库存成本', render: (row) => formatAmount(row.openingInventoryCost) },
+  { key: 'closingInventoryCost', label: '期末库存成本', render: (row) => formatAmount(row.closingInventoryCost) },
+  { key: 'averageInventoryCost', label: '平均库存成本', render: (row) => formatAmount(row.averageInventoryCost) },
+  { key: 'turnoverDays', label: '存货周转天数', render: (row) => formatDays(row.turnoverDays) }
+];
+
 export default function InventoryTurnoverPage({ user = null, kcfxData = null, onRefresh }) {
   const [endMonth, setEndMonth] = useState('');
   const [periodMonths, setPeriodMonths] = useState(1);
@@ -90,6 +98,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingSegmentSummary, setExportingSegmentSummary] = useState(false);
   const [exportingMissingPrice, setExportingMissingPrice] = useState(false);
   const [error, setError] = useState('');
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -192,6 +201,29 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
       window.alert(`导出失败：${exportError?.message || exportError}`);
     } finally {
       setExporting(false);
+    }
+  }, [endMonth, filters, periodMonths, user]);
+
+  const exportSegmentSummary = useCallback(async () => {
+    setExportingSegmentSummary(true);
+    try {
+      const response = await fetch(`${API}/api/kcfx-library/inventory-turnover/segment-summary/export`, {
+        method: 'POST',
+        headers: userHeaders(user, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ endMonth, periodMonths, filters })
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `库存段周转汇总_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (exportError) {
+      window.alert(`导出失败：${exportError?.message || exportError}`);
+    } finally {
+      setExportingSegmentSummary(false);
     }
   }, [endMonth, filters, periodMonths, user]);
 
@@ -338,6 +370,20 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
           </div>
         </div>
       </div>
+
+      <section className="kcfx-panel turnover-segment-summary-panel">
+        <div className="panel-title-row">
+          <h3>库存段周转汇总</h3>
+          <button type="button" onClick={exportSegmentSummary} disabled={exportingSegmentSummary}>
+            {exportingSegmentSummary ? '导出中...' : '导出'}
+          </button>
+        </div>
+        <SimpleTable
+          rows={payload?.segmentSummary || []}
+          columns={SEGMENT_SUMMARY_COLUMNS}
+          paginated={false}
+        />
+      </section>
 
       <PanelGrid className="turnover-chart-grid">
         <TurnoverComparison

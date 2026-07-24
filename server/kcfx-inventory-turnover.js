@@ -887,6 +887,39 @@ function chartRows(rows, field, period, openingApproximate) {
     })), field);
 }
 
+export function inventoryTurnoverSegmentSummary(metrics = {}) {
+  return [
+    {
+      inventorySegment: '未交付量',
+      openingInventoryCost: Number(metrics.openingUndeliveredInventoryCost) || 0,
+      closingInventoryCost: Number(metrics.closingUndeliveredInventoryCost) || 0,
+      averageInventoryCost: Number(metrics.averageUndeliveredInventoryCost) || 0,
+      turnoverDays: metrics.undeliveredTurnoverDays
+    },
+    {
+      inventorySegment: '在途量',
+      openingInventoryCost: Number(metrics.openingInTransitInventoryCost) || 0,
+      closingInventoryCost: Number(metrics.closingInTransitInventoryCost) || 0,
+      averageInventoryCost: Number(metrics.averageInTransitInventoryCost) || 0,
+      turnoverDays: metrics.inTransitInventoryTurnoverDays
+    },
+    {
+      inventorySegment: '在库量',
+      openingInventoryCost: Number(metrics.openingOnHandInventoryCost) || 0,
+      closingInventoryCost: Number(metrics.closingOnHandInventoryCost) || 0,
+      averageInventoryCost: Number(metrics.averageOnHandInventoryCost) || 0,
+      turnoverDays: metrics.onHandInventoryTurnoverDays
+    },
+    {
+      inventorySegment: '合计',
+      openingInventoryCost: Number(metrics.openingInventoryTotalCost) || 0,
+      closingInventoryCost: Number(metrics.closingInventoryTotalCost) || 0,
+      averageInventoryCost: Number(metrics.averageInventoryTotalCost) || 0,
+      turnoverDays: metrics.inventoryTotalTurnoverDays
+    }
+  ];
+}
+
 export function queryInventoryTurnover(cache, input = {}) {
   if (!cache?.latestCommonMonth) {
     return {
@@ -945,6 +978,7 @@ export function queryInventoryTurnover(cache, input = {}) {
       availableEndMonths: cache.commonMonths
     },
     metrics,
+    segmentSummary: inventoryTurnoverSegmentSummary(metrics),
     charts: {
       department: chartRows(filteredRows, 'department', period, openingApproximate),
       productLine: chartRows(filteredRows, 'productLine', period, openingApproximate)

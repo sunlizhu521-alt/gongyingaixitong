@@ -175,6 +175,24 @@ test('在库、在途与未交付库存成本分别计算周转天数', () => {
   assert.equal(result.metrics.onHandQty, 50);
   assert.equal(result.metrics.inTransitQty, 30);
   assert.equal(result.metrics.inventoryTotalQty, 92);
+  assert.deepEqual(
+    result.segmentSummary.map((row) => row.inventorySegment),
+    ['未交付量', '在途量', '在库量', '合计']
+  );
+  assert.deepEqual(result.segmentSummary[0], {
+    inventorySegment: '未交付量',
+    openingInventoryCost: 120,
+    closingInventoryCost: 120,
+    averageInventoryCost: 120,
+    turnoverDays: 89 * (120 / 300)
+  });
+  assert.deepEqual(result.segmentSummary[3], {
+    inventorySegment: '合计',
+    openingInventoryCost: 1120,
+    closingInventoryCost: 920,
+    averageInventoryCost: 1020,
+    turnoverDays: 89 * (1020 / 300)
+  });
   assert.equal(result.charts.department[0].openingInventoryTotalCost, 1120);
   assert.equal(result.charts.department[0].closingInventoryTotalCost, 920);
   assert.equal(result.charts.department[0].averageInventoryTotalCost, 1020);
@@ -450,9 +468,10 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(app, /'salesInventory\.inventoryTurnover'/);
   assert.match(app, /item !== 'salesInventory\.inventoryTurnover'/);
   assert.match(constants, /!\['ageAnalysis', 'inventoryTurnover'\]\.includes\(page\.key\)/);
-  assert.equal((routes.match(/requirePermission\(database, req, res, 'salesInventory\.inventoryTurnover'\)/g) || []).length, 3);
+  assert.equal((routes.match(/requirePermission\(database, req, res, 'salesInventory\.inventoryTurnover'\)/g) || []).length, 4);
   assert.match(routes, /\/api\/kcfx-library\/inventory-turnover\/query/);
   assert.match(routes, /\/api\/kcfx-library\/inventory-turnover\/export/);
+  assert.match(routes, /\/api\/kcfx-library\/inventory-turnover\/segment-summary\/export/);
   assert.match(routes, /\/api\/kcfx-library\/inventory-turnover\/missing-price\/export/);
   assert.match(page, /inventorySegment[\s\S]*productSeries[\s\S]*nonInternalTransactionStatus[\s\S]*finishedGoodsStatus[\s\S]*hasSalesData/);
   assert.match(page, /allLabel: '全部库存段'/);
@@ -465,6 +484,12 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(page, /key: 'openingUndeliveredInventoryCost', label: '期初未交付库存成本'[\s\S]*key: 'averageUndeliveredInventoryCost', label: '平均未交付库存成本'[\s\S]*key: 'undeliveredTurnoverDays', label: '未交付存货周转天数'[\s\S]*key: 'openingInventoryTotalCost', label: '期初库存合计成本'[\s\S]*key: 'inventoryTotalTurnoverDays', label: '库存合计存货周转天数'/);
   assert.doesNotMatch(page, /未交付覆盖天数|inventoryTurnoverDays|undeliveredCoverageDays/);
   assert.match(page, /className="turnover-metric-scroll"[\s\S]*<MetricCards/);
+  assert.match(page, /库存段周转汇总[\s\S]*payload\?\.segmentSummary[\s\S]*SEGMENT_SUMMARY_COLUMNS/);
+  assert.match(page, /inventorySegment', label: '库存段'[\s\S]*openingInventoryCost', label: '期初库存成本'[\s\S]*closingInventoryCost', label: '期末库存成本'[\s\S]*averageInventoryCost', label: '平均库存成本'[\s\S]*turnoverDays', label: '存货周转天数'/);
+  assert.match(page, /inventory-turnover\/segment-summary\/export[\s\S]*库存段周转汇总_/);
+  assert.match(routes, /库存段: row\.inventorySegment,[\s\S]*期初库存成本: row\.openingInventoryCost,[\s\S]*存货周转天数: row\.turnoverDays/);
+  assert.match(styles, /\.turnover-segment-summary-panel\s*\{[\s\S]*margin-top:\s*12px/);
+  assert.match(styles, /\.turnover-segment-summary-panel \.kcfx-table-wrap tbody tr:last-child\s*\{[\s\S]*font-weight:\s*700/);
   assert.match(styles, /\.turnover-metric-scroll\s*\{[\s\S]*overflow-x:\s*auto/);
   assert.match(page, /turnover-metric-row-summary[\s\S]*月均销售产品成本[\s\S]*期间营业成本[\s\S]*期间天数/);
   assert.equal((page.match(/className="turnover-metric-row(?: |")/g) || []).length, 5);
@@ -512,7 +537,7 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(page, /className="turnover-filter-toolbar"[\s\S]*leadingContent/);
   assert.match(page, /const \[periodMonths, setPeriodMonths\] = useState\(1\)/);
   assert.match(page, /截止月份[\s\S]*<select[\s\S]*availableEndMonths[\s\S]*期间（月）/);
-  assert.equal((page.match(/JSON\.stringify\(\{ endMonth, periodMonths, filters/g) || []).length, 3);
+  assert.equal((page.match(/JSON\.stringify\(\{ endMonth, periodMonths, filters/g) || []).length, 4);
   assert.match(filters, /\{leadingContent\}[\s\S]*filters\.map/);
   assert.doesNotMatch(authPage, /setAuthMode\('register'\)/);
   assert.equal((authPage.match(/auth-switch-button/g) || []).length, 1);

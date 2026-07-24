@@ -718,6 +718,36 @@ app.post('/api/kcfx-library/inventory-turnover/export', async (req, res) => {
   }
 });
 
+app.post('/api/kcfx-library/inventory-turnover/segment-summary/export', async (req, res) => {
+  try {
+    const database = await initDb(dataDir);
+    const requestUser = requirePermission(database, req, res, 'salesInventory.inventoryTurnover');
+    if (!requestUser) return;
+    const cache = await getInventoryTurnoverCache(database);
+    const result = queryInventoryTurnover(cache, req.body || {});
+    const data = (result.segmentSummary || []).map((row) => ({
+      库存段: row.inventorySegment,
+      期初库存成本: row.openingInventoryCost,
+      期末库存成本: row.closingInventoryCost,
+      平均库存成本: row.averageInventoryCost,
+      存货周转天数: row.turnoverDays
+    }));
+    const exportRows = data.length ? data : [{ 提示: '暂无数据' }];
+    const workbook = createStyledWorkbook(ExcelJS, [{
+      name: '库存段周转汇总',
+      rows: exportRows,
+      columns: Object.keys(exportRows[0])
+    }]);
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`库存段周转汇总_${stamp}.xlsx`)}`);
+    res.send(buffer);
+  } catch (error) {
+    res.status(500).json({ error: error?.message || String(error) });
+  }
+});
+
 app.post('/api/kcfx-library/inventory-turnover/missing-price/export', async (req, res) => {
   try {
     const database = await initDb(dataDir);

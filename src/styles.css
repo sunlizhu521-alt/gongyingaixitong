@@ -1576,6 +1576,30 @@ th {
   white-space: nowrap;
 }
 
+.turnover-segment-summary-panel {
+  margin-top: 12px;
+}
+
+.turnover-segment-summary-panel .panel-title-row {
+  margin-bottom: 10px;
+}
+
+.turnover-segment-summary-panel .kcfx-table-wrap table {
+  min-width: 720px;
+  table-layout: fixed;
+}
+
+.turnover-segment-summary-panel .kcfx-table-wrap th,
+.turnover-segment-summary-panel .kcfx-table-wrap td {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.turnover-segment-summary-panel .kcfx-table-wrap tbody tr:last-child {
+  background: #edf4fb;
+  font-weight: 700;
+}
+
 .kcfx-react-page .dashboard-grid.receipt-chart-grid.turnover-chart-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
