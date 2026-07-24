@@ -175,6 +175,10 @@ test('在库、在途与未交付库存成本分别计算周转天数', () => {
   assert.equal(result.metrics.onHandQty, 50);
   assert.equal(result.metrics.inTransitQty, 30);
   assert.equal(result.metrics.inventoryTotalQty, 92);
+  assert.equal(result.charts.department[0].openingInventoryTotalCost, 1120);
+  assert.equal(result.charts.department[0].closingInventoryTotalCost, 920);
+  assert.equal(result.charts.department[0].averageInventoryTotalCost, 1020);
+  assert.equal(result.charts.department[0].inventoryTotalTurnoverDays, 89 * (1020 / 300));
   assert.equal('inventoryTurnoverDays' in result.metrics, false);
   assert.equal('undeliveredCoverageDays' in result.metrics, false);
   assert.equal(result.rows[0].dataStatus, '完整');
@@ -495,6 +499,10 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(page, /turnoverBarTitle\([\s\S]*期末在库库存成本[\s\S]*closingOnHandInventoryCost/);
   assert.match(page, /turnoverBarTitle\([\s\S]*期末在途库存成本[\s\S]*closingInTransitInventoryCost/);
   assert.match(page, /turnoverBarTitle\([\s\S]*期末未交付库存成本[\s\S]*closingUndeliveredInventoryCost/);
+  assert.match(page, /事业部在库量、在途量与未交付存货周转天数[\s\S]*showSummaryTable/);
+  assert.match(page, /turnover-department-summary-table[\s\S]*期初库存合计成本[\s\S]*期末库存合计成本[\s\S]*平均库存合计成本[\s\S]*库存合计存货周转天数/);
+  assert.match(styles, /\.turnover-comparison-content\.with-summary-table\s*\{[\s\S]*grid-template-rows:\s*minmax\(0,\s*1fr\) auto/);
+  assert.match(styles, /\.turnover-department-summary-table\s*\{[\s\S]*max-height:\s*238px[\s\S]*overflow:\s*auto/);
   assert.match(page, /导出缺少内部结算价明细/);
   assert.doesNotMatch(page, /近1月|近3月|近6月/);
   assert.match(page, /className="turnover-filter-toolbar"[\s\S]*leadingContent/);

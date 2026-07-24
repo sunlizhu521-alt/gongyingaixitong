@@ -340,7 +340,11 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
       </div>
 
       <PanelGrid className="turnover-chart-grid">
-        <TurnoverComparison title="事业部在库量、在途量与未交付存货周转天数" rows={payload?.charts?.department || []} />
+        <TurnoverComparison
+          title="事业部在库量、在途量与未交付存货周转天数"
+          rows={payload?.charts?.department || []}
+          showSummaryTable
+        />
         <TurnoverComparison title="产品线在库量、在途量与未交付存货周转天数" rows={payload?.charts?.productLine || []} />
       </PanelGrid>
 
@@ -407,7 +411,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
   );
 }
 
-function TurnoverComparison({ title, rows }) {
+function TurnoverComparison({ title, rows, showSummaryTable = false }) {
   const visibleRows = rows.slice(0, 20);
   const max = Math.max(
     ...visibleRows.flatMap((row) => [
@@ -427,44 +431,72 @@ function TurnoverComparison({ title, rows }) {
           <i className="turnover-legend turnover-legend-undelivered" />未交付存货周转天数
         </span>
       </div>
-      <div className="turnover-comparison-rows">
-        {visibleRows.length ? visibleRows.map((row) => (
-          <div className="turnover-comparison-row" key={row.name}>
-            <strong title={row.name}>{row.name}</strong>
-            <div className="turnover-comparison-bars">
-              <div title={turnoverBarTitle(
-                row.name,
-                '在库量存货周转天数',
-                row.onHandInventoryTurnoverDays,
-                '期末在库库存成本',
-                row.closingOnHandInventoryCost
-              )}>
-                <span className="turnover-bar on-hand" style={{ width: `${Math.max(2, ((Number(row.onHandInventoryTurnoverDays) || 0) / max) * 100)}%` }} />
-                <em>{formatDays(row.onHandInventoryTurnoverDays)}</em>
-              </div>
-              <div title={turnoverBarTitle(
-                row.name,
-                '在途量存货周转天数',
-                row.inTransitInventoryTurnoverDays,
-                '期末在途库存成本',
-                row.closingInTransitInventoryCost
-              )}>
-                <span className="turnover-bar in-transit" style={{ width: `${Math.max(2, ((Number(row.inTransitInventoryTurnoverDays) || 0) / max) * 100)}%` }} />
-                <em>{formatDays(row.inTransitInventoryTurnoverDays)}</em>
-              </div>
-              <div title={turnoverBarTitle(
-                row.name,
-                '未交付存货周转天数',
-                row.undeliveredTurnoverDays,
-                '期末未交付库存成本',
-                row.closingUndeliveredInventoryCost
-              )}>
-                <span className="turnover-bar undelivered" style={{ width: `${Math.max(2, ((Number(row.undeliveredTurnoverDays) || 0) / max) * 100)}%` }} />
-                <em>{formatDays(row.undeliveredTurnoverDays)}</em>
+      <div className={`turnover-comparison-content${showSummaryTable ? ' with-summary-table' : ''}`}>
+        <div className="turnover-comparison-rows">
+          {visibleRows.length ? visibleRows.map((row) => (
+            <div className="turnover-comparison-row" key={row.name}>
+              <strong title={row.name}>{row.name}</strong>
+              <div className="turnover-comparison-bars">
+                <div title={turnoverBarTitle(
+                  row.name,
+                  '在库量存货周转天数',
+                  row.onHandInventoryTurnoverDays,
+                  '期末在库库存成本',
+                  row.closingOnHandInventoryCost
+                )}>
+                  <span className="turnover-bar on-hand" style={{ width: `${Math.max(2, ((Number(row.onHandInventoryTurnoverDays) || 0) / max) * 100)}%` }} />
+                  <em>{formatDays(row.onHandInventoryTurnoverDays)}</em>
+                </div>
+                <div title={turnoverBarTitle(
+                  row.name,
+                  '在途量存货周转天数',
+                  row.inTransitInventoryTurnoverDays,
+                  '期末在途库存成本',
+                  row.closingInTransitInventoryCost
+                )}>
+                  <span className="turnover-bar in-transit" style={{ width: `${Math.max(2, ((Number(row.inTransitInventoryTurnoverDays) || 0) / max) * 100)}%` }} />
+                  <em>{formatDays(row.inTransitInventoryTurnoverDays)}</em>
+                </div>
+                <div title={turnoverBarTitle(
+                  row.name,
+                  '未交付存货周转天数',
+                  row.undeliveredTurnoverDays,
+                  '期末未交付库存成本',
+                  row.closingUndeliveredInventoryCost
+                )}>
+                  <span className="turnover-bar undelivered" style={{ width: `${Math.max(2, ((Number(row.undeliveredTurnoverDays) || 0) / max) * 100)}%` }} />
+                  <em>{formatDays(row.undeliveredTurnoverDays)}</em>
+                </div>
               </div>
             </div>
+          )) : <div className="empty">暂无数据</div>}
+        </div>
+        {showSummaryTable && visibleRows.length > 0 && (
+          <div className="turnover-department-summary-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>事业部</th>
+                  <th>期初库存合计成本</th>
+                  <th>期末库存合计成本</th>
+                  <th>平均库存合计成本</th>
+                  <th>库存合计存货周转天数</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.map((row) => (
+                  <tr key={row.name}>
+                    <td title={row.name}>{row.name}</td>
+                    <td>{formatAmount(row.openingInventoryTotalCost)}</td>
+                    <td>{formatAmount(row.closingInventoryTotalCost)}</td>
+                    <td>{formatAmount(row.averageInventoryTotalCost)}</td>
+                    <td>{formatDays(row.inventoryTotalTurnoverDays)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )) : <div className="empty">暂无数据</div>}
+        )}
       </div>
     </section>
   );

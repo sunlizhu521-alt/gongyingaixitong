@@ -1585,6 +1585,21 @@ th {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+.turnover-comparison-content {
+  min-height: 0;
+}
+
+.turnover-comparison-content.with-summary-table {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.turnover-comparison-content.with-summary-table .turnover-comparison-rows {
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .turnover-chart-heading,
 .turnover-detail-panel .panel-title-row {
   display: flex;
@@ -1715,6 +1730,42 @@ th {
   font-style: normal;
   font-weight: 700;
   text-align: right;
+}
+
+.turnover-department-summary-table {
+  max-height: 238px;
+  overflow: auto;
+  border: 1px solid #d8e3ee;
+  border-radius: 4px;
+}
+
+.turnover-department-summary-table table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.turnover-department-summary-table th,
+.turnover-department-summary-table td {
+  padding: 7px 8px;
+  border: 1px solid #d8e3ee;
+  font-size: 12px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.turnover-department-summary-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #edf4fb;
+  color: #1d3850;
+}
+
+.turnover-department-summary-table td:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .turnover-detail-panel {
