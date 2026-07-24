@@ -333,8 +333,8 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
         <div className="turnover-calculation-details">
           <h4>详细计算逻辑</h4>
           <div className="turnover-detail-formulas" aria-label="计算公式">
-            <p><strong>在库量存货周转天数</strong> = 期间天数 ×（平均在库库存成本 ÷ 期间营业成本）</p>
-            <p><strong>在途量存货周转天数</strong> = 期间天数 ×（平均在途库存成本 ÷ 期间营业成本）</p>
+            <p><strong>存货周转天数</strong> = 期间天数 ×（平均存货成本 ÷ 期间营业成本）</p>
+            <p><strong>期间营业成本</strong> = 月均销售产品成本 × 月数</p>
             <p><strong>平均库存成本</strong> =（对应期初库存成本 + 对应期末库存成本）÷ 2</p>
             <p><strong>未交付存货周转天数</strong> = 期间天数 ×（平均未交付库存成本 ÷ 期间营业成本）</p>
             <p><strong>库存合计存货周转天数</strong> = 期间天数 ×（平均库存合计成本 ÷ 期间营业成本）</p>

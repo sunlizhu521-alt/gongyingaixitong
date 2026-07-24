@@ -446,6 +446,8 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(styles, /\.turnover-metric-row-summary \.kcfx-metric-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,/);
   assert.match(styles, /\.turnover-metric-scroll \.kcfx-metric-card span,[\s\S]*white-space:\s*nowrap/);
   assert.match(page, /库存周转明细[\s\S]*TablePagination[\s\S]*详细计算逻辑[\s\S]*className="turnover-detail-formulas"/);
+  assert.match(page, /<strong>存货周转天数<\/strong> = 期间天数 ×（平均存货成本 ÷ 期间营业成本）/);
+  assert.match(page, /<strong>期间营业成本<\/strong> = 月均销售产品成本 × 月数/);
   assert.doesNotMatch(page, /className="turnover-formulas"/);
   assert.match(styles, /\.turnover-detail-formulas\s*\{[\s\S]*grid-template-columns:/);
   assert.doesNotMatch(styles, /\.turnover-formulas\s*\{/);
