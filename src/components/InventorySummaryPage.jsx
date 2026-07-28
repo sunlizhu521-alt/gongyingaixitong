@@ -90,6 +90,7 @@ const VIEW_CONFIG = {
       { key: 'country', label: '国家' },
       { key: 'platform', label: '平台' },
       { key: 'productLine', label: '产品线' },
+      { key: 'productSeries', label: '销售系列' },
       { key: 'materialCode', label: '物料编码' },
       { key: 'sku', label: 'SKU' },
       { key: 'kingdeeName', label: '金蝶名称' },

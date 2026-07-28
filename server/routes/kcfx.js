@@ -614,6 +614,7 @@ app.post('/api/kcfx-library/inventory-summary/export', async (req, res) => {
         国家: row.country,
         平台: row.platform,
         产品线: row.productLine,
+        销售系列: row.productSeries,
         物料编码: row.materialCode,
         SKU: row.sku,
         金蝶名称: row.kingdeeName,

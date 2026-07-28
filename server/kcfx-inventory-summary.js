@@ -425,7 +425,17 @@ function buildOptions(rows, fields, selections, search, searchFields) {
 function groupSalesRows(rows) {
   const map = new Map();
   for (const row of rows) {
-    const fields = ['salesMonth', 'department', 'country', 'platform', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
+    const fields = [
+      'salesMonth',
+      'department',
+      'country',
+      'platform',
+      'productLine',
+      'productSeries',
+      'materialCode',
+      'sku',
+      'kingdeeName'
+    ];
     const key = fields.map((field) => row[field] || '').join('\u0001');
     let target = map.get(key);
     if (!target) {
@@ -436,6 +446,7 @@ function groupSalesRows(rows) {
         country: row.country,
         platform: row.platform,
         productLine: row.productLine,
+        productSeries: row.productSeries,
         materialCode: row.materialCode,
         sku: row.sku,
         kingdeeName: row.kingdeeName,
@@ -459,7 +470,17 @@ function resolveRows(cache, request = {}) {
   const selections = normalizedSelections(request.filters);
   const search = request.search || '';
   if (report === 'sales') {
-    const searchFields = ['searchText', 'department', 'country', 'platform', 'productLine', 'materialCode', 'sku', 'kingdeeName'];
+    const searchFields = [
+      'searchText',
+      'department',
+      'country',
+      'platform',
+      'productLine',
+      'productSeries',
+      'materialCode',
+      'sku',
+      'kingdeeName'
+    ];
     const baseRows = cache.salesDetails || [];
     const options = buildOptions(baseRows, SALES_FILTER_FIELDS, selections, search, searchFields);
     options.salesMonth = sortedOptions(baseRows.map((row) => row.salesMonth), 'salesMonth');
