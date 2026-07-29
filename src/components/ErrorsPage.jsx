@@ -3,6 +3,10 @@ import { API } from '../constants.js';
 import { isStoreMappingRecordValid, STORE_MAPPING_CUSTOMER_HEADERS } from '../../shared/kcfxStoreMapping.js';
 import { TablePagination, useTablePagination } from './TablePagination.jsx';
 import { downloadErrorWorkbook } from './errorReportExport.js';
+import {
+  findNonTaxSettlementPriceHeader,
+  NON_TAX_SETTLEMENT_PRICE_HEADERS
+} from '../../shared/kcfxSettlementPrice.js';
 
 const EMPTY_TABLES = {
   closed: emptyErrorResult(),
@@ -54,7 +58,7 @@ const INVENTORY_SUMMARY_SETTLEMENT_ERROR_COLUMNS = [
   ['materialCode', '物料编码'],
   ['sku', 'SKU'],
   ['kingdeeName', '金蝶名称'],
-  ['settlementPrice', '内部结算价'],
+  ['settlementPrice', '不含税结算价'],
   ['qty', '数量'],
   ['reason', '报错原因']
 ];
@@ -70,7 +74,7 @@ const SALES_SUMMARY_SETTLEMENT_ERROR_COLUMNS = [
   ['materialCode', '物料编码'],
   ['sku', 'SKU'],
   ['kingdeeName', '金蝶名称'],
-  ['settlementPrice', '内部结算价'],
+  ['settlementPrice', '不含税结算价'],
   ['qty', '销售数量'],
   ['amount', '销售金额'],
   ['reason', '报错原因']
@@ -109,7 +113,7 @@ const ERROR_DOWNLOAD_CONFIG = {
   },
   settlementMissing: {
     sources: ['closed', 'detail'],
-    name: '结算价缺失表',
+    name: '不含税结算价缺失表',
     columns: [
       ['materialCode', '物料编码'],
       ['materialName', '物料名称'],
@@ -189,7 +193,7 @@ const ERROR_DOWNLOAD_CONFIG = {
   },
   inventorySummarySettlementMissing: {
     sources: ['inventorySummary'],
-    name: '库存汇总内部结算价缺失表',
+    name: '库存汇总不含税结算价缺失表',
     columns: INVENTORY_SUMMARY_SETTLEMENT_ERROR_COLUMNS
   },
   salesSummaryProductMissing: {
@@ -214,7 +218,7 @@ const ERROR_DOWNLOAD_CONFIG = {
   },
   salesSummarySettlementMissing: {
     sources: ['salesSummary'],
-    name: '销售汇总内部结算价缺失表',
+    name: '销售汇总不含税结算价缺失表',
     columns: SALES_SUMMARY_SETTLEMENT_ERROR_COLUMNS
   }
 };
@@ -234,13 +238,13 @@ const ERROR_TYPE_OPTIONS = {
     { value: 'productMissing', label: '商品分类缺失' },
     { value: 'divisionMissing', label: '事业部对照缺失' },
     { value: 'warehouseMissing', label: '仓库对照缺失' },
-    { value: 'settlementMissing', label: '结算价缺失' }
+    { value: 'settlementMissing', label: '不含税结算价缺失' }
   ],
   detail: [
     { value: 'productMissing', label: '商品分类缺失' },
     { value: 'divisionMissing', label: '事业部对照缺失' },
     { value: 'warehouseMissing', label: '仓库对照缺失' },
-    { value: 'settlementMissing', label: '结算价缺失' }
+    { value: 'settlementMissing', label: '不含税结算价缺失' }
   ],
   sales: [
     { value: 'productMissing', label: '商品分类缺失' },
@@ -254,14 +258,14 @@ const ERROR_TYPE_OPTIONS = {
     { value: 'inventorySummaryDepartmentMissing', label: '事业部匹配缺失' },
     { value: 'inventorySummaryWarehouseMissing', label: '库存所在地匹配缺失' },
     { value: 'inventorySummarySupplierMissing', label: '供应商缺失' },
-    { value: 'inventorySummarySettlementMissing', label: '内部结算价缺失' }
+    { value: 'inventorySummarySettlementMissing', label: '不含税结算价缺失' }
   ],
   salesSummary: [
     { value: 'salesSummaryProductMissing', label: '商品维度信息缺失' },
     { value: 'salesSummaryDepartmentMissing', label: '事业部匹配缺失' },
     { value: 'salesSummaryCountryMissing', label: '国家信息缺失' },
     { value: 'salesSummaryPlatformMissing', label: '平台信息缺失' },
-    { value: 'salesSummarySettlementMissing', label: '内部结算价缺失' }
+    { value: 'salesSummarySettlementMissing', label: '不含税结算价缺失' }
   ]
 };
 
@@ -509,7 +513,7 @@ export default function ErrorsPage({
       {selectedSource === 'detail' && <CheckGroup
         source="detail"
         title="根据库存分析月份表"
-        description="数量取库存分析月份表的合计库存数量；结算价、销售产品线、销售系列通过物料编码匹配商品分类维表；事业部按使用组织 + 结库 + 物料编码匹配仓库物料事业部对照表。"
+        description="数量取库存分析月份表的合计库存数量；不含税结算价、销售产品线、销售系列通过物料编码匹配商品分类维表；事业部按使用组织 + 结库 + 物料编码匹配仓库物料事业部对照表。"
         result={checks.detail}
         activeIssue={selectedErrorType}
         onDownload={downloadSingle}
@@ -548,7 +552,7 @@ function CheckGroup({ source, title, description, result, activeIssue, onDownloa
         <MetricCard label="商品分类缺失" value={result.productMissing.length} />
         <MetricCard label="事业部对照缺失" value={result.divisionMissing.length} />
         <MetricCard label="仓库对照缺失" value={result.warehouseMissing.length} />
-        <MetricCard label="结算价缺失" value={result.settlementMissing.length} />
+        <MetricCard label="不含税结算价缺失" value={result.settlementMissing.length} />
       </section>
 
       {activeIssue === 'productMissing' && <ErrorTable
@@ -603,7 +607,7 @@ function CheckGroup({ source, title, description, result, activeIssue, onDownloa
         onDownload={() => onDownload(source, 'warehouseMissing')}
       />}
       {activeIssue === 'settlementMissing' && <ErrorTable
-        title="有库存没有结算价（含税）的物料"
+        title="有库存没有不含税结算价的物料"
         columns={[
           ['materialCode', '物料编码'],
           ['materialName', '物料名称'],
@@ -614,9 +618,9 @@ function CheckGroup({ source, title, description, result, activeIssue, onDownloa
         rows={result.settlementMissing}
         diagnostic={[
           '来源：事实表取有库存物料编码和数量。',
-          '比对：商品分类维表物料编码对应的结算价（含税）。',
-          '缺失提示：销售成品有库存，但商品分类维表结算价（含税）为空或为 0。',
-          '需要维护：维度表文件库的商品分类维表结算价（含税）。'
+          '比对：商品分类维表物料编码对应的不含税结算价。',
+          '缺失提示：销售成品有库存，但商品分类维表不含税结算价为空或为 0。',
+          '需要维护：维度表文件库的商品分类维表不含税结算价。'
         ]}
         onDownload={() => onDownload(source, 'settlementMissing')}
       />}
@@ -750,13 +754,13 @@ function SummaryReportCheckGroup({ source, title, result, activeIssue, onDownloa
     ? [
         '来源：库存汇总报表使用的在库、在途和采购订单未交付记录。',
         '检查：沿用库存汇总报表的物料编码、仓库、库存组织和采购订单字段映射结果。',
-        '缺失提示：报表中显示为未匹配产品线、SKU、金蝶名称、事业部、库存所在地、供应商，或内部结算价为空或为0的记录。',
+        '缺失提示：报表中显示为未匹配产品线、SKU、金蝶名称、事业部、库存所在地、供应商，或不含税结算价为空或为0的记录。',
         '需要维护：对应的商品分类维表、仓库维表、仓库物料事业部对照表或采购订单文件。'
       ]
     : [
         '来源：销售汇总报表使用的有效销售记录。',
         '检查：沿用销售汇总报表按客户名称 + 物料编码匹配事业部、按客户名称匹配国家和平台、按物料编码匹配商品维度的结果。',
-        '缺失提示：报表中显示为未匹配事业部、国家、平台、产品线、SKU、金蝶名称，或内部结算价为空或为0的记录。',
+        '缺失提示：报表中显示为未匹配事业部、国家、平台、产品线、SKU、金蝶名称，或不含税结算价为空或为0的记录。',
         '需要维护：客户与物料对照表、店铺名称汇总维表或商品分类维表。'
       ];
 
@@ -1316,9 +1320,8 @@ function mapProduct(rows) {
       category1: normalizeText(firstValue(row, ['一级品类'])),
       productStatus: normalizeText(firstValue(row, ['产品状态（Dim）', '产品状态'])),
       settlementPrice: firstNumber([
-        firstValue(row, ['结算价（含税）', '结算价(含税)', '结算价含税', '结算价', '内部结算价', '26年内部结算价', '2026年内部结算价']),
-        firstValueByHeaderIncludes(row, ['结算价']),
-        nthValue(row, 9)
+        firstValue(row, NON_TAX_SETTLEMENT_PRICE_HEADERS),
+        row?.[findNonTaxSettlementPriceHeader(row)]
       ])
     });
   }

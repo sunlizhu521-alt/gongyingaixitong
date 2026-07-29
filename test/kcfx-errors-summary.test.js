@@ -39,7 +39,7 @@ test('维度表更新后重新计算会移除已经补齐的商品报错', () =>
   assert.equal(before.sales.productMissing.length, 1);
 
   records['dim-product'] = record([
-    { 物料编码: '1001', SKU: 'SKU-A', 金蝶名称: '产品A', 销售产品线: '产品线A', 销售系列: '系列A', '结算价（含税）': '10' }
+    { 物料编码: '1001', SKU: 'SKU-A', 金蝶名称: '产品A', 销售产品线: '产品线A', 销售系列: '系列A', '不含税结算价': '10' }
   ], '2026-07-22T01:00:00.000Z');
   const after = buildKcfxErrorsSummary(records, 'after');
   assert.equal(after.closed.productMissing.length, 0);
@@ -48,10 +48,10 @@ test('维度表更新后重新计算会移除已经补齐的商品报错', () =>
   assert.equal(after.closed.settlementMissing.length, 0);
 });
 
-test('结算价缺失报错带出商品维表销售系列', () => {
+test('不含税结算价缺失报错带出商品维表销售系列', () => {
   const records = sampleRecords();
   records['dim-product'] = record([
-    { 物料编码: '1001', SKU: 'SKU-A', 金蝶名称: '产品A', 销售产品线: '产品线A', 销售系列: '系列A', 结算价: '0' }
+    { 物料编码: '1001', SKU: 'SKU-A', 金蝶名称: '产品A', 销售产品线: '产品线A', 销售系列: '系列A', 不含税结算价: '0' }
   ]);
   const summary = buildKcfxErrorsSummary(records, 'saved-at');
   assert.equal(summary.closed.settlementMissing[0].productLine, '产品线A');

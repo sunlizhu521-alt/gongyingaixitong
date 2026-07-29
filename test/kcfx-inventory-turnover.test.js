@@ -17,8 +17,8 @@ function record(rows, id = '') {
 function sampleRecords() {
   const records = {
     'dim-product': record([
-      { 物料编码: '1001', SKU: 'SKU-1', 金蝶名称: '产品A', 销售产品线: '产品线A', 销售系列: '系列A', 一级分类: '成品', 结算价: 10 },
-      { 物料编码: '1002', SKU: 'SKU-2', 金蝶名称: '配件B', 销售产品线: '健康办公', 销售系列: '护理床附件', 一级分类: '成品', 结算价: 20 }
+      { 物料编码: '1001', SKU: 'SKU-1', 金蝶名称: '产品A', 销售产品线: '产品线A', 销售系列: '系列A', 一级分类: '成品', 不含税结算价: 10 },
+      { 物料编码: '1002', SKU: 'SKU-2', 金蝶名称: '配件B', 销售产品线: '健康办公', 销售系列: '护理床附件', 一级分类: '成品', 不含税结算价: 20 }
     ]),
     'dim-warehouse': record([
       { 仓库名称: '销售仓', 一级仓库分类: '销售出库仓', 二级仓库分类: '国内' },
@@ -355,21 +355,21 @@ test('缺少严格期初时使用最早库存快照并标记数据不完整', ()
   assert.match(result.metrics.dataStatus, /缺少2025-12期初库存快照/);
 });
 
-test('零分母返回空周转天数且缺失结算价标记不完整', () => {
+test('零分母返回空周转天数且缺失不含税结算价标记不完整', () => {
   const records = sampleRecords();
-  records['dim-product'].rows[0].结算价 = 0;
+  records['dim-product'].rows[0].不含税结算价 = 0;
   for (const row of records['sales-data'].rows) row.出库数量 = 0;
   const result = queryInventoryTurnover(buildInventoryTurnoverCache(records), { periodMonths: 3 });
   assert.equal(result.metrics.onHandInventoryTurnoverDays, null);
   assert.equal(result.metrics.inTransitInventoryTurnoverDays, null);
   assert.equal(result.metrics.undeliveredTurnoverDays, null);
   assert.ok(result.diagnostics.missingPriceRows > 0);
-  assert.match(result.metrics.dataStatus, /期初库存缺少结算价2条/);
-  assert.match(result.metrics.dataStatus, /期末库存缺少结算价2条/);
-  assert.match(result.metrics.dataStatus, /销售数据缺少结算价3条（物料编码：1001）/);
-  assert.match(result.metrics.dataStatus, /采购订单未交付库存缺少结算价1条（物料编码：1001）/);
-  assert.match(result.rows[0].dataStatus, /销售数据缺少结算价3条（物料编码：1001）/);
-  assert.match(result.rows[0].dataStatus, /采购订单未交付库存缺少结算价1条（物料编码：1001）/);
+  assert.match(result.metrics.dataStatus, /期初库存缺少不含税结算价2条/);
+  assert.match(result.metrics.dataStatus, /期末库存缺少不含税结算价2条/);
+  assert.match(result.metrics.dataStatus, /销售数据缺少不含税结算价3条（物料编码：1001）/);
+  assert.match(result.metrics.dataStatus, /采购订单未交付库存缺少不含税结算价1条（物料编码：1001）/);
+  assert.match(result.rows[0].dataStatus, /销售数据缺少不含税结算价3条（物料编码：1001）/);
+  assert.match(result.rows[0].dataStatus, /采购订单未交付库存缺少不含税结算价1条（物料编码：1001）/);
   assert.deepEqual(result.rows[0].salesMissingPriceMaterialCodes, ['1001']);
   assert.deepEqual(result.rows[0].undeliveredMissingPriceMaterialCodes, ['1001']);
   const missingRows = exportInventoryTurnoverMissingPriceRows(buildInventoryTurnoverCache(records), { periodMonths: 3 });
@@ -470,7 +470,7 @@ test('是否有销售数据默认只保留期间内存在销售记录的汇总�
     销售产品线: '产品线B',
     销售系列: '系列B',
     一级分类: '成品',
-    结算价: 5
+    不含税结算价: 5
   });
   records['dim-warehouse-material'].rows.push({
     库存组织: '组织A',
@@ -578,7 +578,7 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(page, /平均在库库存成本 =（期初在库库存成本 \+ 期末在库库存成本）÷ 2/);
   assert.match(page, /平均在途库存成本 =（期初在途库存成本 \+ 期末在途库存成本）÷ 2/);
   assert.match(page, /在库量、在途量和未交付存货周转天数三项相加等于库存合计存货周转天数/);
-  assert.match(page, /未交付库存成本<\/strong> = 采购订单剩余入库数量 × 2026年结算价/);
+  assert.match(page, /未交付库存成本<\/strong> = 采购订单剩余入库数量 × 2026年不含税结算价/);
   assert.match(page, /未交付存货周转天数 = 期间天数 ×（平均未交付库存成本 ÷ 期间营业成本）/);
   assert.match(page, /库存合计存货周转天数<\/strong> = 期间天数 ×（平均库存合计成本 ÷ 期间营业成本）/);
   assert.match(page, /期间营业成本小于等于0时，对应周转天数显示“--”/);
@@ -598,7 +598,7 @@ test('菜单、独立权限、筛选器、查询和导出接口已接入', async
   assert.match(styles, /\.turnover-comparison-total > span\s*\{[\s\S]*font-size:\s*70px/);
   assert.match(styles, /\.turnover-comparison-content\.with-summary-table\s*\{[\s\S]*grid-template-rows:\s*minmax\(0,\s*1fr\) auto/);
   assert.match(styles, /\.turnover-department-summary-table\s*\{[\s\S]*max-height:\s*238px[\s\S]*overflow:\s*auto/);
-  assert.match(page, /导出缺少内部结算价明细/);
+  assert.match(page, /导出缺少不含税结算价明细/);
   assert.doesNotMatch(page, /近1月|近3月|近6月/);
   assert.match(page, /className="turnover-filter-toolbar"[\s\S]*leadingContent/);
   assert.match(page, /const \[periodMonths, setPeriodMonths\] = useState\(1\)/);

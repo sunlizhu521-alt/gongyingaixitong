@@ -51,6 +51,10 @@ import {
 } from './kcfx-age-analysis.js';
 import { isStoreMappingHeaderSet, isStoreMappingRecordValid, pickStoreMappingSheetName, STORE_MAPPING_SHEET_HINT } from '../shared/kcfxStoreMapping.js';
 import { normalizeKcfxMaterialCodeRows } from '../shared/kcfxMaterialCodeText.js';
+import {
+  findNonTaxSettlementPriceHeader,
+  NON_TAX_SETTLEMENT_PRICE_HEADERS
+} from '../shared/kcfxSettlementPrice.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -1522,7 +1526,7 @@ const KCFX_RECEIPT_UNINSPECTED_RETURN_CATEGORIES = new Set(['全新品', '其他
 const KCFX_RECEIPT_OTHER_UNSALEABLE_RETURN_CATEGORIES = new Set(['健康办公', '其他/配件']);
 let kcfxReceiptSummaryCache = null;
 let kcfxReceiptSummaryPromise = null;
-const KCFX_RECEIPT_SUMMARY_CACHE_VERSION = 6;
+const KCFX_RECEIPT_SUMMARY_CACHE_VERSION = 7;
 let kcfxAgeAnalysisCache = null;
 let kcfxAgeAnalysisPromise = null;
 const KCFX_RECEIPT_SUMMARY_ROW_FIELDS = [
@@ -2194,9 +2198,8 @@ function mapKcfxReceiptProductsByMaterialCode(rows) {
       productLine: kcfxReceiptFirstText([kcfxReceiptFirstValue(row, ['销售产品线', '产品线']), kcfxNthValue(row, 7)]),
       series: kcfxReceiptFirstText([kcfxReceiptFirstValue(row, ['销售系列', '系列']), kcfxNthValue(row, 8)]),
       settlementPrice: kcfxReceiptFirstNumber([
-        kcfxReceiptFirstValue(row, ['结算价(含税)', '结算价（含税）', '结算价含税', '结算价', '内部结算价', '26年内部结算价', '2026年内部结算价']),
-        kcfxReceiptFirstValueByHeaderIncludes(row, ['结算价']),
-        kcfxNthValue(row, 9)
+        kcfxReceiptFirstValue(row, NON_TAX_SETTLEMENT_PRICE_HEADERS),
+        row?.[findNonTaxSettlementPriceHeader(row)]
       ])
     });
   }
@@ -2606,14 +2609,10 @@ function normalizeKcfxMaterialCode(value) {
 }
 
 function makeKcfxTrendPriceAccessor(sampleRow, fallbackOneBasedIndex = 16) {
-  const keys = Object.keys(sampleRow || {});
-  const normalized = keys.map((key) => ({ key, text: normalizeKcfxTrendHeaderText(key) }));
-  const preferred = normalized.find(({ text }) => text.includes('结算价') && text.includes('含税'))
-    || normalized.find(({ text }) => text.includes('结算价'))
-    || normalized.find(({ text }) => text.includes('含税') && text.includes('价'));
+  const preferred = findNonTaxSettlementPriceHeader(sampleRow);
   return preferred
-    ? (row) => row?.[preferred.key]
-    : (row) => (fallbackOneBasedIndex > 0 ? kcfxNthValue(row, fallbackOneBasedIndex) : 0);
+    ? (row) => row?.[preferred]
+    : () => 0;
 }
 
 function makeKcfxTrendQtyAccessor(sampleRow) {
@@ -2744,7 +2743,7 @@ function kcfxHeaderKeywordsForSlot(slot = {}) {
     return [...common, '数量(库存)', '0天到30天', '151天到180天', '181天以上', '结余库存数量', '库龄'];
   }
   if (/^fact-[3-8]$/.test(slot.id || '')) {
-    return [...common, '结算价', '含税', '库存数量', '期末', '收发'];
+    return [...common, '不含税结算价', '库存数量', '期末', '收发'];
   }
   return common;
 }

@@ -243,7 +243,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `缺少内部结算价明细_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      anchor.download = `缺少不含税结算价明细_${new Date().toISOString().slice(0, 10)}.xlsx`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (exportError) {
@@ -269,7 +269,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
       ? `期初目标为${period.openingTargetMonth}，当前使用${period.openingSnapshotLabel}快照，期初数据不完整。`
       : '',
     Number(payload?.diagnostics?.missingPriceRows) > 0
-      ? `有${formatNumber(payload.diagnostics.missingPriceRows)}条记录缺少内部结算价，相关成本按0计算。`
+      ? `有${formatNumber(payload.diagnostics.missingPriceRows)}条记录缺少不含税结算价，相关成本按0计算。`
       : ''
   ].filter(Boolean).join(' ');
 
@@ -324,7 +324,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
           <span>{warning}</span>
           {Number(payload?.diagnostics?.missingPriceRows) > 0 && (
             <button type="button" onClick={exportMissingPriceRows} disabled={exportingMissingPrice}>
-              {exportingMissingPrice ? '导出中...' : '导出缺少内部结算价明细'}
+              {exportingMissingPrice ? '导出中...' : '导出缺少不含税结算价明细'}
             </button>
           )}
         </div>
@@ -394,7 +394,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
             <p><strong>平均库存成本</strong> =（对应期初库存成本 + 对应期末库存成本）÷ 2</p>
             <p><strong>未交付存货周转天数</strong> = 期间天数 ×（平均未交付库存成本 ÷ 期间营业成本）</p>
             <p><strong>库存合计存货周转天数</strong> = 期间天数 ×（平均库存合计成本 ÷ 期间营业成本）</p>
-            <p><strong>销售成本</strong> = 应收数量 × 2026年结算价；<strong>未交付库存成本</strong> = 采购订单剩余入库数量 × 2026年结算价</p>
+            <p><strong>销售成本</strong> = 应收数量 × 2026年不含税结算价；<strong>未交付库存成本</strong> = 采购订单剩余入库数量 × 2026年不含税结算价</p>
             <p><strong>库存合计</strong> = 在库量 + 在途量 + 未交付总数量</p>
           </div>
           <ol>
@@ -415,7 +415,7 @@ export default function InventoryTurnoverPage({ user = null, kcfxData = null, on
             </li>
             <li>
               <strong>未交付存货周转天数：</strong>
-              采购订单当前快照的剩余入库数量乘以2026年内部结算价，得到未交付库存成本；
+              采购订单当前快照的剩余入库数量乘以2026年不含税结算价，得到未交付库存成本；
               当前快照同时作为期初和期末未交付库存成本，因此平均未交付库存成本与当前快照成本相同；
               未交付存货周转天数 = 期间天数 ×（平均未交付库存成本 ÷ 期间营业成本）。
               期间营业成本小于等于0时，对应周转天数显示“--”。

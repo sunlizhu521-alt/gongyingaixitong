@@ -18,7 +18,7 @@ const VIEW_CONFIG = {
       { key: 'materialCode', label: '物料编码' },
       { key: 'sku', label: 'SKU' },
       { key: 'kingdeeName', label: '金蝶名称' },
-      { key: 'settlementPrice', label: '内部结算价', render: (row) => `¥${formatNumber(row.settlementPrice, 2)}` },
+      { key: 'settlementPrice', label: '不含税结算价', render: (row) => `¥${formatNumber(row.settlementPrice, 2)}` },
       { key: 'onHandQty', label: '在库数量', render: (row) => formatNumber(row.onHandQty, 2) },
       { key: 'inTransitQty', label: '在途数量', render: (row) => formatNumber(row.inTransitQty, 2) },
       { key: 'undeliveredQty', label: '未交付总数量', render: (row) => formatNumber(row.undeliveredQty, 2) },

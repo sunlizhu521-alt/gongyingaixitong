@@ -52,7 +52,7 @@ test('maps the new inventory month fields and long-age buckets by header', () =>
 });
 
 test('does not use an inventory age column as a fallback settlement price', () => {
-  const product = rowFrom(['物料编码', '名称', 'SKU', '金蝶名称', '分类', '状态', '销售产品线', '销售系列', '结算价(含税)'], ['1001', '', 'SKU-1', '产品A', '', '', '产品线A', '系列A', 100]);
+  const product = rowFrom(['物料编码', '名称', 'SKU', '金蝶名称', '分类', '状态', '销售产品线', '销售系列', '不含税结算价'], ['1001', '', 'SKU-1', '产品A', '', '', '产品线A', '系列A', 100]);
   const inventoryMonth = rowFrom(NEW_HEADERS, ['组织A', '1001', '产品A', '仓库A', '可用', '', '业务组织', '组织A', '个', 5, 0, 0, 0, 0, 0, 999, 0]);
   const trendHeaders = ['库存组织', '物料编码', '物料名称', '仓库名称', '结存数量'];
   const trendRow = rowFrom(trendHeaders, ['组织A', '1001', '产品A', '仓库A', 2]);

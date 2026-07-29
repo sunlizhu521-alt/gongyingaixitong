@@ -12,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_SUMMARY_VERSION = 19;
+export const KCFX_INVENTORY_SUMMARY_VERSION = 20;
 
 const INVENTORY_VIEW_FIELDS = {
   summary: ['department', 'productLine'],
@@ -330,7 +330,7 @@ function buildInventorySummaryErrors(inventory, undelivered, salesDetails) {
       settlementMissing: inventoryIssueRows(
         inventoryRows,
         (row) => Number(row.qty) !== 0 && !(Number(row.settlementPrice) > 0),
-        '内部结算价为空或为0'
+        '不含税结算价为空或为0'
       )
     },
     sales: {
@@ -346,7 +346,7 @@ function buildInventorySummaryErrors(inventory, undelivered, salesDetails) {
       settlementMissing: salesIssueRows(
         salesDetails,
         (row) => Number(row.qty) !== 0 && !(Number(row.settlementPrice) > 0),
-        '内部结算价为空或为0'
+        '不含税结算价为空或为0'
       )
     }
   };

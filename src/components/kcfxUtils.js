@@ -7,6 +7,10 @@ import {
   STORE_MAPPING_SHORT_NAME_HEADERS
 } from '../../shared/kcfxStoreMapping.js';
 import { selectInventoryTrendPrice } from '../../shared/kcfxTrendPrice.js';
+import {
+  findNonTaxSettlementPriceHeader,
+  NON_TAX_SETTLEMENT_PRICE_HEADERS
+} from '../../shared/kcfxSettlementPrice.js';
 
 export { INVENTORY_TREND_MONTHS };
 export const KCFX_COLORS = ['#007aff', '#34c759', '#ff9f0a', '#af52de', '#ff375f', '#5ac8fa', '#5856d6', '#30d158', '#bf5af2', '#ff6b35'];
@@ -235,9 +239,8 @@ export function mapProducts(rows) {
       model: firstText([firstValue(row, ['型号', '规格型号']), nthValue(row, 16)]),
       department: firstText([firstValue(row, ['采购分组', '事业部']), nthValue(row, 22)]),
       settlementPrice: firstNumber([
-        firstValue(row, ['结算价(含税)', '结算价（含税）', '结算价含税', '结算价', '内部结算价', '26年内部结算价', '2026年内部结算价']),
-        firstValueByHeaderIncludes(row, ['结算价']),
-        nthValue(row, 10)
+        firstValue(row, NON_TAX_SETTLEMENT_PRICE_HEADERS),
+        row?.[findNonTaxSettlementPriceHeader(row)]
       ])
     };
     const current = map.get(materialCode);
@@ -338,15 +341,11 @@ function enrichInventoryRow(row, maps) {
   const product = maps.productMap.get(materialCode) || {};
   const warehouseInfo = maps.warehouseMap.get(warehouse) || {};
   const price = firstNumber([
-    firstValue(row, ['结算价(含税)', '结算价（含税）', '结算价含税', '结算价']),
-    firstValueByHeaderIncludes(row, ['结算价']),
+    firstValue(row, NON_TAX_SETTLEMENT_PRICE_HEADERS),
+    row?.[findNonTaxSettlementPriceHeader(row)],
     product.settlementPrice
   ]);
-  const amount = firstNumber([
-    firstValue(row, ['库存金额合计', '库存金额', '金额合计', '库存货值', '货值']),
-    firstValueByHeaderIncludes(row, ['库存', '金额']),
-    firstValueByHeaderIncludes(row, ['货值'])
-  ]) || qty * price;
+  const amount = qty * price;
   const departmentKey = normalizeDepartmentKey(`${organization}${warehouse}${materialCode}`);
   const productCategory = product.productCategory || firstText([firstValue(row, ['销售产品分类', '产品分类', '品类'])]);
   const warehouseType = warehouseInfo.type || '';
@@ -455,14 +454,10 @@ function buildFallbackPriceMap(inventoryMonthRecord, productMap) {
 }
 
 function makeTrendPriceAccessor(sampleRow, fallbackOneBasedIndex = 16) {
-  const keys = Object.keys(sampleRow || {});
-  const normalized = keys.map((key) => ({ key, text: normalizeHeaderName(key) }));
-  const preferred = normalized.find(({ text }) => text.includes('结算价') && text.includes('含税'))
-    || normalized.find(({ text }) => text.includes('结算价'))
-    || normalized.find(({ text }) => text.includes('含税') && text.includes('价'));
+  const preferred = findNonTaxSettlementPriceHeader(sampleRow);
   return preferred
-    ? (row) => row?.[preferred.key]
-    : (row) => (fallbackOneBasedIndex > 0 ? nthValue(row, fallbackOneBasedIndex) : 0);
+    ? (row) => row?.[preferred]
+    : () => 0;
 }
 
 function makeTrendQtyAccessor(sampleRow) {

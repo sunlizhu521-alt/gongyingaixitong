@@ -52,9 +52,9 @@ test('物料编码保留文本显示并使用统一关联键', () => {
   assert.equal(materialCodeMatchKey('1.007010385E+9'), '1007010385');
 
   const products = mapProducts([
-    { 物料编码: '00000011', SKU: '', 金蝶名称: '', 销售产品线: '其他/配件', 结算价: '0' },
-    { 物料编码: 11, SKU: 'SKU-11', 金蝶名称: '拆卸报废虚拟料号', 销售产品线: '其他/配件', 结算价: '12' },
-    { 物料编码: '1007010385', SKU: 'G01-A-BK-1-X', 金蝶名称: '黑色可折叠拐杖 美国G01', 销售产品线: '其他/成品', 结算价: '33' }
+    { 物料编码: '00000011', SKU: '', 金蝶名称: '', 销售产品线: '其他/配件', 不含税结算价: '0' },
+    { 物料编码: 11, SKU: 'SKU-11', 金蝶名称: '拆卸报废虚拟料号', 销售产品线: '其他/配件', 不含税结算价: '12' },
+    { 物料编码: '1007010385', SKU: 'G01-A-BK-1-X', 金蝶名称: '黑色可折叠拐杖 美国G01', 销售产品线: '其他/成品', 不含税结算价: '33' }
   ]);
 
   assert.equal(products.size, 2);
@@ -62,6 +62,23 @@ test('物料编码保留文本显示并使用统一关联键', () => {
   assert.equal(products.get('11').settlementPrice, 12);
   assert.equal(products.get('1.007010385E+9').sku, 'G01-A-BK-1-X');
   assert.equal(products.get(1007010385).settlementPrice, 33);
+});
+
+test('商品维表同时存在含税和不含税价格时只使用不含税结算价', () => {
+  const products = mapProducts([{
+    物料编码: '1001',
+    结算价: 113,
+    '结算价（含税）': 113,
+    '内部结算价（不含税）': 100
+  }]);
+  assert.equal(products.get('1001').settlementPrice, 100);
+
+  const missingNonTax = mapProducts([{
+    物料编码: '1002',
+    结算价: 226,
+    '结算价（含税）': 226
+  }]);
+  assert.equal(missingNonTax.get('1002').settlementPrice, 0);
 });
 
 test('没有物料编码列的槽位保持原行对象', () => {
@@ -85,5 +102,5 @@ test('服务器、趋势后台和浏览器缓存都接入全槽位文本化规�
   assert.match(loaderSource, /recordRowsCacheVersion = 'v4'/);
   assert.match(loaderSource, /normalizeMaterialCodeRecord\(cached, id\)/);
   assert.match(loaderSource, /normalizeKcfxMaterialCodeRows\(id, record\.rows\)/);
-  assert.match(workflowSource, /expectedSchemaVersion = 10/);
+  assert.match(workflowSource, /expectedSchemaVersion = 11/);
 });

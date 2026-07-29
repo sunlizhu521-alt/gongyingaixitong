@@ -58,7 +58,7 @@ const TABLE_COLUMNS = [
   { key: 'warehouse', label: '仓库' },
   { key: 'ageGroup', label: '库龄' },
   { key: 'qty', label: '库存数量', render: (row) => formatNumber(row.qty, 2) },
-  { key: 'settlementPrice', label: '结算价', render: (row) => formatNumber(row.settlementPrice, 4) },
+  { key: 'settlementPrice', label: '不含税结算价', render: (row) => formatNumber(row.settlementPrice, 4) },
   { key: 'amount', label: '库存金额', render: (row) => moneyWan(row.amount) }
 ];
 

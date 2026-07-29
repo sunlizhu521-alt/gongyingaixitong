@@ -22,7 +22,7 @@ test('销售汇总分类和月份控件同步到月度销售、销售趋势及�
   assert.match(loader, /salesRowsCacheVersion = 'v11'/);
   assert.match(routes, /outboundQty: Number\(row\.outboundQty\) \|\| 0/);
   assert.match(filters, /targetFilter\.independentOptions/);
-  assert.match(inventorySummary, /KCFX_INVENTORY_SUMMARY_VERSION = 19/);
+  assert.match(inventorySummary, /KCFX_INVENTORY_SUMMARY_VERSION = 20/);
   assert.match(utils, /INTERNAL_SALES_CUSTOMERS = \[/);
   assert.match(utils, /浙江迈德斯特医疗器械科技有限公司/);
   assert.match(utils, /MATESIDE GLOBAL US INC\./);

@@ -498,7 +498,7 @@ app.post('/api/kcfx-library/age-analysis/export', async (req, res) => {
       商品分类: row.productCategory,
       库龄: row.ageGroup,
       库存数量: Number(row.qty) || 0,
-      结算价: Number(row.settlementPrice) || 0,
+      不含税结算价: Number(row.settlementPrice) || 0,
       库存金额: Number(row.amount) || 0
     }));
     const workbook = createStyledWorkbook(ExcelJS, [{
@@ -629,7 +629,7 @@ app.post('/api/kcfx-library/inventory-summary/export', async (req, res) => {
         物料编码: row.materialCode,
         SKU: row.sku,
         金蝶名称: row.kingdeeName,
-        内部结算价: Number(row.settlementPrice) || 0,
+        不含税结算价: Number(row.settlementPrice) || 0,
         在库数量: Number(row.onHandQty) || 0,
         在途数量: Number(row.inTransitQty) || 0,
         未交付总数量: Number(row.undeliveredQty) || 0,
@@ -774,18 +774,18 @@ app.post('/api/kcfx-library/inventory-turnover/missing-price/export', async (req
       是否成品: row.finishedGoodsStatus || '',
       应收或库存数量: row.quantity,
       出库数量: row.outboundQty || 0,
-      缺失字段: '2026年结算价'
+      缺失字段: '2026年不含税结算价'
     }));
-    const exportRows = data.length ? data : [{ 提示: '当前筛选条件没有缺少内部结算价的记录' }];
+    const exportRows = data.length ? data : [{ 提示: '当前筛选条件没有缺少不含税结算价的记录' }];
     const workbook = createStyledWorkbook(ExcelJS, [{
-      name: '缺少内部结算价明细',
+      name: '缺少不含税结算价明细',
       rows: exportRows,
       columns: Object.keys(exportRows[0])
     }]);
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
     const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`缺少内部结算价明细_${stamp}.xlsx`)}`);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`缺少不含税结算价明细_${stamp}.xlsx`)}`);
     res.send(buffer);
   } catch (error) {
     res.status(500).json({ error: error?.message || String(error) });

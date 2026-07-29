@@ -13,7 +13,7 @@ import {
   rowsOf
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_INVENTORY_TURNOVER_VERSION = 13;
+export const KCFX_INVENTORY_TURNOVER_VERSION = 14;
 export const INVENTORY_TURNOVER_PAGE_SIZE = 20;
 
 const GROUP_SEPARATOR = '\u001f';
@@ -425,7 +425,7 @@ function uniqueMaterialCodes(values) {
 function missingPriceStatus(label, count, materialCodes) {
   if (!count) return '';
   const codes = uniqueMaterialCodes(materialCodes);
-  return `${label}缺少结算价${count}条${codes.length ? `（物料编码：${codes.join('、')}）` : ''}`;
+  return `${label}缺少不含税结算价${count}条${codes.length ? `（物料编码：${codes.join('、')}）` : ''}`;
 }
 
 function calculateRow(

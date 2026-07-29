@@ -15,8 +15,8 @@ function record(rows) {
 function sampleRecords() {
   return {
     'dim-product': record([
-      { 物料编码: '1001', SKU: 'SKU-A', 销售产品线: '产品线A', 销售系列: '系列A', 金蝶名称: '产品A', 结算价: '10' },
-      { 物料编码: '1002', SKU: 'SKU-B', 销售产品线: '产品线A', 销售系列: '系列B', 金蝶名称: '产品B', 结算价: '20' }
+      { 物料编码: '1001', SKU: 'SKU-A', 销售产品线: '产品线A', 销售系列: '系列A', 金蝶名称: '产品A', 不含税结算价: '10' },
+      { 物料编码: '1002', SKU: 'SKU-B', 销售产品线: '产品线A', 销售系列: '系列B', 金蝶名称: '产品B', 不含税结算价: '20' }
     ]),
     'dim-warehouse': record([
       { 仓库名称: '正常仓', 二级仓库分类: '华南仓' },
@@ -63,7 +63,7 @@ test('采购订单事业部只保留第一个星号前的内容', () => {
 
 test('库存汇总按海上在途精确分段并排除汇总行', () => {
   const cache = buildInventorySummaryCache(sampleRecords(), 'saved-at');
-  assert.equal(cache.version, 19);
+  assert.equal(cache.version, 20);
   assert.equal(cache.inventoryViews.onHand.length, 2);
   assert.equal(cache.inventoryViews.onHand.reduce((sum, row) => sum + row.qty, 0), 12);
   assert.equal(cache.inventoryViews.inTransit.length, 1);
@@ -99,9 +99,9 @@ test('库存汇总按海上在途精确分段并排除汇总行', () => {
 test('库存汇总按文本关联前导零和科学计数法物料编码', () => {
   const cache = buildInventorySummaryCache({
     'dim-product': record([
-      { 物料编码: '00000011', SKU: '', 金蝶名称: '', 销售产品线: '其他/配件', 结算价: '0' },
-      { 物料编码: '11', SKU: 'SKU-11', 金蝶名称: '拆卸报废虚拟料号', 销售产品线: '其他/配件', 结算价: '12' },
-      { 物料编码: '1007010385', SKU: 'G01-A-BK-1-X', 金蝶名称: '黑色可折叠拐杖 美国G01', 销售产品线: '其他/成品', 结算价: '33' }
+      { 物料编码: '00000011', SKU: '', 金蝶名称: '', 销售产品线: '其他/配件', 不含税结算价: '0' },
+      { 物料编码: '11', SKU: 'SKU-11', 金蝶名称: '拆卸报废虚拟料号', 销售产品线: '其他/配件', 不含税结算价: '12' },
+      { 物料编码: '1007010385', SKU: 'G01-A-BK-1-X', 金蝶名称: '黑色可折叠拐杖 美国G01', 销售产品线: '其他/成品', 不含税结算价: '33' }
     ]),
     'dim-warehouse': record([{ 仓库名称: '正常仓', 二级仓库分类: '华南仓' }]),
     'dim-warehouse-material': record([]),
@@ -320,10 +320,10 @@ test('店铺简称维表重复客户使用非空国家和平台补全', () => {
   assert.equal(cache.errors.sales.platformMissing.length, 0);
 });
 
-test('库存和销售汇总报表提示内部结算价缺失', () => {
+test('库存和销售汇总报表提示不含税结算价缺失', () => {
   const records = sampleRecords();
   records['dim-product'].rows[1].销售系列 = '系列B';
-  records['dim-product'].rows[1].结算价 = '0';
+  records['dim-product'].rows[1].不含税结算价 = '0';
   records['fact-inventory'].rows.push({
     库存组织: '组织A',
     仓库名称: '正常仓',
@@ -352,7 +352,7 @@ test('库存和销售汇总报表提示内部结算价缺失', () => {
     kingdeeName: '产品B',
     settlementPrice: '',
     inventoryLocation: '华南仓',
-    reason: '内部结算价为空或为0',
+    reason: '不含税结算价为空或为0',
     qty: 4
   });
   assert.equal(cache.errors.sales.settlementMissing.length, 1);
@@ -361,7 +361,7 @@ test('库存和销售汇总报表提示内部结算价缺失', () => {
   assert.equal(cache.errors.sales.settlementMissing[0].settlementPrice, '');
   assert.equal(cache.errors.sales.settlementMissing[0].qty, 3);
   assert.equal(cache.errors.sales.settlementMissing[0].amount, 200);
-  assert.equal(cache.errors.sales.settlementMissing[0].reason, '内部结算价为空或为0');
+  assert.equal(cache.errors.sales.settlementMissing[0].reason, '不含税结算价为空或为0');
 });
 
 test('库存和销售汇总报表错误检查沿用报表匹配结果', () => {
@@ -471,7 +471,7 @@ test('库存和销售汇总报表已分别接入菜单、页面、权限和受�
   assert.match(inventoryPageSource, /label: '销售金额', value: `[\s\S]*100000000[\s\S]*亿元/);
   assert.match(inventoryPageSource, /key: 'department', label: '事业部'[\s\S]*key: 'country', label: '国家'[\s\S]*key: 'platform', label: '平台'[\s\S]*key: 'productLine', label: '产品线'[\s\S]*key: 'productSeries', label: '销售系列'[\s\S]*key: 'materialCode', label: '物料编码'/);
   assert.doesNotMatch(inventoryPageSource, /key: 'channel'|label: '渠道'|全部渠道|、渠道/);
-  assert.match(inventoryPageSource, /key: 'sku', label: 'SKU'[\s\S]*key: 'kingdeeName', label: '金蝶名称'[\s\S]*key: 'settlementPrice', label: '内部结算价'/);
+  assert.match(inventoryPageSource, /key: 'sku', label: 'SKU'[\s\S]*key: 'kingdeeName', label: '金蝶名称'[\s\S]*key: 'settlementPrice', label: '不含税结算价'/);
   assert.match(inventoryPageSource, /key: 'totalQty', label: '合计'[\s\S]*key: 'inventoryValue', label: '货值'/);
   assert.match(inventoryPageSource, /label: '货值', value: `¥\$\{formatNumber\(metrics\.inventoryValue, 2\)\}`/);
   assert.doesNotMatch(inventoryPageSource, /materialCodeCount|物料编码数量/);
@@ -483,7 +483,7 @@ test('库存和销售汇总报表已分别接入菜单、页面、权限和受�
   assert.match(routeSource, /requirePermission\(database, req, res, 'maintenanceLibrary\.errors'\)/);
   assert.match(routeSource, /function inventorySummaryPermission\(body = \{\}\)[\s\S]*body\.report === 'sales'[\s\S]*'salesInventory\.salesSummary'[\s\S]*'salesInventory\.inventorySummary'/);
   assert.equal((routeSource.match(/requirePermission\(database, req, res, inventorySummaryPermission\(req\.body\)\)/g) || []).length, 2);
-  assert.match(routeSource, /物料编码: row\.materialCode,[\s\S]*SKU: row\.sku,[\s\S]*金蝶名称: row\.kingdeeName,[\s\S]*内部结算价: Number\(row\.settlementPrice\)[\s\S]*合计: Number\(row\.totalQty\)[\s\S]*货值: Number\(row\.inventoryValue\)/);
+  assert.match(routeSource, /物料编码: row\.materialCode,[\s\S]*SKU: row\.sku,[\s\S]*金蝶名称: row\.kingdeeName,[\s\S]*不含税结算价: Number\(row\.settlementPrice\)[\s\S]*合计: Number\(row\.totalQty\)[\s\S]*货值: Number\(row\.inventoryValue\)/);
   assert.match(routeSource, /事业部: row\.department,[\s\S]*国家: row\.country,[\s\S]*平台: row\.platform,[\s\S]*产品线: row\.productLine,[\s\S]*销售系列: row\.productSeries,[\s\S]*物料编码: row\.materialCode/);
   assert.doesNotMatch(routeSource, /渠道: row\.channel/);
   assert.doesNotMatch(routeSource, /物料编码数量|materialCodeCount/);
@@ -493,8 +493,8 @@ test('库存和销售汇总报表已分别接入菜单、页面、权限和受�
   assert.doesNotMatch(errorsPageSource, /salesSummaryChannelMissing|店铺简称匹配缺失/);
   assert.match(errorsPageSource, /salesSummaryCountryMissing[\s\S]*国家信息缺失/);
   assert.match(errorsPageSource, /salesSummaryPlatformMissing[\s\S]*平台信息缺失/);
-  assert.match(errorsPageSource, /inventorySummarySettlementMissing[\s\S]*内部结算价缺失/);
-  assert.match(errorsPageSource, /salesSummarySettlementMissing[\s\S]*内部结算价缺失/);
+  assert.match(errorsPageSource, /inventorySummarySettlementMissing[\s\S]*不含税结算价缺失/);
+  assert.match(errorsPageSource, /salesSummarySettlementMissing[\s\S]*不含税结算价缺失/);
   assert.match(errorsPageSource, /productLine', '产品线'[\s\S]*productSeries', '销售系列'/);
   assert.match(errorsPageSource, /productLine', '销售产品线'[\s\S]*productSeries', '销售系列'/);
 });

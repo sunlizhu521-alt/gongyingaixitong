@@ -6,6 +6,7 @@ import { allocateInventoryTrendAge, buildInventoryTrendAgeLookup, inventoryMonth
 import { latestInventoryAgeSlotId } from '../shared/kcfxAgeMonths.js';
 import { selectInventoryTrendPrice } from '../shared/kcfxTrendPrice.js';
 import { normalizeKcfxMaterialCodeRows } from '../shared/kcfxMaterialCodeText.js';
+import { findNonTaxSettlementPriceHeader } from '../shared/kcfxSettlementPrice.js';
 
 const [dataDirArg, outputPathArg] = process.argv.slice(2);
 const dataDir = path.resolve(dataDirArg || 'data');
@@ -91,14 +92,10 @@ function normalizeHeaderText(value) {
 }
 
 function makePriceAccessor(sampleRow, fallbackOneBasedIndex = 16) {
-  const keys = Object.keys(sampleRow || {});
-  const normalized = keys.map((key) => ({ key, text: normalizeHeaderText(key) }));
-  const preferred = normalized.find(({ text }) => text.includes('结算价') && text.includes('含税'))
-    || normalized.find(({ text }) => text.includes('结算价'))
-    || normalized.find(({ text }) => text.includes('含税') && text.includes('价'));
+  const preferred = findNonTaxSettlementPriceHeader(sampleRow);
   return preferred
-    ? (row) => row?.[preferred.key]
-    : (row) => (fallbackOneBasedIndex > 0 ? nthValue(row, fallbackOneBasedIndex) : 0);
+    ? (row) => row?.[preferred]
+    : () => 0;
 }
 
 function makeQtyAccessor(sampleRow) {

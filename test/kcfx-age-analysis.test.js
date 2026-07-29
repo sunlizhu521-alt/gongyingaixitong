@@ -99,8 +99,8 @@ test('builds, filters, paginates and exports age analysis rows', () => {
     'inventory-age-2026-02': { id: 'inventory-age-2026-02', rows: februaryRows, rowCount: 1 },
     'dim-product': {
       rows: [
-        rowFrom(['物料编码', '名称', 'SKU', '金蝶名称', '分类', '状态', '销售产品线', '销售系列', '', '结算价'], ['1001', '', 'SKU-1', '产品A', '', '', '产品线A', '系列A', '', 10]),
-        rowFrom(['物料编码', '名称', 'SKU', '金蝶名称', '分类', '状态', '销售产品线', '销售系列', '', '结算价'], ['1002', '', 'SKU-2', '产品B', '', '', '产品线B', '系列B', '', 20])
+        rowFrom(['物料编码', '名称', 'SKU', '金蝶名称', '分类', '状态', '销售产品线', '销售系列', '', '不含税结算价'], ['1001', '', 'SKU-1', '产品A', '', '', '产品线A', '系列A', '', 10]),
+        rowFrom(['物料编码', '名称', 'SKU', '金蝶名称', '分类', '状态', '销售产品线', '销售系列', '', '不含税结算价'], ['1002', '', 'SKU-2', '产品B', '', '', '产品线B', '系列B', '', 20])
       ]
     },
     'dim-warehouse': {
@@ -206,7 +206,7 @@ test('does not use financial weighted average price when a named settlement pric
     '销售系列',
     '',
     '财务加权平均价',
-    '结算价'
+    '不含税结算价'
   ];
   const cache = buildAgeAnalysisCache({
     'inventory-age-2026-06': {
@@ -225,7 +225,7 @@ test('does not use financial weighted average price when a named settlement pric
   assert.equal(queryAgeAnalysis(cache, {}).dimensionTrends.productLine[0].amount, 0);
 });
 
-test('keeps the legacy positional settlement-price fallback when no price header exists', () => {
+test('does not use a positional or generic settlement-price fallback', () => {
   const headers = [...BASE_HEADERS, '(0天到30天)数量(库存)'];
   const cache = buildAgeAnalysisCache({
     'inventory-age-2026-06': {
@@ -241,8 +241,8 @@ test('keeps the legacy positional settlement-price fallback when no price header
     }
   }, 'saved-at');
 
-  assert.equal(cache.rows[0].settlementPrice, 12);
-  assert.equal(cache.rows[0].amount, 60);
+  assert.equal(cache.rows[0].settlementPrice, 0);
+  assert.equal(cache.rows[0].amount, 0);
 });
 
 test('uses fact-2 as the June analysis source until the June slot is uploaded', () => {

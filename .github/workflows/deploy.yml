@@ -104,8 +104,8 @@ jobs:
 
             if ! node --input-type=module <<'NODE'
           const baseUrl = 'http://127.0.0.1:4001';
-          const expectedSchemaVersion = 10;
-          const expectedJuneValue = 156793401.1207;
+          const expectedSchemaVersion = 11;
+          const expectedJuneQuantity = 12837001.483;
           const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
           async function readJson(pathname) {
@@ -161,8 +161,11 @@ jobs:
             })}`);
           }
           if (!june) throw new Error('June inventory trend summary is missing');
-          if (Math.abs(Number(june.totalValue) - expectedJuneValue) > 0.01) {
-            throw new Error(`June inventory value mismatch: ${june.totalValue}`);
+          if (Math.abs(Number(june.totalQty) - expectedJuneQuantity) > 0.01) {
+            throw new Error(`June inventory quantity mismatch: ${june.totalQty}`);
+          }
+          if (!(Number(june.totalValue) > 0)) {
+            throw new Error(`June non-tax inventory value is invalid: ${june.totalValue}`);
           }
 
           console.log(JSON.stringify({
