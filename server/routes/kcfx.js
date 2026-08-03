@@ -16,12 +16,6 @@ import {
   queryInventorySummary
 } from '../kcfx-inventory-summary.js';
 import {
-  buildInventoryRiskCache,
-  inventoryRiskCacheKey,
-  normalizeInventoryRiskParams,
-  queryInventoryRisk
-} from '../kcfx-inventory-risk.js';
-import {
   buildKcfxErrorsSummary,
   KCFX_ERRORS_RECORD_IDS,
   kcfxErrorsSummaryCacheKey
@@ -53,18 +47,6 @@ const INVENTORY_TURNOVER_RECORD_IDS = [
   'dim-customer-material'
 ];
 let inventoryTurnoverPayloadCache = { key: '', payload: null };
-const INVENTORY_RISK_RECORD_IDS = [
-  'fact-inventory',
-  'sales-forecast',
-  'sales-data',
-  'purchase-order-data',
-  'dim-product',
-  'dim-warehouse',
-  'dim-store-name',
-  'dim-customer-material'
-];
-let inventoryRiskPayloadCache = { key: '', payload: null };
-let inventoryRiskResultCache = { key: '', payload: null };
 let errorsSummaryPayloadCache = { key: '', payload: null };
 let errorsSummaryPayloadPromise = { key: '', promise: null };
 
@@ -256,45 +238,6 @@ async function getInventoryTurnoverCache(database, { force = false } = {}) {
   }
   const payload = buildInventoryTurnoverCache(records, database.kcfxLibrary?.savedAt || '');
   inventoryTurnoverPayloadCache = { key, payload };
-  return payload;
-}
-
-async function getInventoryRiskCache(database, { force = false } = {}) {
-  const key = [
-    database.kcfxLibrary?.savedAt || '',
-    ...INVENTORY_RISK_RECORD_IDS.map((id) => {
-      const record = database.kcfxLibrary?.records?.[id] || {};
-      return `${id}:${record.rowsSavedAt || record.serverSavedAt || record.savedAt || record.appliedAt || ''}:${record.rowCount || 0}`;
-    })
-  ].join('|');
-  if (!force && inventoryRiskPayloadCache.key === key && inventoryRiskPayloadCache.payload) {
-    return inventoryRiskPayloadCache.payload;
-  }
-  const records = {};
-  for (const id of INVENTORY_RISK_RECORD_IDS) {
-    const source = database.kcfxLibrary.records[id] || await recoverKcfxRecordFromRowsFile(id);
-    if (!source) {
-      records[id] = { id, rows: [] };
-      continue;
-    }
-    const record = await ensureKcfxRecordRows(database, id, source);
-    records[id] = await attachKcfxRecordRows(record);
-  }
-  const payload = buildInventoryRiskCache(records, database.kcfxLibrary?.savedAt || '');
-  inventoryRiskPayloadCache = { key, payload };
-  inventoryRiskResultCache = { key: '', payload: null };
-  return payload;
-}
-
-async function getInventoryRiskResult(database, body = {}) {
-  const params = normalizeInventoryRiskParams(body);
-  const key = inventoryRiskCacheKey(database, INVENTORY_RISK_RECORD_IDS, params);
-  if (body.refresh !== true && inventoryRiskResultCache.key === key && inventoryRiskResultCache.payload) {
-    return inventoryRiskResultCache.payload;
-  }
-  const cache = await getInventoryRiskCache(database, { force: body.refresh === true });
-  const payload = queryInventoryRisk(cache, params);
-  inventoryRiskResultCache = { key, payload };
   return payload;
 }
 
@@ -609,29 +552,6 @@ app.post('/api/kcfx-library/inventory-turnover/query', async (req, res) => {
   }
 });
 
-app.post('/api/kcfx-library/risk-analysis/query', async (req, res) => {
-  try {
-    const database = await initDb(dataDir);
-    const requestUser = requirePermission(database, req, res, 'salesInventory.inventoryRisk');
-    if (!requestUser) return;
-    try {
-      normalizeInventoryRiskParams(req.body || {});
-    } catch (error) {
-      return res.status(400).json({ ok: false, status: 'invalid_params', error: error.message });
-    }
-    res.setHeader('Cache-Control', 'no-store');
-    const result = await getInventoryRiskResult(database, req.body || {});
-    res.status(result.ok ? 200 : result.status === 'missing_data' ? 422 : 400).json(result);
-  } catch (error) {
-    res.status(500).json({
-      ok: false,
-      status: 'failed',
-      source: 'server-inventory-risk',
-      error: error?.message || String(error)
-    });
-  }
-});
-
 app.get('/api/kcfx-library/inventory-summary/errors', async (req, res) => {
   try {
     const database = await initDb(dataDir);
@@ -793,82 +713,6 @@ app.post('/api/kcfx-library/inventory-turnover/export', async (req, res) => {
     const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`库存周转天数_${stamp}.xlsx`)}`);
-    res.send(buffer);
-  } catch (error) {
-    res.status(500).json({ error: error?.message || String(error) });
-  }
-});
-
-app.post('/api/kcfx-library/risk-analysis/export', async (req, res) => {
-  try {
-    const database = await initDb(dataDir);
-    const requestUser = requirePermission(database, req, res, 'salesInventory.inventoryRisk');
-    if (!requestUser) return;
-    try {
-      normalizeInventoryRiskParams(req.body || {});
-    } catch (error) {
-      return res.status(400).json({ error: error.message });
-    }
-    const result = await getInventoryRiskResult(database, req.body || {});
-    if (!result.ok) return res.status(result.status === 'missing_data' ? 422 : 400).json({ error: result.error });
-    const riskRows = (rows) => (rows.length ? rows : [{ action: '暂无数据' }]).map((row) => ({
-      物料编码: row.materialCode || '',
-      SKU: row.sku || '',
-      产品线: row.productLine || '',
-      库存段: row.inventorySegment || '',
-      在库数量: Number(row.onHandQty) || 0,
-      在途数量: Number(row.inTransitQty) || 0,
-      库存合计: Number(row.inventoryQty) || 0,
-      待交付数量: Number(row.undeliveredQty) || 0,
-      预测月均销量: Number(row.forecastMonthlyAverage) || 0,
-      历史月均销量: Number(row.historicalMonthlyAverage) || 0,
-      在途周转天数: Number(row.transitTurnoverDays) || 0,
-      全链覆盖天数: Number(row.fullChainCoverageDays) || 0,
-      预测数据状态: row.forecastStatus || '',
-      处置动作: row.action || ''
-    }));
-    const unknownRows = result.diagnostics.unknownLocations.length
-      ? result.diagnostics.unknownLocations.map((row) => ({
-        物料编码: row.materialCode,
-        SKU: row.sku,
-        产品线: row.productLine,
-        仓库名称: row.warehouse,
-        仓库位置: row.warehouseLocation,
-        影响数量: Number(row.qty) || 0,
-        问题: row.reason
-      }))
-      : [{ 问题: '暂无未确定位置记录' }];
-    const paramLabels = {
-      transitHighOverseas: '在途偏高线-海外',
-      transitHighDomestic: '在途偏高线-国内',
-      transitSevereOverseas: '在途严重线-海外',
-      transitSevereDomestic: '在途严重线-国内',
-      chainAttentionOverseas: '全链关注线-海外',
-      chainAttentionDomestic: '全链关注线-国内',
-      chainInterventionOverseas: '全链干预线-海外',
-      chainInterventionDomestic: '全链干预线-国内',
-      deliveryPeriod: '交期天数',
-      forecastMonths: '预测月数',
-      historicalMonths: '历史销量月数'
-    };
-    const parameterRows = Object.entries(result.params).map(([key, value]) => ({
-      参数: paramLabels[key] || key,
-      数值: value
-    }));
-    parameterRows.push(
-      { 参数: '预测期间', 数值: `${result.periods.forecastStartMonth} 至 ${result.periods.forecastEndMonth}` },
-      { 参数: '历史期间', 数值: result.periods.historicalStartMonth ? `${result.periods.historicalStartMonth} 至 ${result.periods.historicalEndMonth}` : '无历史销售月份' }
-    );
-    const workbook = createStyledWorkbook(ExcelJS, [
-      { name: '限制采购', rows: riskRows(result.restricted) },
-      { name: '停止采购', rows: riskRows(result.stopped) },
-      { name: '未确定位置', rows: unknownRows },
-      { name: '计算参数', rows: parameterRows }
-    ]);
-    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
-    const stamp = format(new Date(), 'yyyyMMdd-HHmmss');
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`库存风险分析_${stamp}.xlsx`)}`);
     res.send(buffer);
   } catch (error) {
     res.status(500).json({ error: error?.message || String(error) });

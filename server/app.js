@@ -178,7 +178,6 @@ const SALES_INVENTORY_PERMISSIONS = [
   'salesInventory.inventoryTrend',
   'salesInventory.inventorySummary',
   'salesInventory.inventoryTurnover',
-  'salesInventory.inventoryRisk',
   'salesInventory.salesSummary',
   'salesInventory.salesAnalysis',
   'salesInventory.salesTrend',
@@ -249,7 +248,6 @@ const KC_LIBRARY_SLOT_IDS = new Set([
   'fact-14',
   ...INVENTORY_AGE_SLOT_IDS,
   'sales-data',
-  'sales-forecast',
   PURCHASE_ORDER_RECORD_ID
 ]);
 const KC_PRIORITY_PRELOAD_SLOT_IDS = new Set([
@@ -293,7 +291,6 @@ function expandPermissionKey(permission) {
       ...SALES_INVENTORY_PERMISSIONS.filter((item) => (
         item !== 'salesInventory.ageAnalysis'
         && item !== 'salesInventory.inventoryTurnover'
-        && item !== 'salesInventory.inventoryRisk'
       )),
       'maintenanceLibrary.receiptFeedback',
       'maintenanceLibrary.salesFeedback',
@@ -1297,8 +1294,7 @@ async function readKcfxRecordRowsPayload(id) {
 function defaultKcfxSlotTitle(slotId) {
   const titles = {
     'dim-product': '商品分类维表',
-    'dim-purchase-division': '采购分工明细',
-    'sales-forecast': '销售预测文件'
+    'dim-purchase-division': '采购分工明细'
   };
   return titles[slotId] || slotId;
 }
@@ -2743,9 +2739,6 @@ function kcfxHeaderKeywordsForSlot(slot = {}) {
   if (slot.id === PURCHASE_ORDER_RECORD_ID) {
     return PURCHASE_ORDER_HEADER_KEYWORDS;
   }
-  if (slot.id === 'sales-forecast') {
-    return ['事业部', '部门', '物料编码', '销售预测', '月份'];
-  }
   if (isInventoryMonthSlotId(slot.id)) {
     return [...common, '数量(库存)', '0天到30天', '151天到180天', '181天以上', '结余库存数量', '库龄'];
   }
@@ -3082,9 +3075,6 @@ function parseKcfxWorkbookFile(filePath, slot) {
     bookSheets: true,
     bookProps: false
   });
-  if (slot.id === 'sales-forecast' && (workbookIndex.SheetNames || []).length !== 1) {
-    throw new Error('销售预测文件必须且只能包含一个工作表');
-  }
   const sheetName = pickKcfxSheetName(workbookIndex, slot);
   if (!sheetName) throw new Error('missing sheet');
   const workbook = reader.read({
@@ -3098,17 +3088,6 @@ function parseKcfxWorkbookFile(filePath, slot) {
   const parsed = parseKcfxWorkbookRows(workbook, slot);
   if (slot.id === 'dim-customer-material' && !isStoreMappingHeaderSet(parsed.headers)) {
     throw new Error('店铺简称维表缺少客户名称或日常汇报沟通简称列');
-  }
-  if (slot.id === 'sales-forecast') {
-    const headers = parsed.headers.map((header) => normalizeKcfxHeaderName(header));
-    const hasDepartment = headers.some((header) => header === '事业部' || header === '部门' || header === '业务部门');
-    const hasMaterialCode = headers.some((header) => ['物料编码', '货品编码', '商品编码'].includes(header));
-    const hasMonth = parsed.headers.some((header) => /^(\d{4})(?:年|[-/.])(\d{1,2})(?:月)?$/.test(
-      normalizeKcfxText(header).normalize('NFKC').replace(/\s+/g, '')
-    ));
-    if (!hasDepartment || !hasMaterialCode || !hasMonth) {
-      throw new Error('销售预测文件必须包含事业部、物料编码和至少一个月份列');
-    }
   }
   return {
     ...parsed,

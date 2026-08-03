@@ -2,7 +2,7 @@ import React from 'react';
 import { KCFX_COLORS, formatNumber, percent } from './kcfxUtils.js';
 import { DEFAULT_TABLE_PAGE_SIZE, TablePagination, useTablePagination } from './TablePagination.jsx';
 
-export function KcfxPageShell({ title, status, note, loading, onRefresh, actions, children, className = '' }) {
+export function KcfxPageShell({ title, status, note, loading, onRefresh, children, className = '' }) {
   return (
     <section className={`kcfx-react-page ${className}`.trim()}>
       <header className="kcfx-page-header">
@@ -11,15 +11,10 @@ export function KcfxPageShell({ title, status, note, loading, onRefresh, actions
           {status && <p className="section-count">{status}</p>}
           {note && <p className="kcfx-page-note">{note}</p>}
         </div>
-        {(actions || onRefresh) && (
-          <div className="kcfx-page-actions">
-            {actions}
-            {onRefresh && (
-              <button type="button" onClick={onRefresh} disabled={loading}>
-                {loading ? '读取中...' : '应用刷新'}
-              </button>
-            )}
-          </div>
+        {onRefresh && (
+          <button type="button" onClick={onRefresh} disabled={loading}>
+            {loading ? '读取中...' : '应用刷新'}
+          </button>
         )}
       </header>
       {children}
