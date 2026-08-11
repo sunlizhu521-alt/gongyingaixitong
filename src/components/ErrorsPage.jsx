@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API } from '../constants.js';
 import { isStoreMappingRecordValid, STORE_MAPPING_CUSTOMER_HEADERS } from '../../shared/kcfxStoreMapping.js';
+import {
+  hasKcfxErrorExcludedWarehouse,
+  isKcfxErrorExcludedWarehouse
+} from '../../shared/kcfxErrorWarehouseExclusions.js';
 import { TablePagination, useTablePagination } from './TablePagination.jsx';
 import { downloadErrorWorkbook } from './errorReportExport.js';
 import {
@@ -887,10 +891,10 @@ function normalizeServerErrorResult(payload) {
     ...emptyErrorResult(payload?.message || ''),
     ...(payload || {}),
     stockMaterialCount: Number(payload?.stockMaterialCount) || payload?.stockMaterials?.length || 0,
-    productMissing: Array.isArray(payload?.productMissing) ? payload.productMissing : [],
-    divisionMissing: Array.isArray(payload?.divisionMissing) ? payload.divisionMissing : [],
-    warehouseMissing: Array.isArray(payload?.warehouseMissing) ? payload.warehouseMissing : [],
-    settlementMissing: Array.isArray(payload?.settlementMissing) ? payload.settlementMissing : []
+    productMissing: filterExcludedWarehouseRows(payload?.productMissing),
+    divisionMissing: filterExcludedWarehouseRows(payload?.divisionMissing),
+    warehouseMissing: filterExcludedWarehouseRows(payload?.warehouseMissing),
+    settlementMissing: filterExcludedWarehouseRows(payload?.settlementMissing)
   };
 }
 
@@ -930,11 +934,11 @@ function buildSummaryReportChecks(payload, type) {
     return {
       ...emptySummaryErrorResult(),
       rowCount: Number(payload.rowCount) || 0,
-      inventorySummaryProductMissing: Array.isArray(payload.productMissing) ? payload.productMissing : [],
-      inventorySummaryDepartmentMissing: Array.isArray(payload.departmentMissing) ? payload.departmentMissing : [],
-      inventorySummaryWarehouseMissing: Array.isArray(payload.warehouseMissing) ? payload.warehouseMissing : [],
-      inventorySummarySupplierMissing: Array.isArray(payload.supplierMissing) ? payload.supplierMissing : [],
-      inventorySummarySettlementMissing: Array.isArray(payload.settlementMissing) ? payload.settlementMissing : []
+      inventorySummaryProductMissing: filterExcludedWarehouseRows(payload.productMissing),
+      inventorySummaryDepartmentMissing: filterExcludedWarehouseRows(payload.departmentMissing),
+      inventorySummaryWarehouseMissing: filterExcludedWarehouseRows(payload.warehouseMissing),
+      inventorySummarySupplierMissing: filterExcludedWarehouseRows(payload.supplierMissing),
+      inventorySummarySettlementMissing: filterExcludedWarehouseRows(payload.settlementMissing)
     };
   }
   return {
@@ -952,7 +956,7 @@ function buildAgeAnalysisChecks(summary) {
   if (!summary?.ok) return emptyAgeErrorResult(summary?.message || '库龄维度分析：汇总尚未生成完成');
   return {
     message: '',
-    ageDivisionMissing: Array.isArray(summary.rows) ? summary.rows : []
+    ageDivisionMissing: filterExcludedWarehouseRows(summary.rows)
   };
 }
 
@@ -965,6 +969,7 @@ function buildTrendChecks(summary) {
       const month = normalizeText(row.month || monthSummary.label);
       const organization = normalizeText(row.organization || row.materialA);
       const warehouse = normalizeText(row.warehouse);
+      if (isKcfxErrorExcludedWarehouse(warehouse)) continue;
       const materialCode = normalizeMaterialCode(row.materialCode);
       const sku = normalizeText(row.sku);
       const materialName = normalizeText(row.materialName);
@@ -1563,6 +1568,10 @@ function getSalesReceivableQty(row) {
     firstValue(row, ['应收数量']),
     firstValueByHeaderIncludes(row, ['应收', '数量'])
   ]);
+}
+
+function filterExcludedWarehouseRows(rows) {
+  return Array.isArray(rows) ? rows.filter((row) => !hasKcfxErrorExcludedWarehouse(row)) : [];
 }
 
 function makeDetailDepartmentKey(row) {

@@ -1,5 +1,6 @@
 import { isStoreMappingRecordValid, STORE_MAPPING_CUSTOMER_HEADERS } from '../shared/kcfxStoreMapping.js';
 import { materialCodeMatchKey } from '../shared/kcfxMaterialCodeText.js';
+import { isKcfxErrorExcludedWarehouse } from '../shared/kcfxErrorWarehouseExclusions.js';
 import {
   firstText,
   firstValue,
@@ -11,7 +12,7 @@ import {
   toNumber
 } from '../src/components/kcfxUtils.js';
 
-export const KCFX_ERRORS_SUMMARY_VERSION = 8;
+export const KCFX_ERRORS_SUMMARY_VERSION = 9;
 
 export const KCFX_ERRORS_RECORD_IDS = [
   'fact-inventory',
@@ -99,10 +100,11 @@ function buildClosedInventoryChecks(records, maps) {
   if (!records['dim-product']) return emptyErrorResult('关账库存事实表：缺少商品分类维表');
   if (!records['dim-warehouse-material']) return emptyErrorResult('关账库存事实表：缺少仓库物料事业部对照表');
 
-  const stockMaterials = summarizeByMaterial(fact.rows || [], getClosedMaterialCode, getClosedMaterialName, getClosedStockQty);
-  const stockWarehouses = summarizeByWarehouse(fact.rows || [], getClosedWarehouse, getClosedStockQty);
+  const rows = (fact.rows || []).filter((row) => !isKcfxErrorExcludedWarehouse(getClosedWarehouse(row)));
+  const stockMaterials = summarizeByMaterial(rows, getClosedMaterialCode, getClosedMaterialName, getClosedStockQty);
+  const stockWarehouses = summarizeByWarehouse(rows, getClosedWarehouse, getClosedStockQty);
   const productMissing = stockMaterials.filter((item) => !maps.productMap.has(item.materialCode));
-  const divisionMissing = summarizeDivisionMissing(fact.rows || [], maps.productMap, {
+  const divisionMissing = summarizeDivisionMissing(rows, maps.productMap, {
     qtyGetter: getClosedStockQty,
     materialGetter: getClosedMaterialCode,
     materialNameGetter: getClosedMaterialName,
@@ -131,7 +133,7 @@ function buildInventoryMonthChecks(records, maps) {
   if (!records['dim-product']) return emptyErrorResult('库存分析月份表：缺少商品分类维表');
   if (!records['dim-warehouse-material']) return emptyErrorResult('库存分析月份表：缺少仓库物料事业部对照表');
 
-  const rows = detail.rows || [];
+  const rows = (detail.rows || []).filter((row) => !isKcfxErrorExcludedWarehouse(getDetailWarehouse(row)));
   const stockMaterials = summarizeByMaterial(rows, getDetailMaterialCode, getDetailMaterialName, getDetailStockQty);
   const stockWarehouses = summarizeByWarehouse(rows, getDetailWarehouse, getDetailStockQty);
   const productMissing = stockMaterials.filter((item) => !maps.productMap.has(item.materialCode));

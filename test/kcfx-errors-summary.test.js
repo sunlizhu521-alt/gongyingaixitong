@@ -132,3 +132,52 @@ test('事业部对照按标准化字段重建组合键并兼容旧科学计数�
   assert.equal(summary.closed.divisionMissing.length, 0);
   assert.equal(summary.detail.divisionMissing.length, 0);
 });
+
+test('报错信息汇总过滤英国东荣仓新旧名称的全部库存报错', () => {
+  const excludedWarehouses = [
+    '101-G-海外一部-英国东荣仓-国源英国',
+    '101-G-海外一部-英国东荣CV5仓-国源英国',
+    '555-G-退货仓-海外一部-英国东荣仓',
+    '555-G-退货仓-海外一部-英国东荣CV5仓',
+    '106-G-国内事业部-英国东荣仓-Temu欧区国源',
+    '106-G-国内事业部-英国东荣CV5仓-Temu欧区国源',
+    '777-G-售后配件仓-英国东荣仓',
+    '777-G-售后配件仓-英国东荣CV5仓',
+    '104-US-全球招商部-英国东荣仓-分销下单-Global',
+    '104-US-全球招商部-英国东荣CV5仓-分销下单-Global'
+  ];
+  const inventoryRows = excludedWarehouses.map((warehouse, index) => ({
+    库存组织: '组织A',
+    仓库名称: warehouse,
+    物料编码: String(2000 + index),
+    '(结存)数量（库存）': '1'
+  }));
+  const detailRows = excludedWarehouses.map((warehouse, index) => ({
+    库存组织: '组织A',
+    仓库: warehouse,
+    物料编码: String(3000 + index),
+    合计库存数量: '1'
+  }));
+  const records = {
+    'fact-inventory': record([...inventoryRows, {
+      库存组织: '组织A', 仓库名称: '正常仓', 物料编码: '9991', '(结存)数量（库存）': '1'
+    }]),
+    'fact-2': record([...detailRows, {
+      库存组织: '组织A', 仓库: '正常仓', 物料编码: '9992', 合计库存数量: '1'
+    }]),
+    'sales-data': record([]),
+    'dim-product': record([]),
+    'dim-warehouse': record([]),
+    'dim-warehouse-material': record([]),
+    'dim-store-name': record([]),
+    'dim-customer-material': record([])
+  };
+
+  const summary = buildKcfxErrorsSummary(records, 'saved-at');
+  assert.equal(summary.closed.stockMaterialCount, 1);
+  assert.equal(summary.detail.stockMaterialCount, 1);
+  assert.deepEqual(summary.closed.productMissing.map((row) => row.materialCode), ['9991']);
+  assert.deepEqual(summary.detail.productMissing.map((row) => row.materialCode), ['9992']);
+  assert.equal(summary.closed.divisionMissing.every((row) => row.warehouse === '正常仓'), true);
+  assert.equal(summary.detail.divisionMissing.every((row) => row.warehouse === '正常仓'), true);
+});
