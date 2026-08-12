@@ -510,8 +510,10 @@ h3 {
   width: max-content;
   min-width: 220px;
   max-width: min(520px, calc(100vw - 48px));
-  max-height: none;
-  overflow: visible;
+  max-height: min(420px, calc(100vh - 150px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 6px;
   border: 1px solid #dbe3ee;
   border-radius: 8px;

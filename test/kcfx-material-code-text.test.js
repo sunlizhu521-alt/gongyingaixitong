@@ -102,5 +102,5 @@ test('服务器、趋势后台和浏览器缓存都接入全槽位文本化规�
   assert.match(loaderSource, /recordRowsCacheVersion = 'v4'/);
   assert.match(loaderSource, /normalizeMaterialCodeRecord\(cached, id\)/);
   assert.match(loaderSource, /normalizeKcfxMaterialCodeRows\(id, record\.rows\)/);
-  assert.match(workflowSource, /expectedSchemaVersion = 11/);
+  assert.match(workflowSource, /expectedSchemaVersion = 12/);
 });
