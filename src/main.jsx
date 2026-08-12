@@ -662,14 +662,6 @@ function App() {
     return () => window.clearInterval(timer);
   }, [activeEmbeddedKcfxLoading, activeEmbeddedKcfxPage]);
 
-  useEffect(() => {
-    function closeFilters() {
-      setOpenFilter('');
-    }
-    window.addEventListener('click', closeFilters);
-    return () => window.removeEventListener('click', closeFilters);
-  }, []);
-
   const supplierMetaByName = useMemo(() => {
     return new Map(suppliers.map((supplier) => [supplier.name, supplier]));
   }, [suppliers]);

@@ -68,8 +68,16 @@ test('inventory trend worker uses localized unmatched labels', async () => {
 });
 
 test('inventory trend filter menus stay selectable inside the viewport', async () => {
-  const styles = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
+  const [styles, mainSource, multiFilterSource, monthFilterSource] = await Promise.all([
+    readFile(new URL('../src/styles.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/main.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/MultiFilter.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/MonthCalendarFilter.jsx', import.meta.url), 'utf8')
+  ]);
   assert.match(styles, /\.multi-filter-menu\s*\{[\s\S]*max-height:\s*min\(420px, calc\(100vh - 150px\)\)/);
   assert.match(styles, /\.multi-filter-menu\s*\{[\s\S]*overflow-y:\s*auto/);
   assert.match(styles, /\.multi-filter-menu\s*\{[\s\S]*overscroll-behavior:\s*contain/);
+  assert.doesNotMatch(mainSource, /window\.addEventListener\(['"]click['"],\s*closeFilters\)/);
+  assert.match(multiFilterSource, /document\.addEventListener\(['"]pointerdown['"],\s*closeOnOutsidePointer\)/);
+  assert.match(monthFilterSource, /document\.addEventListener\(['"]pointerdown['"],\s*closeOnOutsidePointer\)/);
 });
