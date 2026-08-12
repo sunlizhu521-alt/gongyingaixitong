@@ -935,7 +935,7 @@ function buildSummaryReportChecks(payload, type) {
       ...emptySummaryErrorResult(),
       rowCount: Number(payload.rowCount) || 0,
       inventorySummaryProductMissing: filterExcludedWarehouseRows(payload.productMissing),
-      inventorySummaryDepartmentMissing: filterExcludedWarehouseRows(payload.departmentMissing),
+      inventorySummaryDepartmentMissing: Array.isArray(payload.departmentMissing) ? payload.departmentMissing : [],
       inventorySummaryWarehouseMissing: filterExcludedWarehouseRows(payload.warehouseMissing),
       inventorySummarySupplierMissing: filterExcludedWarehouseRows(payload.supplierMissing),
       inventorySummarySettlementMissing: filterExcludedWarehouseRows(payload.settlementMissing)

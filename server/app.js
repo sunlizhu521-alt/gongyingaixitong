@@ -55,6 +55,7 @@ import {
   findNonTaxSettlementPriceHeader,
   NON_TAX_SETTLEMENT_PRICE_HEADERS
 } from '../shared/kcfxSettlementPrice.js';
+import { canonicalKcfxWarehouseName } from '../shared/kcfxErrorWarehouseExclusions.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -2455,7 +2456,7 @@ function summarizeKcfxTrendMonth(month, record, maps) {
     const materialA = normalizeKcfxMaterialCode(kcfxNthValue(row, 1));
     const materialB = normalizeKcfxMaterialCode(kcfxNthValue(row, 2));
     const materialName = normalizeKcfxText(kcfxNthValue(row, 3));
-    const warehouse = normalizeKcfxText(kcfxNthValue(row, 4));
+    const warehouse = canonicalKcfxWarehouseName(normalizeKcfxText(kcfxNthValue(row, 4)));
     const qty = kcfxTrendToNumber(qtyAccessor(row));
     if (!qty) continue;
     const directSettlementPrice = kcfxTrendToNumber(priceAccessor(row));
@@ -2547,7 +2548,7 @@ function buildKcfxTrendDimensionMaps(records) {
   for (const row of records['dim-warehouse-material']?.rows || []) {
     const department = normalizeKcfxText(kcfxNthValue(row, 7));
     const keys = [
-      makeKcfxTrendDepartmentKey(kcfxNthValue(row, 1), kcfxNthValue(row, 2), kcfxNthValue(row, 3)),
+      makeKcfxTrendDepartmentKey(kcfxNthValue(row, 1), canonicalKcfxWarehouseName(kcfxNthValue(row, 2)), kcfxNthValue(row, 3)),
       normalizeKcfxTrendDepartmentKey(kcfxNthValue(row, 6))
     ].filter(Boolean);
     for (const key of keys) {
@@ -2558,7 +2559,7 @@ function buildKcfxTrendDimensionMaps(records) {
   const warehouseTypeByName = new Map();
   const warehouseLocationByName = new Map();
   for (const row of records['dim-warehouse']?.rows || []) {
-    const warehouseName = normalizeKcfxText(kcfxNthValue(row, 2));
+    const warehouseName = canonicalKcfxWarehouseName(normalizeKcfxText(kcfxNthValue(row, 2)));
     const warehouseType = normalizeKcfxText(kcfxNthValue(row, 7));
     const warehouseLocation = normalizeKcfxText(kcfxNthValue(row, 8));
     if (warehouseName && warehouseType && !warehouseTypeByName.has(warehouseName)) warehouseTypeByName.set(warehouseName, warehouseType);

@@ -7,6 +7,7 @@ import { latestInventoryAgeSlotId } from '../shared/kcfxAgeMonths.js';
 import { selectInventoryTrendPrice } from '../shared/kcfxTrendPrice.js';
 import { normalizeKcfxMaterialCodeRows } from '../shared/kcfxMaterialCodeText.js';
 import { findNonTaxSettlementPriceHeader } from '../shared/kcfxSettlementPrice.js';
+import { canonicalKcfxWarehouseName } from '../shared/kcfxErrorWarehouseExclusions.js';
 
 const [dataDirArg, outputPathArg] = process.argv.slice(2);
 const dataDir = path.resolve(dataDirArg || 'data');
@@ -121,7 +122,7 @@ function buildDimensionMaps(records) {
   for (const row of records['dim-warehouse-material']?.rows || []) {
     const department = normalizeText(nthValue(row, 7));
     const keys = [
-      makeDepartmentKey(nthValue(row, 1), nthValue(row, 2), nthValue(row, 3)),
+      makeDepartmentKey(nthValue(row, 1), canonicalKcfxWarehouseName(nthValue(row, 2)), nthValue(row, 3)),
       normalizeDepartmentKey(nthValue(row, 6))
     ].filter(Boolean);
     for (const key of keys) {
@@ -132,7 +133,7 @@ function buildDimensionMaps(records) {
   const warehouseTypeByName = new Map();
   const warehouseLocationByName = new Map();
   for (const row of records['dim-warehouse']?.rows || []) {
-    const warehouseName = normalizeText(nthValue(row, 2));
+    const warehouseName = canonicalKcfxWarehouseName(normalizeText(nthValue(row, 2)));
     const warehouseType = normalizeText(nthValue(row, 7));
     const warehouseLocation = normalizeText(nthValue(row, 8));
     if (warehouseName && warehouseType && !warehouseTypeByName.has(warehouseName)) warehouseTypeByName.set(warehouseName, warehouseType);
@@ -208,7 +209,7 @@ function summarizeMonth(month, record, maps) {
     const materialA = normalizeMaterialCode(nthValue(row, 1));
     const materialB = normalizeMaterialCode(nthValue(row, 2));
     const materialName = normalizeText(nthValue(row, 3));
-    const warehouse = normalizeText(nthValue(row, 4));
+    const warehouse = canonicalKcfxWarehouseName(normalizeText(nthValue(row, 4)));
     const qty = toNumber(qtyAccessor(row));
     if (!qty) continue;
     const directSettlementPrice = toNumber(priceAccessor(row));

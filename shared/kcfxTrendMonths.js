@@ -1,4 +1,4 @@
-export const KCFX_TREND_SCHEMA_VERSION = 11;
+export const KCFX_TREND_SCHEMA_VERSION = 12;
 
 export const INVENTORY_TREND_MONTHS = Array.from({ length: 12 }, (_, index) => ({
   id: `fact-${index + 3}`,
